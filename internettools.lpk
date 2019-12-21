@@ -9,12 +9,18 @@
       <SearchPaths>
         <IncludeFiles Value="data;../lazarus/dialogs;import/synapse"/>
         <OtherUnitFiles Value="data;internet;import/regexpr/source;../lazarus/dialogs;import/synapse;system;../../../components/pascal/import/flre/src;import/flre/src"/>
-        <UnitOutputDirectory Value="lib/$(TargetCPU)-$(TargetOS)"/>
+        <UnitOutputDirectory Value="$Env(TEMP)/lazarus/lib/internettools/$(TargetCPU)-$(TargetOS)"/>
       </SearchPaths>
+      <Other>
+        <CustomOptions Value="-dUSE_SOROKINS_REGEX"/>
+        <OtherDefines Count="1">
+          <Define0 Value="USE_SOROKINS_REGEX"/>
+        </OtherDefines>
+      </Other>
     </CompilerOptions>
     <Description Value="This package provides standard conformant XPath 2.0, XQuery 1.0 and XPath/XQuery 3.0 interpreters with extensions for - among others - JSONiq, pattern matching, CSS and HTML; as well as functions to perform HTTP/S requests on Windows/Linux/MacOSX/Android and an XSLT-inspired webscraping language"/>
     <License Value="GPLv3"/>
-    <Files Count="30">
+    <Files Count="26">
       <Item1>
         <Filename Value="data/bbutils.pas"/>
         <UnitName Value="bbutils"/>
@@ -119,27 +125,14 @@
         <Filename Value="internet/multipagetemplate.pas"/>
         <UnitName Value="multipagetemplate"/>
       </Item26>
-      <Item27>
-        <Filename Value="data/xquery.internals.common.pas"/>
-        <UnitName Value="xquery.internals.common"/>
-      </Item27>
-      <Item28>
-        <Filename Value="data/xquery.namespaces.pas"/>
-        <UnitName Value="xquery.namespaces"/>
-      </Item28>
-      <Item29>
-        <Filename Value="data/xquery.internals.protectionbreakers.pas"/>
-        <UnitName Value="xquery.internals.protectionbreakers"/>
-      </Item29>
-      <Item30>
-        <Filename Value="data/xquery.internals.lclexcerpt.pas"/>
-        <UnitName Value="xquery.internals.lclexcerpt"/>
-      </Item30>
     </Files>
-    <RequiredPkgs Count="1">
+    <RequiredPkgs Count="2">
       <Item1>
-        <PackageName Value="FCL"/>
+        <PackageName Value="laz_synapse"/>
       </Item1>
+      <Item2>
+        <PackageName Value="FCL"/>
+      </Item2>
     </RequiredPkgs>
     <UsageOptions>
       <UnitPath Value="$(PkgOutDir)"/>
@@ -147,5 +140,8 @@
     <PublishOptions>
       <Version Value="2"/>
     </PublishOptions>
+    <CustomOptions Items="ExternHelp" Version="2">
+      <_ExternHelp Items="Count"/>
+    </CustomOptions>
   </Package>
 </CONFIG>
