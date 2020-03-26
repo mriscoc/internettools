@@ -25,44 +25,95 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 interface
 
 uses
-  classes, contnrs, SysUtils, {$ifdef USE_FLRE}FLRE{$else}ghashmap{$endif}, bbutils;
+  classes, contnrs, SysUtils, bbutils;
 
 type
+  TXQDefaultTypeInfo = record
+    class function hash(data: pchar; datalen: SizeUInt): uint32; static;
+    class procedure keyToData(const key: string; out data: pchar; out datalen: SizeUInt); static; inline;
+    class function equalKeys(const key: string; data: pchar; datalen: SizeUInt): boolean; static; inline;
+    class procedure createDeletionKey(out key: string); static;
+  end;
+  TXQVoid = record end;
+  //Hashmap based on Bero's FLRECacheHashMap
+  generic TXQBaseHashmap<TKey, TBaseValue, TInfo> = object
+    type THashMapEntity=record
+      Key: TKey;
+      Value: TBaseValue;
+    end;
+    PHashMapEntity = ^THashMapEntity;
+    PValue = ^TBaseValue;
+  private
+    //if a cell with key = Key exists, return that cell; otherwise return empty cell at expected position
+    function findCell(keydata: pchar; keylen: SizeUInt): UInt32;
+    function findCell(const Key: TKey): UInt32;
+    procedure resize;
+  protected
+    DELETED_KEY: TKey;
+    RealSize: int32;
+    LogSize: int32;
+    Size: int32;
+    Entities:array of THashMapEntity;
+    CellToEntityIndex: array of int32;
+    function getBaseValueOrDefault(const Key:TKey):TBaseValue;
+    procedure setBaseValue(const Key:TKey;const Value:TBaseValue);
+    class function hash(const key: TKey): uint32; static;
+    function include(const Key:TKey; const Value:TBaseValue; allowOverride: boolean=true):PHashMapEntity;
+  public
+    constructor init;
+    destructor done;
+    procedure Clear;
+    function findEntity(const Key:TKey; CreateIfNotExist:boolean=false): PHashMapEntity;
+    function findEntity(data: pchar; keylen: SizeUInt): PHashMapEntity;
+    function exclude(const Key:TKey):boolean;
+    function contains(const key: TKey): boolean;
+    property values[const Key:TKey]: TBaseValue read getBaseValueOrDefault write SetBaseValue; default;
+  end;
 
-  TXQHashKeyString = {$ifdef USE_FLRE}TFLRERawByteString{$else}RawByteString{$endif};
-{$ifndef USE_FLRE}TXQHash = record
-  class function hash(const a: TXQHashKeyString; n: SizeUInt): SizeUInt; static;
-end;{$endif}
-  TXQBaseHashmapStrPointer = class({$ifdef USE_FLRE}TFLRECacheHashMap{$else}specialize THashmap<TXQHashKeyString, pointer, TXQHash>{$endif})
-  protected
-    function GetPointer(const Key: TXQHashKeyString): pointer; inline;
-    procedure SetPointer(const Key: TXQHashKeyString; const AValue: pointer); inline;
+  generic TXQHashset<TKey, TInfo> = object(specialize TXQBaseHashmap<string,TXQVoid,TInfo>)
+    procedure include(const Key:TKey; allowOverride: boolean=true);
   end;
-  generic TXQBaseHashmapStr<TValue> = class(TXQBaseHashmapStrPointer)
+  TXQHashsetStr = specialize TXQHashset<string,TXQDefaultTypeInfo>;
+  PXQHashsetStr = ^TXQHashsetStr;
+
+  TXQBaseHashmapStrPointer = specialize TXQBaseHashmap<string,pointer,TXQDefaultTypeInfo>;
+  generic TXQBaseHashmapStrPointerButNotPointer<TValue> = object(TXQBaseHashmapStrPointer)
   protected
-    function GetValue(const Key: TXQHashKeyString): TValue; inline;
+    function get(const Key: string; const def: TValue): TValue; inline;
+    function getOrDefault(const Key: string): TValue; inline;
+    function GetValue(const Key: string): TValue; inline;
   end;
-generic TXQHashmapStr<TValue> = class(specialize TXQBaseHashmapStr<TValue>)
-protected
-  procedure SetValue(const Key: TXQHashKeyString; const AValue: TValue); inline;
-public
-  procedure Add(const Key:TXQHashKeyString; const AValue:TValue); inline;
-  property Values[const Key:TXQHashKeyString]: TValue read GetValue write SetValue; default;
-end;
-generic TXQHashmapStrOwning<TValue, TOwnershipTracker> = class(specialize TXQBaseHashmapStr<TValue>)
-protected
-  procedure SetValue(const Key: TXQHashKeyString; const AValue: TValue); inline;
-public
-  destructor destroy; override;
-  //procedure Add(const Key:TXQHashKeyString; const Value:TValue); //inline;
-  property Values[const Key:TXQHashKeyString]: TValue read GetValue write SetValue; default;
-end;
-TFreeObjectOnRelease = record
-  class procedure addRef(o: TObject); static;
-  class procedure release(o: TObject); static;
-end;
-generic TXQHashmapStrOwningGenericObject<TValue> = class(specialize TXQHashmapStrOwning<TValue, TFreeObjectOnRelease>);
-TXQHashmapStrOwningObject = specialize TXQHashmapStrOwningGenericObject<TObject>;
+
+  generic TXQHashmapStr<TValue> = object(specialize TXQBaseHashmapStrPointerButNotPointer<TValue>)
+  protected
+    procedure SetValue(const Key: string; const AValue: TValue); inline;
+  public
+    procedure include(const Key: string; const Value: TValue; allowOverride: boolean=true);
+    property Values[const Key:string]: TValue read GetValue write SetValue; default;
+  end;
+  generic TXQHashmapStrOwning<TValue, TOwnershipTracker> = object(specialize TXQBaseHashmapStrPointerButNotPointer<TValue>)
+  type PXQHashmapStrOwning = ^TXQHashmapStrOwning;
+  protected
+    procedure SetValue(const Key: string; const AValue: TValue); inline;
+  public
+    procedure clear;
+    destructor done;
+    class procedure disposeAndNil(var map: PXQHashmapStrOwning);
+    procedure include(const Key: string; const aValue: TValue; allowOverride: boolean=true);
+    //procedure Add(const Key:TXQHashKeyString; const Value:TValue); //inline;
+    property Values[const Key:string]: TValue read GetValue write SetValue; default;
+  end;
+  TXQDefaultOwnershipTracker = record
+    class procedure addRef(o: TObject); static; inline;
+    class procedure release(o: TObject); static; inline;
+    class procedure addRef(const str: string); static; inline;
+    class procedure release(var str: string); static; inline;
+  end;
+  generic TXQHashmapStrOwningGenericObject<TValue> = object(specialize TXQHashmapStrOwning<TValue, TXQDefaultOwnershipTracker>)
+  end;
+  TXQHashmapStrOwningObject = specialize TXQHashmapStrOwningGenericObject<TObject>;
+  TXQHashmapStrStr = object(specialize TXQHashmapStrOwning<string, TXQDefaultOwnershipTracker>)
+  end;
 
 //** A simple refcounted object like TInterfacedObject, but faster, because it assumes you never convert it to an interface in constructor or destructor
 type TFastInterfacedObject = class(TObject, IUnknown)
@@ -111,7 +162,8 @@ public
   property Capacity: integer read fcapacity write setCapacity;
 end;
 
-type TXHTMLStrBuilder = object(TStrBuilder)
+TXMLDeclarationStandalone = (xdsOmit, xdsYes, xdsNo);
+TXHTMLStrBuilder = object(TStrBuilder)
   procedure appendHexEntity(codepoint: integer);
 
   procedure appendHTMLText(inbuffer: pchar; len: SizeInt);
@@ -120,17 +172,26 @@ type TXHTMLStrBuilder = object(TStrBuilder)
   procedure appendHTMLAttrib(const s: string);
   procedure appendHTMLElementAttribute(const name, value: string);
 
+  procedure appendXMLHeader(const version, anencoding: string; standalone: TXMLDeclarationStandalone);
   procedure appendXMLElementStartOpen(const name: string);
   procedure appendXMLElementAttribute(const name, value: string);
   procedure appendXMLElementStartClose(); inline;
   procedure appendXMLElementStartTag(const name: string); //open and close
   procedure appendXMLElementEndTag(const name: string);
+  procedure appendXMLProcessingInstruction(const name, content: string);
   procedure appendXMLEmptyElement(const name: string);
   procedure appendXMLText(const s: string);
   procedure appendXMLAttrib(const s: string);
+  procedure appendXMLCDATAStart();
+  procedure appendXMLCDATAText(p: pchar; len: sizeint);
+  procedure appendXMLCDATAText(const s: string); inline;
+  procedure appendXMLCDATAEnd();
 end;
 
 type TJSONXHTMLStrBuilder = object(TXHTMLStrBuilder)
+  standard: boolean;
+  procedure init(abuffer:pstring; basecapacity: SizeInt = 64; aencoding: TSystemCodePage = {$ifdef HAS_CPSTRING}CP_ACP{$else}CP_UTF8{$endif});
+
   procedure appendJSONEmptyObject; inline;
   procedure appendJSONObjectStart; inline;
   procedure appendJSONObjectKeyColon(const key: string); inline;
@@ -142,6 +203,8 @@ type TJSONXHTMLStrBuilder = object(TXHTMLStrBuilder)
   procedure appendJSONArrayComma; inline;
   procedure appendJSONArrayEnd; inline;
 
+  procedure appendJSONStringUnicodeEscape(codepoint: integer);
+  procedure appendJSONStringWithoutQuotes(const s: string);
   procedure appendJSONString(const s: string);
 end;
 
@@ -168,7 +231,215 @@ procedure raiseXQEvaluationException(const code, message: string); overload; nor
 type xqfloat = double;
 function xqround(const f: xqfloat): Int64;
 
+const
+  ENT_EMPTY=-1;
+  ENT_DELETED=-2;
+
+{$ifdef FPC} //hide this from pasdoc, since it cannot parse external
+  //need this in interface, otherwise calls to it are not inlined
+  Procedure fpc_AnsiStr_Incr_Ref (S : Pointer); [external name 'FPC_ANSISTR_INCR_REF'];
+  Procedure fpc_ansistr_decr_ref (Var S : Pointer); [external name 'FPC_ANSISTR_DECR_REF'];
+{$endif}
+
 implementation
+uses math;
+
+
+class procedure TXQDefaultTypeInfo.keyToData(const key: string; out data: pchar; out datalen: SizeUInt);
+begin
+  data := pointer(key);
+  datalen := length(key);
+end;
+
+class function TXQDefaultTypeInfo.equalKeys(const key: string; data: pchar; datalen: SizeUInt): boolean;
+begin
+  result := (length(key)  = datalen) and CompareMem(data, pointer(key), datalen);
+end;
+
+constructor TXQBaseHashmap.init;
+begin
+ Tinfo.createDeletionKey(DELETED_KEY);
+ RealSize:=0;
+ LogSize:=0;
+ Size:=0;
+ Entities:=nil;
+ CellToEntityIndex:=nil;
+ Resize;
+end;
+
+destructor TXQBaseHashmap.done;
+begin
+ clear;
+ inherited;
+end;
+
+procedure TXQBaseHashmap.Clear;
+begin
+ RealSize:=0;
+ LogSize:=0;
+ Size:=0;
+ SetLength(Entities,0);
+ SetLength(CellToEntityIndex,0);
+ Resize;
+end;
+
+function TXQBaseHashmap.findCell(keydata: pchar; keylen: SizeUInt): UInt32;
+var HashCode,Mask,Step:uint32;
+    Entity:int32;
+begin
+ HashCode:=TInfo.hash(keydata, keylen);
+ Mask:=(2 shl LogSize)-1;
+ Step:=((HashCode shl 1)+1) and Mask;
+ if LogSize<>0 then begin
+  result:=HashCode shr (32-LogSize);
+ end else begin
+  result:=0;
+ end;
+ repeat
+  Entity:=CellToEntityIndex[result];
+  if (Entity=ENT_EMPTY) or ((Entity<>ENT_DELETED) and (tinfo.equalKeys(Entities[Entity].Key, keydata, keylen))) then begin
+   exit;
+  end;
+  result:=(result+Step) and Mask;
+ until false;
+end;
+
+function TXQBaseHashmap.findCell(const Key: TKey): UInt32;
+var data: pchar;
+    datalen: SizeUInt;
+begin
+  TInfo.keyToData(key, data, datalen);
+  result := findCell(data, datalen);
+end;
+
+procedure TXQBaseHashmap.resize;
+var NewLogSize,NewSize,OldSize,Counter:int32;
+    OldEntities:array of THashMapEntity;
+begin
+ OldSize := Size;
+ NewLogSize:=0;
+ NewSize:=RealSize;
+ while NewSize<>0 do begin
+  NewSize:=NewSize shr 1;
+  inc(NewLogSize);
+ end;
+ if NewLogSize<1 then begin
+  NewLogSize:=1;
+ end;
+ Size:=0;
+ RealSize:=0;
+ LogSize:=NewLogSize;
+ OldEntities:=Entities;
+ Entities:=nil;
+ SetLength(Entities,2 shl LogSize);
+ SetLength(CellToEntityIndex,2 shl LogSize);
+ for Counter:=0 to length(CellToEntityIndex)-1 do begin
+  CellToEntityIndex[Counter]:=ENT_EMPTY;
+ end;
+ for Counter:=0 to OldSize-1 do
+  if pointer(OldEntities[Counter].Key) <> pointer(DELETED_KEY) then
+    include(OldEntities[Counter].Key, OldEntities[Counter].Value);
+ //remove old data (not really needed)
+ for Counter:=Size to min(OldSize - 1, high(Entities)) do begin
+   Entities[Counter].Key:=default(TKey);
+   Entities[Counter].Value:=default(TBaseValue);
+ end;
+end;
+
+function TXQBaseHashmap.include(const Key: TKey; const Value: TBaseValue; allowOverride: boolean): PHashMapEntity;
+var Entity:int32;
+    Cell:uint32;
+begin
+ result:=nil;
+ while RealSize>=(1 shl LogSize) do begin
+  Resize;
+ end;
+ Cell:=FindCell(Key);
+ Entity:=CellToEntityIndex[Cell];;
+ if Entity>=0 then begin
+  result:=@Entities[Entity];
+  if not allowOverride then exit;
+  result^.Key:=Key;
+  result^.Value:=Value;
+  exit;
+ end;
+ Entity:=Size;
+ inc(Size);
+ if Entity<(2 shl LogSize) then begin
+  CellToEntityIndex[Cell]:=Entity;
+  inc(RealSize);
+  result:=@Entities[Entity];
+  result^.Key:=Key;
+  result^.Value:=Value;
+ end;
+end;
+
+function TXQBaseHashmap.findEntity(const Key:TKey;CreateIfNotExist:boolean=false):PHashMapEntity;
+var Entity:int32;
+    Cell:uint32;
+begin
+ result:=nil;
+ Cell:=FindCell(Key);
+ Entity:=CellToEntityIndex[Cell];
+ if Entity>=0 then begin
+  result:=@Entities[Entity];
+ end else if CreateIfNotExist then begin
+  result:=include(Key,default(TBaseValue));
+ end;
+end;
+
+function TXQBaseHashmap.findEntity(data: pchar; keylen: SizeUInt): PHashMapEntity;
+var Entity:int32;
+    Cell:uint32;
+begin
+ result:=nil;
+ Cell:=FindCell(data, keylen);
+ Entity:=CellToEntityIndex[Cell];
+ if Entity>=0 then
+  result:=@Entities[Entity];
+end;
+
+function TXQBaseHashmap.exclude(const Key:TKey):boolean;
+var Entity:int32;
+    Cell:uint32;
+begin
+ result:=false;
+ Cell:=FindCell(Key);
+ Entity:=CellToEntityIndex[Cell];
+ if Entity>=0 then begin
+  Entities[Entity].Key:=DELETED_KEY;
+  Entities[Entity].Value:=default(TBaseValue);
+  CellToEntityIndex[Cell]:=ENT_DELETED;
+  result:=true;
+ end;
+end;
+
+function TXQBaseHashmap.contains(const key: TKey): boolean;
+begin
+  result := findEntity(key) <> nil;
+end;
+
+function TXQBaseHashmap.getBaseValueOrDefault(const Key: TKey): TBaseValue;
+var Entity:int32;
+    Cell:uint32;
+begin
+ Cell:=FindCell(Key);
+ Entity:=CellToEntityIndex[Cell];
+ if Entity>=0 then begin
+  result:=Entities[Entity].Value;
+ end else begin
+  result:=default(TBaseValue);
+ end;
+end;
+
+procedure TXQBaseHashmap.setBaseValue(const Key: TKey; const Value: TBaseValue);
+begin
+  include(Key,Value);
+end;
+
+
+
+
 
 function xqround(const f: xqfloat): Int64;
 var tempf: xqfloat;
@@ -176,6 +447,12 @@ begin
   tempf := f + 0.5;
   result := trunc(tempf);
   if frac(tempf) < 0 then result -= 1;
+end;
+
+procedure TJSONXHTMLStrBuilder.init(abuffer: pstring; basecapacity: SizeInt; aencoding: TSystemCodePage);
+begin
+  inherited init(abuffer, basecapacity, aencoding);
+  standard := false;
 end;
 
 procedure TJSONXHTMLStrBuilder.appendJSONEmptyObject;
@@ -224,11 +501,24 @@ begin
   append(']');
 end;
 
-procedure TJSONXHTMLStrBuilder.appendJSONString(const s: string);
+procedure TJSONXHTMLStrBuilder.appendJSONStringUnicodeEscape(codepoint: integer);
+var
+  s1, s2: word;
+begin
+  append('\u');
+  if codepoint > $FFFF then begin
+    utf16EncodeSurrogatePair(codepoint, s1, s2);
+    appendHexNumber(s1, 4);
+    append('\u');
+    codepoint := s2;
+  end;
+  appendHexNumber(codepoint, 4)
+end;
+
+procedure TJSONXHTMLStrBuilder.appendJSONStringWithoutQuotes(const s: string);
 var
   i: SizeInt;
 begin
-  append('"');
   for i:=1 to length(s) do begin
     case s[i] of
       #0..#8,#11,#12,#14..#31: begin
@@ -240,20 +530,38 @@ begin
       #13: append('\r');
       '"': append('\"');
       '\': append('\\');
+      '/': if standard then append('\/') else append('/'); //mandatory in xquery standard
       else append(s[i]);
     end;
   end;
+end;
+
+procedure TJSONXHTMLStrBuilder.appendJSONString(const s: string);
+begin
+  append('"');
+  appendJSONStringWithoutQuotes(s);
   append('"');
 end;
 
-class procedure TFreeObjectOnRelease.addRef(o: TObject);
+class procedure TXQDefaultOwnershipTracker.addRef(o: TObject);
 begin
+ ignore(o);
   //empty
 end;
 
-class procedure TFreeObjectOnRelease.release(o: TObject);
+class procedure TXQDefaultOwnershipTracker.release(o: TObject);
 begin
   o.free;
+end;
+
+class procedure TXQDefaultOwnershipTracker.addRef(const str: string);
+begin
+  fpc_ansistr_incr_ref(pointer(str));
+end;
+
+class procedure TXQDefaultOwnershipTracker.release(var str: string);
+begin
+ fpc_ansistr_decr_ref(pointer(str));
 end;
 
 
@@ -286,77 +594,84 @@ begin
   if self <> nil then _Release;
 end;
 
-
-function TXQBaseHashmapStrPointer.GetPointer(const Key: TXQHashKeyString): pointer;
+procedure TXQHashset.include(const Key: TKey; allowOverride: boolean);
 begin
-  {$ifdef USE_FLRE}
-  result := pointer(GetValue(key));
-  {$else}
-  if not GetValue(key, result) then result := nil;
-  {$endif}
+  inherited include(key, default(TXQVoid), allowOverride);
 end;
 
-procedure TXQBaseHashmapStrPointer.SetPointer(const Key: TXQHashKeyString; const AValue: pointer);
-begin
-  {$ifdef USE_FLRE}
-  Add(key, TFLRECacheHashMapData(AValue));
-  {$else}
-  insert(key, AValue);
-  {$endif}
-end;
-
-
-function TXQBaseHashmapStr.GetValue(const Key: TXQHashKeyString): TValue;
-begin
-  result := TValue(GetPointer(key));
-end;
-
-procedure TXQHashmapStr.SetValue(const Key: TXQHashKeyString; const AValue: TValue);
-begin
-  SetPointer(key, pointer(avalue));
-end;
-
-procedure TXQHashmapStr.Add(const Key: TXQHashKeyString; const AValue: TValue);
-begin
-  SetPointer(key, pointer(avalue));
-end;
-
-procedure TXQHashmapStrOwning.SetValue(const Key: TXQHashKeyString; const AValue: TValue);
+function TXQBaseHashmapStrPointerButNotPointer.get(const Key: string; const def: TValue): TValue;
 var
-  old: pointer;
+  entity: PHashMapEntity;
 begin
-  old := GetPointer(key);
-  if old = pointer(AValue) then exit;
-  if old <> nil then TOwnershipTracker.release(TValue(old));
-
-
-  assert(avalue <> nil);
-  TOwnershipTracker.addRef(avalue);
-  SetPointer(key, pointer(avalue));
-
+  entity := findEntity(key);
+  if entity = nil then result := def
+  else result := tvalue(entity^.Value);
 end;
 
-destructor TXQHashmapStrOwning.destroy;
-{$ifdef USE_FLRE}
-var i: SizeInt;
-{$else}
-var it: TIterator;
-{$endif}
+function TXQBaseHashmapStrPointerButNotPointer.getOrDefault(const Key: string): TValue;
 begin
-  {$ifdef USE_FLRE}
-  for i := 0 to high(Entities) do
-    if (Entities[i].Key <> '') or (Entities[i].Value <> nil) then
-      TOwnershipTracker.Release(TValue(pointer(Entities[i].Value)));
-  {$else}
-  if not IsEmpty then begin
-    it := Iterator;
-    repeat
-      TOwnershipTracker.Release(TValue(it.GetValue));
-    until not it.Next;
+  result := get(key, default(tvalue));
+end;
+
+function TXQBaseHashmapStrPointerButNotPointer.GetValue(const Key: string): TValue;
+begin
+  result := TValue(getBaseValueOrDefault(key));
+end;
+
+procedure TXQHashmapStr.SetValue(const Key: string; const AValue: TValue);
+begin
+  SetBaseValue(key, pointer(avalue));
+end;
+
+procedure TXQHashmapStr.include(const Key: string; const Value: TValue; allowOverride: boolean);
+begin
+  inherited include(key, pointer(value), allowOverride);
+end;
+
+
+procedure TXQHashmapStrOwning.include(const Key: string; const aValue: TValue; allowOverride: boolean=true);
+var
+  ent: PHashMapEntity;
+begin
+  ent := findEntity(key, true);
+  if ent^.Value = pointer(AValue) then exit;
+  if ent^.Value <> nil then begin
+    if not allowOverride then exit;
+    TOwnershipTracker.release(TValue(ent^.Value));
   end;
-  {$endif}
-  inherited destroy;
+  TOwnershipTracker.addRef(avalue);
+  ent^.Value:=pointer(avalue);
 end;
+
+procedure TXQHashmapStrOwning.SetValue(const Key: string; const AValue: TValue);
+begin
+  include(key, avalue, true);
+end;
+
+procedure TXQHashmapStrOwning.clear;
+var
+  i: SizeInt;
+begin
+ for i := 0 to high(Entities) do
+   if (pointer(Entities[i].Key) <> pointer(DELETED_KEY)) and ( (Entities[i].Key <> '') or (Entities[i].Value <> nil) ) then
+     TOwnershipTracker.Release(TValue(Entities[i].Value));
+  inherited;
+end;
+
+destructor TXQHashmapStrOwning.done;
+begin
+  clear;
+end;
+
+class procedure TXQHashmapStrOwning.disposeAndNil(var map: PXQHashmapStrOwning);
+begin
+   if map <> nil then begin
+     dispose(map,done);
+     map := nil;
+   end;
+end;
+
+
 
 
 
@@ -439,6 +754,17 @@ begin
   append('"');
 end;
 
+procedure TXHTMLStrBuilder.appendXMLHeader(const version, anencoding: string; standalone: TXMLDeclarationStandalone);
+begin
+  append('<?xml version="'+version+'" encoding="'+anencoding+'"');
+  case standalone of
+    xdsOmit:;
+    xdsYes: append(' standalone="yes"');
+    xdsNo: append(' standalone="no"');
+  end;
+  append('?>');
+end;
+
 procedure TXHTMLStrBuilder.appendXMLElementStartOpen(const name: string);
 begin
   append('<');
@@ -470,6 +796,17 @@ begin
   append('</');
   append(name);
   append('>');
+end;
+
+procedure TXHTMLStrBuilder.appendXMLProcessingInstruction(const name, content: string);
+begin
+  append('<?');
+  append(name);
+  if content <> '' then begin
+    append(' ');
+    append(content);
+  end;
+  append('?>');
 end;
 
 procedure TXHTMLStrBuilder.appendXMLEmptyElement(const name: string);
@@ -538,6 +875,46 @@ begin
   end;
 end;
 
+procedure TXHTMLStrBuilder.appendXMLCDATAStart();
+begin
+  append('<![CDATA[');
+end;
+
+procedure TXHTMLStrBuilder.appendXMLCDATAText(p: pchar; len: sizeint);
+var pendMinus2, marker: pchar;
+  procedure appendMarkedBlock;
+  begin
+    if p = marker then exit;
+    appendXMLCDATAStart();
+    append(marker, p - marker);
+    appendXMLCDATAEnd();
+  end;
+
+begin
+  if len = 0 then exit;
+  pendMinus2 := p + len - 2;
+  marker := p;
+  while p < pendMinus2 do begin
+    if {p+2 < pend and } (p^ = ']') and ((p + 1)^ = ']') and ((p + 2)^ = '>') then begin
+      inc(p, 2);
+      appendMarkedBlock;
+      marker := p;
+    end else inc(p);
+  end;
+  p := pendMinus2 + 2;
+  appendMarkedBlock;
+end;
+
+procedure TXHTMLStrBuilder.appendXMLCDATAText(const s: string);
+begin
+  appendXMLCDATAText(pointer(s), length(s));
+end;
+
+procedure TXHTMLStrBuilder.appendXMLCDATAEnd();
+begin
+  append(']]>');
+end;
+
 function htmlStrEscape(s: string; attrib: boolean): string;
 var
   builder: TXHTMLStrBuilder;
@@ -567,6 +944,7 @@ var
   p: Integer;
   i: Integer;
 begin
+  result := '';
   SetLength(result, length(s));
   p := 1;
   i := 1;
@@ -593,6 +971,36 @@ end;
 
 
 {$PUSH}{$RangeChecks off}{$OverflowChecks off}
+class function TXQDefaultTypeInfo.hash(data: pchar; datalen: SizeUInt): uint32;
+var
+  p, last: PByte;
+begin
+  if datalen = 0 then exit(1);
+  p := pbyte(data);
+  last := p + datalen;
+  result := 0;
+  while p < last do begin
+    result := result + p^;
+    result := result + (result shl 10);
+    result := result xor (result shr 6);
+    inc(p);
+  end;
+
+  result := result + (result shl 3);
+  result := result xor (result shr 11);
+  result := result + (result shl 15);
+end;
+
+class procedure TXQDefaultTypeInfo.createDeletionKey(out key: string);
+begin
+  key := #0'DELETED';
+end;
+
+class function TXQBaseHashmap.hash(const key: TKey): uint32;
+begin
+  result := TInfo.hash(pointer(key), length(key));
+end;
+
 function nodeNameHash(const s: RawByteString): cardinal;
 var
   p, last: PByte;
@@ -623,12 +1031,6 @@ begin
   for i := 1 to length(s) do if s[i] >= #128 then exit(0);
   result := nodeNameHash(s);
 end;
-{$ifndef USE_FLRE}
-class function TXQHash.hash(const a: TXQHashKeyString; n: SizeUInt): SizeUInt;
-begin
-  result := nodeNameHash(a) and (n-1);
-end;
-{$endif}
 
 {$POP}
 

@@ -121,6 +121,7 @@ end;
 TResult = class
   assertions: TList;
   constructor create(e: TTreeNode);
+  function hasSerializationAssertion: boolean;
   function check(errorCode: string=''): TTestCaseResult;
   function expectError: boolean;
 end;
@@ -323,6 +324,22 @@ begin
   end;
 end;
 
+function trimLines(const s: string): string;
+var
+  leadingSpace, i: Integer;
+  lines: bbutils.TStringArray;
+begin
+  result := s;
+  while (result <> '') and (result[1] in [#10,#13]) do delete(result, 1, 1);
+  if strBeginsWith(result, ' ') then begin
+    lines := strSplit(result, #10);
+    leadingSpace := 0;
+    while (leadingSpace < length(lines[0])) and (lines[0][leadingSpace + 1] in [#9, ' ']) do inc(leadingSpace);
+    for i := 0 to high(lines) do Delete(lines[i], 1, leadingSpace);
+    result := strJoin(lines, #10);
+  end;
+end;
+
 constructor TResource.create(n: TTreeNode);
 begin
   filename := strResolveURI(n['file'], n.getDocument().baseURI);
@@ -342,7 +359,13 @@ begin
 
   writeln('<!doctype html><html><head><title>XQuery Test Suite Evaluation</title>');
   writeln('<link rel="stylesheet" type="text/css" href="xqts.css">');
-  writeln('<style>.restable tr {background-color: #AAFFAA} .restable tr.S {background-color: white;}</style>');
+  writeln('<style>.restable tr {background-color: #AAFFAA} .restable tr.S {background-color: white;}');
+  writeln('table.testcases td { vertical-align: top }');
+  writeln('table.testcases td:nth-child(2) {font-weight: bold }');
+  writeln('table.testcases td:nth-child(3) {white-space: pre-wrap; font-family: monospace }');
+  writeln('table.testcases td:nth-child(4) {white-space: pre-wrap; font-family: monospace }');
+  writeln('table.testcases td:nth-child(5) {white-space: pre-wrap; font-family: monospace }');
+  writeln('</style>');
   writeln('</head><body>');
 
   writeln('<h1>XQuery/XPath Test Suite Evaluation</h1>');
@@ -393,17 +416,17 @@ begin
   if not logAllTestCases then begin
     if not testCasesToLog[resultValue.result] then exit;
   end;
-  if bufferTestSet.count = 0 then bufferTestSet.add('<table><tr><th>Testname</th><th>Status</th><th>Got</th><th>Expected</th>'+ifthen(printInputs,'<th>Test Input</th>','')+'</tr>');
+  if bufferTestSet.count = 0 then bufferTestSet.add('<table class="testcases"><tr><th>Testname</th><th>Status</th><th>Got</th><th>Expected</th>'+ifthen(printInputs,'<th>Test Input</th>','')+'</tr>');
   n := '<td>'+tc.name+'</td>';
   case resultValue.result of
     tcrPass: bufferTestSet.add('<tr class="passed" >'+n+'<td colspan="4">passed</td>');
     tcrFail: begin
-      bufferTestSet.add('<tr class="failed">'+n+'<td>FAILED</td><td>'+htmlStrEscape(got)+'</td><td>'+htmlStrEscape(tc.expectedPrettier)+'</td>');
-      if printInputs then bufferTestSet.add('<td>'+htmlStrEscape(TTest(tc.tests[0]).test)+'</td>');
+      bufferTestSet.add('<tr class="failed">'+n+'<td>FAILED</td><td>'+trimLines(htmlStrEscape(got))+'</td><td>'+htmlStrEscape(tc.expectedPrettier)+'</td>');
+      if printInputs then bufferTestSet.add('<td>'+trimLines(htmlStrEscape(TTest(tc.tests[0]).test))+'</td>');
     end;
     tcrWrongError: begin
-      bufferTestSet.add('<tr class="wrongError">'+n+'<td>wrong error</td><td>'+htmlStrEscape(got)+'</td><td>'+htmlStrEscape(tc.expectedPrettier)+'</td>');
-      if printInputs then bufferTestSet.add('<td>'+htmlStrEscape(TTest(tc.tests[0]).test)+'</td>');
+      bufferTestSet.add('<tr class="wrongError">'+n+'<td>wrong error</td><td>'+trimLines(htmlStrEscape(got))+'</td><td>'+htmlStrEscape(tc.expectedPrettier)+'</td>');
+      if printInputs then bufferTestSet.add('<td>'+trimLines(htmlStrEscape(TTest(tc.tests[0]).test))+'</td>');
     end;
     tcrNA: bufferTestSet.add('<tr class="correctNA" >'+n+'<td colspan="4">n/a</td>');
     tcrDisputed: bufferTestSet.add('<tr class="correctIgnored" >'+n+'<td colspan="4">disputed</td>');
@@ -597,13 +620,13 @@ begin
     tcrPass: writeln('passed'); //todo
     tcrFail: begin
       writeln('FAILED');
-      writeln('      got: '+got+ ' expected: '+tc.expectedPrettier);
-      if printInputs then writeln('      Input: ', TTest(tc.tests[0]).test);
+      writeln(' got: '+got+ LineEnding+' expected: '+tc.expectedPrettier);
+      if printInputs then writeln(' Input: ', TTest(tc.tests[0]).test);
     end;
     tcrWrongError: begin
       writeln('wrong error');
-      writeln('      got: '+got+ ' expected: '+tc.expectedPrettier);
-      if printInputs then writeln('      Input: ', TTest(tc.tests[0]).test);
+      writeln(' got: '+got+ LineEnding+' expected: '+tc.expectedPrettier);
+      if printInputs then writeln(' Input: ', TTest(tc.tests[0]).test);
     end;
     tcrNA: writeln('na');
     tcrDisputed: writeln('disputed');
@@ -877,7 +900,7 @@ begin
   case kind of
     aakAssert: result := OK[xq.evaluate(value, ASSERTION_PARSING_MODEL).toBoolean];
     aakEq: try
-      result := OK[xq.StaticContext.compareAtomic (res, xq.parseQuery(value, config.version).evaluate(),  nil) = 0];
+      result := OK[xq.StaticContext.compareAtomic (res, xq.parseQuery(value, xqpmXPath3_1).evaluate(),  nil) = 0];
     except
       on e: EXQEvaluationException do
         if e.errorCode = 'XPTY0004' then result := OK[false]
@@ -890,9 +913,10 @@ begin
     aakPermutation: result := OK[deepEqual(normalize(res), normalize(xq.parseQuery(value, config.version).evaluate()))];
     aakSerializationMatches: begin
       result := tcrFail;
-      node := res.toNode;
-      if node <> nil then str := node.outerXML()
-      else str := xmlStrEscape(res.toString);
+      case res.kind of
+        pvkNode: str := res.toNode.outerXML();
+        else str := res.toString;
+      end;
       regex := wregexprParse(value, regexflags);
       try
         result := OK[wregexprMatches(regex, str)]
@@ -917,11 +941,10 @@ begin
       end;
       result := OK[str = value];
     end;
-    aakError:
+    aakError, aakSerializationError:
       if errorCode = '' then result := tcrFail
       else if (errorCode = value) or (value = '*') then result := tcrPass
       else result := tcrWrongError;
-    aakSerializationError: result := tcrFail; //  raise exception.Create('assert serialization-error not supported ');
   end;
 end;
 
@@ -953,6 +976,16 @@ begin
   loadAsserts(assertions, e);
 end;
 
+function TResult.hasSerializationAssertion: boolean;
+var
+  i: Integer;
+begin
+  for i := 0 to assertions.Count - 1 do
+    if (tassertion(assertions[i]) is TAssertionAssert) and (TAssertionAssert(assertions[i]).kind in [aakSerializationError, aakSerializationMatches]) then
+      exit(true);
+  exit(false);
+end;
+
 function TResult.check(errorCode: string=''): TTestCaseResult;
 begin
   if assertions.Count <> 1 then
@@ -978,10 +1011,12 @@ end;
 
 { TTestCase }
 
+
 function TTestCase.expectedPrettier: string;
 begin
   result := expected;
   if strContains(result, '&lt;') then result := strDecodeHTMLEntities(result,CP_UTF8) + ' <!--unescaped--> ';
+  result := trimLines(result);
 end;
 
 constructor TTestCase.create(e: TTreeNode);
@@ -1073,10 +1108,16 @@ begin
         xq.parseQuery(strLoadFromFile(TModule(modules[i]).fn), config.version);}
   if tests.Count <> 1 then raise Exception.Create('invalid test count');
   try
+    if Results.Count <> 1 then raise Exception.Create('invalid result count');
+    if tresult(results[0]).hasSerializationAssertion and not TTest(tests[0]).test.Contains('http://www.w3.org/2010/xslt-xquery-serialization') then
+      with TTest(tests[0]) do begin
+        test := 'declare namespace xxxxoutput = "http://www.w3.org/2010/xslt-xquery-serialization";'
+                + 'declare option xxxxoutput:method "xml";'
+                + test;
+      end;
     result.value := xq.parseQuery(TTest(tests[0]).test, config.version).evaluate(contexttree);
     xq.VariableChangelog.add('result', result.value);
     //todo:. modules,
-    if Results.Count <> 1 then raise Exception.Create('invalid result count');
   except
     on e: EXQException do begin
       result.error := e.errorCode +': '+e.Message;
@@ -1088,7 +1129,7 @@ begin
     end;
   end;
   if result.error = '' then
-    result.result := TResult(results[0]).check;    ;
+    result.result := TResult(results[0]).check;
 end;
 
 procedure TTestCase.importModule(sender: TObject; context: TXQStaticContext; const namespace: string; const at: array of string);
@@ -1193,7 +1234,7 @@ begin
 
   put('feature', 'moduleImport', true);
 
-  put('feature', 'serialization', false);
+  put('feature', 'serialization', true);
   put('feature', 'higherOrderFunctions', true);
   put('feature', 'typedData', false);
   put('feature', 'schemaValidation', false);
@@ -1766,7 +1807,7 @@ begin
 
   testsets := TList.Create;
   environments := TStringList.Create;
-  treeCache := TXQHashmapStrOwningTreeDocument.Create;
+  treeCache.init();
 
   clr := TCommandLineReader.create;
   clr.declareString('mode', 'Query mode (xquery1, xquery3, xpath2, xpath3)', 'xquery1');
@@ -1884,7 +1925,7 @@ begin
   end;}
   logger.endXQTS(totalResults);
 
-  treeCache.Free
+  treeCache.done
 end.
 
 

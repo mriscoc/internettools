@@ -71,7 +71,8 @@ type
       property current: TElement read first;
     end;
   public
-    data, dataend: pelement;
+    data: pelement; //first element
+    dataend: pelement; //after last element
     function length: SizeInt;
     function isEmpty: boolean; inline;
     function isInBounds(target: PElement): boolean; inline;
@@ -98,6 +99,9 @@ type
   end;
 
   TCharArrayView = object(specialize TArrayView<char>)
+  private
+    function moveToFound(target: pchar): boolean; inline;
+  public
     procedure init(const buffer: string);
     function ToString: string;
 
@@ -107,6 +111,11 @@ type
 
     function moveToFind(const s: string): boolean;
     function moveAfterFind(const s: string): boolean;
+
+    //finds #13 or #10  (implicit #13#10)
+    function findLineBreak: pchar;
+    function moveToLineBreak: boolean;
+    function moveAfterLineBreak: boolean;
 
     function cutBeforeFind(const s: string): boolean;
     function cutAfterFind(const s: string): boolean;
@@ -122,6 +131,9 @@ type
 
   TBB2StringHelper = type helper (TBBStringHelper) for ansistring
     function unsafeView: TStringView;
+  end;
+  TBBPcharHelper = type helper for pchar
+    function nilToLast: pchar;
   end;
 
   TCriticalSectionHelper = record helper for TRTLCriticalSection
@@ -142,6 +154,7 @@ function objInheritsFrom(o: TObject; c: TClass): boolean;
 begin
   result := assigned(o) and o.InheritsFrom(c);
 end;
+
 
 
 
@@ -304,6 +317,11 @@ end;
 
 
 
+function TCharArrayView.moveToFound(target: pchar): boolean;
+begin
+  result := target <> nil;
+  if result then data := target;
+end;
 
 procedure TCharArrayView.init(const buffer: string);
 begin
@@ -346,13 +364,8 @@ end;
 
 
 function TCharArrayView.moveToFind(const s: string): boolean;
-var
-  target: PChar;
 begin
-  target := find(s);
-  result := target <> nil;
-  if result then
-    data := target;
+  result := moveToFound(find(s));
 end;
 
 function TCharArrayView.moveAfterFind(const s: string): boolean;
@@ -363,6 +376,35 @@ begin
   result := target <> nil;
   if result then
     data := target + system.length(s);
+end;
+
+
+function TCharArrayView.findLineBreak: pchar;
+begin
+  result := data;
+  while result < dataend do begin
+    if result^ in [#10,#13] then exit;
+    inc(result);
+  end;
+  result := nil;
+end;
+
+function TCharArrayView.moveToLineBreak: boolean;
+begin
+  result := moveToFound(findLineBreak);
+end;
+
+function TCharArrayView.moveAfterLineBreak: boolean;
+var
+  target: PChar;
+begin
+  target := findLineBreak();
+  result := target <> nil;
+  if result then begin
+    if (target^ = #13) and ((target + 1)^ = #10) then inc(target, 2)
+    else inc(target);
+    data := target;
+  end;
 end;
 
 function TCharArrayView.cutBeforeFind(const s: string): boolean;
@@ -409,6 +451,13 @@ function TBB2StringHelper.unsafeView: TStringView;
 begin
   result.init(self);
 end;
+
+function TBBPcharHelper.nilToLast: pchar;
+begin
+  if self = nil then result := pchar(high(PtrUInt))
+  else result := self;
+end;
+
 
 procedure TCriticalSectionHelper.init;
 begin

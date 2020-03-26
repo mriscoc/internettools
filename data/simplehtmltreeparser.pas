@@ -373,9 +373,9 @@ private
   function findNamespace(const prefix: string): TNamespace;
 
   function htmlTagWeight(s:string): integer;
-  class function htmlElementChildless(const s:string): boolean; static;
-  class function htmlElementIsCDATA(const s: string): boolean; static;
   class function htmlElementClosesPTag(const s: string): boolean; static;
+public
+  class function htmlElementIsChildless(const s:string): boolean; static;
 public
   treeNodeClass: TTreeNodeClass; //**< Class of the tree nodes. You can subclass TTreeNode if you need to store additional data at every node
   globalNamespaces: TNamespaceList;
@@ -454,6 +454,9 @@ type HTMLNodeNameHashs = object
   const track = $AB8D6A26;
   const title = $FE8D4719;
 end;
+
+type TSerializationCallback = function (node: TTreeNode; includeSelf, insertLineBreaks, html: boolean): string;
+var GlobalNodeSerializationCallback: TSerializationCallback;
 
 implementation
 uses xquery, xquery.internals.common;
@@ -1723,142 +1726,18 @@ begin
   result := false;
 end;
 
-function serializationWrapper(base: TTreeNode; nodeSelf: boolean; insertLineBreaks, html: boolean): RawByteString;
-var builder: TXHTMLStrBuilder;
-var known: TNamespaceList;
-  encoding: TSystemCodePage;
-  function requireNamespace(n: TNamespace): string;
-  begin //that function is useless the namespace should always be in known. But just for safety...
-    if (n = nil) or (n.getURL = XMLNamespaceUrl_XML) or (n.getURL = XMLNamespaceUrl_XMLNS) or (known.hasNamespace(n)) then exit('');
-    known.add(n);
-    result := ' ' + n.serialize;
-  end;
-
-  procedure inner(n: TTreeNode); forward;
-
-  procedure outer(n: TTreeNode);
-  var attrib: TTreeAttribute;
-      oldnamespacecount: integer;
-      i: Integer;
-      temp: TNamespace;
-  begin
-    with n do with builder do
-    case typ of
-      tetText:
-        if not html then append(xmlStrEscape(value))
-        else if (getParent() <> nil) and TTreeParser.htmlElementIsCDATA(getParent().value) then append(value)
-        else appendHTMLText(value);
-      tetClose:  begin;
-        append('</');
-        append(getNodeName());
-        append('>');
-      end;
-      tetComment: begin
-        append('<!--');
-        append(value);
-        append('-->');
-      end;
-      tetProcessingInstruction: begin
-        append('<?'+value);
-        if attributes <> nil then append(' '+getAttribute(''));
-        append('?>');
-      end;
-      tetOpen: begin
-        oldnamespacecount:=known.Count;
-        append('<');
-        append(getNodeName());
-
-        {
-        writeln(stderr,'--');
-         if attributes <> nil then
-          for attrib in attributes do
-            if attrib.isNamespaceNode then
-             writeln(stderr, value+': '+attrib.toNamespace.serialize);
-        }
-        if oldnamespacecount = 0 then n.getAllNamespaces(known)
-        else n.getOwnNamespaces(known);
-        for i:=oldnamespacecount to known.Count - 1 do
-          if (known.items[i].getURL <> '') or
-             (known.hasNamespacePrefixBefore(known.items[i].getPrefix, oldnamespacecount)
-                and (isNamespaceUsed(known.items[i])
-                     or ((known.items[i].getPrefix = '') and (isNamespaceUsed(nil))))) then begin
-                       append(' ');
-                       append(known.items[i].serialize);
-                     end;
-
-        if namespace <> nil then append(requireNamespace(namespace))
-        else if known.hasNamespacePrefix('', temp) then
-          if temp.getURL <> '' then begin
-            known.add(TNamespace.Make('', ''));
-            append(' xmlns=""');
-          end;
-        if attributes <> nil then
-          for attrib in getEnumeratorAttributes do
-            append(requireNamespace(attrib.namespace));
-
-
-        if attributes <> nil then
-          for attrib in getEnumeratorAttributes do
-            if not attrib.isNamespaceNode then begin
-              if html then appendHTMLElementAttribute(attrib.getNodeName(), attrib.realvalue)
-              else appendXMLElementAttribute(attrib.getNodeName(), attrib.realvalue);
-            end;
-
-        if (n.next = reverse) and (not html or (TTreeParser.htmlElementChildless(value))) then begin
-          if html then append('>')
-          else append('/>');
-          if insertLineBreaks then append(LineEnding);
-          while known.count > oldnamespacecount do
-            known.Delete(known.count-1);
-          exit();
-        end;
-        append('>');
-        if insertLineBreaks then append(LineEnding);
-        inner(n);
-        append('</'); append(n.getNodeName()); append('>');
-        if insertLineBreaks then append(LineEnding);
-        while known.count > oldnamespacecount do
-          known.Delete(known.count-1);
-      end;
-      tetDocument: inner(n);
-      else; //should not happen
-    end;
-  end;
-
-  procedure inner(n: TTreeNode);
-  var sub: TTreeNode;
-  begin
-    if not (n.typ in TreeNodesWithChildren) then exit;
-    sub := n.next;
-    while sub <> n.reverse do begin
-      outer(sub);
-      if not (sub.typ in TreeNodesWithChildren) then sub:=sub.next
-      else if sub.reverse = nil then raise ETreeParseException.Create('Failed to serialize, no closing tag for '+sub.value)
-      else sub := sub.reverse.next;
-    end;
-  end;
-begin
-  builder.init(@result);
-  known := TNamespaceList.Create;
-  encoding := CP_NONE;
-  if base.root.typ = tetDocument then encoding := base.getDocument().FEncoding;
-  if nodeSelf then outer(base)
-  else inner(base);
-  known.free;
-  builder.final;
-end;
 
 function TTreeNode.serializeXML(nodeSelf: boolean; insertLineBreaks: boolean): string;
 
 begin
   if self = nil then exit('');
-  result := serializationWrapper(self, nodeSelf, insertLineBreaks, false);
+  result := GlobalNodeSerializationCallback(self, nodeSelf, insertLineBreaks, false);
 end;
 
 function TTreeNode.serializeHTML(nodeSelf: boolean; insertLineBreaks: boolean): string;
 begin
   if self = nil then exit('');
-  result := serializationWrapper(self, nodeSelf, insertLineBreaks, true);
+  result := GlobalNodeSerializationCallback(self, nodeSelf, insertLineBreaks, true);
 end;
 
 
@@ -2379,7 +2258,7 @@ begin
       bpmInBody: if repairMissingStartTags and (striEqual(tag, 'body') or striEqual(tag, 'html') or striEqual(tag, 'head')) then exit; //skip
       bpmInFrameset: if repairMissingStartTags and (striEqual(tag, 'frameset') or striEqual(tag, 'html') or striEqual(tag, 'head')) then exit; //skip
     end;
-    FAutoCloseTag:=htmlElementChildless(tag);
+    FAutoCloseTag:=htmlElementIsChildless(tag);
     if striEqual(tag, 'table') and (FElementStack.Count > 0) and striEqual(TTreeNode(FElementStack.Last).value, 'table') then
       leaveTag(tagName, tagNameLen);
   end;
@@ -2509,7 +2388,7 @@ begin
     end;
 
     name := strFromPchar(tagName, tagNameLen);
-    if (FParsingModel = pmHTML) and htmlElementChildless(name) then begin
+    if (FParsingModel = pmHTML) and htmlElementIsChildless(name) then begin
       parenDelta := 0;
       last := FCurrentElement;
       weight := htmlTagWeight(strFromPchar(tagName, tagNameLen));
@@ -2686,25 +2565,31 @@ begin
   if striequal(s, '') then exit(100); //force closing of root element
 end;
 
-class function TTreeParser.htmlElementChildless(const s: string): boolean;
+class function TTreeParser.htmlElementIsChildless(const s: string): boolean;
 begin
   //elements that should/must not have children
   //area, base, basefont, bgsound, br, col, command, embed, frame, hr, img, input, keygen, link, meta, param, source, track or wbr
-  //Regex ([a-z]+),  => striequal(s,'\1') or
   if s = '' then exit(false);
-  result:=striequal(s,'area') or striequal(s,'base') or striequal(s,'basefont') or striequal(s,'bgsound') or striequal(s,'br') or striequal(s,'col')
-          or striequal(s,'command') or striequal(s,'embed') or striequal(s,'frame') or striequal(s,'hr') or striequal(s,'img') or striequal(s,'input')
-          or striequal(s,'keygen') or striequal(s,'link') or striequal(s,'meta') or striequal(s,'param') or striequal(s,'source') or striequal(s,'track')
-          or striequal(s,'wbr');
-
+  case s[1] of
+    'a', 'A': result := striequal(s,'area');
+    'b', 'B': result := striequal(s,'base') or striequal(s,'basefont') or striequal(s,'bgsound') or striequal(s,'br') ;
+    'c', 'C': result := striequal(s,'col') or striequal(s,'command');
+    'e', 'E': result := striequal(s,'embed');
+    'f', 'F': result := striequal(s,'frame');
+    'h', 'H': result := striequal(s,'hr') ;
+    'i', 'I': result := striequal(s,'img') or striequal(s,'input') or striequal(s,'isindex');
+    'k', 'K': result := striequal(s,'keygen') ;
+    'l', 'L': result := striequal(s,'link') ;
+    'm', 'M': result := striequal(s,'meta') ;
+    'p', 'P': result := striequal(s,'param') ;
+    's', 'S': result := striequal(s,'source') ;
+    't', 'T': result := striequal(s,'track');
+    'w', 'W': result := striequal(s,'wbr');
+    else result := false;
+  end;
   //elements listed above, not being void are probably (??) deprecated?
   //void elements: area, base, br, col, command, embed, hr, img, input, keygen, link, meta, param, source, track, wbr
 
-end;
-
-class function TTreeParser.htmlElementIsCDATA(const s: string): boolean;
-begin
-  result := simplehtmlparser.htmlElementIsCDATA(pchar(s), length(s));
 end;
 
 class function TTreeParser.htmlElementClosesPTag(const s: string): boolean;
@@ -2961,11 +2846,12 @@ end;
 
 
 function guessFormat(const data, uri, contenttype: string): TInternetToolsFormat;
+//see http://mimesniff.spec.whatwg.org/
 var
   tdata: PChar;
   tdatalength: SizeInt;
-  function checkRawDataForHtml: boolean; //following http://mimesniff.spec.whatwg.org/ (except allowing #9 as TT ) todo: what is with utf-16?
-  var tocheck: array[1..16] of string = ('<!DOCTYPE HTML', '<HTML', '<HEAD', '<SCRIPT', '<IFRAME', '<H1', '<DIV', '<FONT', '<TABLE', '<A', '<STYLE', '<TITLE', '<B', '<BODY', '<BR', '<P');
+  function checkRawDataForHtml: boolean;
+  var tocheck: array[1..16] of string = ('<!DOCTYPE HTML', '<HTML', '<HEAD', '<TITLE', '<BODY', '<SCRIPT', '<IFRAME', '<H1', '<DIV', '<FONT', '<TABLE', '<A', '<STYLE', '<B', '<BR', '<P');
     i: Integer;
   begin
     for i := low(tocheck) to high(tocheck) do
@@ -2977,23 +2863,47 @@ var
   end;
 
 begin
+  if contenttype.beginsWithI('text/xml') or contenttype.beginsWithI('application/xml') then
+    exit(itfXML);
+  if contenttype.beginsWithI('text/html') then
+    exit(itfHTML);
+  if contenttype.beginsWithI('text/json') or contenttype.beginsWithI('application/json') then
+    exit(itfJSON);
+
+  if contenttype.containsI('html') then
+    exit(itfHTML);
+  if contenttype.containsI('xml') then
+    exit(itfXML);
+  if contenttype.containsI('json') then
+    exit(itfJSON);
+
+  if uri.endsWithI('.html') or uri.endsWithI('.htm') then
+    exit(itfHTML);
+  if uri.endsWithI('.xml') then
+    exit(itfXML);
+  if uri.endsWithI('.json') then
+    exit(itfJSON);
+
+
   tdata := pchar(data);
   tdatalength := length(data);
   strlTrim(tdata, tdatalength);
-  if striEndsWith(uri, 'html') or striEndsWith(uri, 'htm')
-     or striContains(contenttype, 'html')
-     or checkRawDataForHtml() then
-      Result := itfHTML
-    else if strBeginsWith(tdata, '<?xml') //mimesniff.spec says to check for this
-            or striContains(contenttype, 'xml') then
-      result := itfXML
-    else if striEndsWith(uri, '.json')
-         or striContains(contentType, 'json')
-         or strBeginsWith(tdata, '{')
-         or strBeginsWith(tdata, '[') then
-      result := itfJSON
-    else
-      result := itfXML;
+
+  if strBeginsWith(tdata, '<?xml') then
+    exit(itfXML);
+  if checkRawDataForHtml() then
+    exit(itfHTML);
+  if strBeginsWith(tdata, '{') or strBeginsWith(tdata, '[') then
+    exit(itfJSON);
+
+  if striBeginsWith(tdata, '<!doctype') then begin
+    tdata += 9;
+    tdatalength -= 9;
+    strlTrim(tdata, tdatalength);
+    if striBeginsWith(tdata, 'html') then exit(itfHTML);
+  end;
+
+  result := itfXML;
 end;
 
 function strEncodingFromContentType(const contenttype: string): TSystemCodePage;
