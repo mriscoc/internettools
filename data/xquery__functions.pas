@@ -39,9 +39,9 @@ procedure finalizeFunctions;
 
 implementation
 
-uses xquery, xquery.internals.protectionbreakers, xquery.internals.common, xquery.namespaces, bigdecimalmath, math,
-  simplehtmltreeparser, simplehtmlparser,
-  bbutils, internetaccess, strutils, base64, xquery__regex, bbutilsbeta, xquery.internals.rng,
+uses xquery, xquery.internals.protectionbreakers, xquery.internals.common, xquery.internals.floathelpers, xquery.internals.collations, xquery.namespaces, bigdecimalmath, math,
+  simplehtmltreeparser, simplehtmlparser, htmlInformation,
+  bbutils, internetaccess, strutils, base64, xquery__regex, bbutilsbeta, xquery.internals.rng, xquery__serialization,
 
   {$IFDEF USE_BBFLRE_UNICODE}PUCU,bbnormalizeunicode{$ENDIF} //get FLRE from https://github.com/BeRo1985/flre or https://github.com/benibela/flre/
   {$IFDEF USE_BBFULL_UNICODE}bbunicodeinfo{$ENDIF}
@@ -102,6 +102,30 @@ const NonNumericKind = [pvkUndefined, pvkBoolean, pvkQName, pvkObject, pvkArray,
 
 //================================Operators=====================================
 
+function arrayAsList(const a: IXQValue): TXQVList;
+begin
+  result := (a as TXQValueJSONArray).seq;
+end;
+
+function arrayHeadOrEmpty(const a: IXQValue): IXQValue;
+var
+  l: TXQVList;
+begin
+  l := arrayAsList(a);
+  if l.Count = 0 then result := xqvalue
+  else result := l[0];
+end;
+
+function binaryOperatorOnUnwrappedArrays(op: TXQBinaryOp; const cxt: TXQEvaluationContext; const aa, ab: IXQValue): IXQValue;
+var
+  a, b: IXQValue;
+begin
+  if aa.kind = pvkArray then a := arrayHeadOrEmpty(aa)
+  else a := aa;
+  if ab.kind = pvkArray then b := arrayHeadOrEmpty(ab)
+  else b := ab;
+  result := op(cxt, a, b);
+end;
 
 function xqvalueUnaryMinus(const cxt: TXQEvaluationContext; const nothing, arg: IXQValue): IXQValue;
 var
@@ -123,6 +147,7 @@ begin
     pvkFloat: result := TXQValueFloat.create((arg.typeAnnotation as TXSSimpleType).primitive, - arg.toFloat);
     pvkUndefined: result := xqvalue();
     pvkSequence: result := xqvalueUnaryMinus(cxt, nothing, arg.get(1));
+    pvkArray: result := xqvalueUnaryMinus(cxt, nothing, arrayHeadOrEmpty(arg));
     else result := TXQValueFloat.create(- arg.toFloat);
   end;
 end;
@@ -136,6 +161,7 @@ begin
     pvkFloat: result := TXQValueFloat.create(arg.typeAnnotation, arg.toFloat);
     pvkUndefined: result := xqvalue();
     pvkSequence: result := xqvalueUnaryPlus(cxt, nothing, arg.get(1));
+    pvkArray: result := xqvalueUnaryPlus(cxt, nothing, arrayHeadOrEmpty(arg));
     else result := TXQValueFloat.create(arg.toFloat);
   end;
 end;
@@ -170,9 +196,13 @@ begin
   if (ak in [pvkInt64, pvkBigDecimal]) and (bk in [pvkInt64, pvkBigDecimal]) then
     exit(xqvalueAddDecimals(a,b));
 
-  if (ak = pvkNull) or (bk = pvkNull) then
-    raise EXQEvaluationException.create('err:XPTY0004', 'json null is not allowed in arithmetic expressions');
-  if (ak in NonNumericKind) or (bk in NonNumericKind) then exit(xqvalue());
+  if (ak in NonNumericKind) or (bk in NonNumericKind) then begin
+    if (ak = pvkArray) or (bk = pvkArray) then
+      exit(binaryOperatorOnUnwrappedArrays(@xquery__functions.xqvalueAdd, cxt, a, b));
+    if (ak = pvkNull) or (bk = pvkNull) then
+      raise EXQEvaluationException.create('err:XPTY0004', 'json null is not allowed in arithmetic expressions');
+    exit(xqvalue());
+  end;
 
   if (ak = pvkDateTime) or (bk = pvkDateTime) then begin
     if (ak <> pvkDateTime) or (bk <> pvkDateTime) or
@@ -251,9 +281,13 @@ begin
   if (ak in [pvkInt64, pvkBigDecimal]) and (bk in [pvkInt64, pvkBigDecimal]) then
     exit(xqvalueSubtractDecimals(a,b));
 
-  if (ak = pvkNull) or (bk = pvkNull) then
-    raise EXQEvaluationException.create('err:XPTY0004', 'json null is not allowed in arithmetic expressions');
-  if (ak in NonNumericKind) or (bk in NonNumericKind) then exit(xqvalue());
+  if (ak in NonNumericKind) or (bk in NonNumericKind) then begin
+    if (ak = pvkArray) or (bk = pvkArray) then
+      exit(binaryOperatorOnUnwrappedArrays(@xquery__functions.xqvalueSubtract, cxt, a, b));
+    if (ak = pvkNull) or (bk = pvkNull) then
+      raise EXQEvaluationException.create('err:XPTY0004', 'json null is not allowed in arithmetic expressions');
+    exit(xqvalue());
+  end;
 
   if (ak = pvkDateTime) or (bk = pvkDateTime) then begin
     if (ak <> pvkDateTime) or (bk <> pvkDateTime) then exit(xqvalue);
@@ -341,9 +375,13 @@ begin
   if (ak in [pvkInt64, pvkBigDecimal]) and (bk in [pvkInt64, pvkBigDecimal]) then
     exit(xqvalueMultiplyDecimals(a,b));
 
-  if (ak = pvkNull) or (bk = pvkNull) then
-    raise EXQEvaluationException.create('err:XPTY0004', 'json null is not allowed in arithmetic expressions');
-  if (ak in NonNumericKind) or (bk in NonNumericKind) then exit(xqvalue());
+  if (ak in NonNumericKind) or (bk in NonNumericKind) then begin
+    if (ak = pvkArray) or (bk = pvkArray) then
+      exit(binaryOperatorOnUnwrappedArrays(@xquery__functions.xqvalueMultiply, cxt, a, b));
+    if (ak = pvkNull) or (bk = pvkNull) then
+      raise EXQEvaluationException.create('err:XPTY0004', 'json null is not allowed in arithmetic expressions');
+    exit(xqvalue());
+  end;
 
   if (ak = pvkDateTime) or (bk = pvkDateTime) then begin
     if ((ak = pvkDateTime) and (bk = pvkDateTime)) then exit(xqvalue);
@@ -400,9 +438,13 @@ begin
     end else raiseDivisionBy0NotAllowed;
   end;
 
-  if (ak = pvkNull) or (bk = pvkNull) then
-    raise EXQEvaluationException.create('err:XPTY0004', 'json null is not allowed in arithmetic expressions');
-  if (ak in NonNumericKind) or (bk in NonNumericKind) then exit(xqvalue());
+  if (ak in NonNumericKind) or (bk in NonNumericKind) then begin
+    if (ak = pvkArray) or (bk = pvkArray) then
+      exit(binaryOperatorOnUnwrappedArrays(@xquery__functions.xqvalueDivide, cxt, a, b));
+    if (ak = pvkNull) or (bk = pvkNull) then
+      raise EXQEvaluationException.create('err:XPTY0004', 'json null is not allowed in arithmetic expressions');
+    exit(xqvalue());
+  end;
 
   if (ak = pvkDateTime) then begin
     if not (a.typeAnnotation as TXSDateTimeType).isDuration then exit(xqvalue);
@@ -437,11 +479,11 @@ begin
   if isnan(f) or (f = 0) then begin
     if a.instanceOf(baseSchema.decimal) and b.instanceOf(baseSchema.decimal) then
       raiseDivisionBy0NotAllowed;
-    if IsNan(f) then exit(xqvalueF(getNaN, a, b));
+    if IsNan(f) then exit(xqvalueF(xqfloat.NaN, a, b));
     e := a.toFloat;
-    if isnan(e) or (e=0) then result := xqvalueF(getNaN, a, b)
-    else if isSignedXQFloat(e) = isSignedXQFloat(f) then result := xqvalueF(getPosInf, a, b)
-    else result := xqvalueF(getNegInf, a, b);
+    if isnan(e) or (e=0) then result := xqvalueF(xqfloat.NaN, a, b)
+    else if e.Sign = f.sign then result := xqvalueF(xqfloat.PositiveInfinity, a, b)
+    else result := xqvalueF(xqfloat.NegativeInfinity, a, b);
     exit();
   end;
   e := a.toFloat;
@@ -476,9 +518,13 @@ begin
     exit(baseSchema.integer.createValue(i));
   end;
 
-  if (ak = pvkNull) or (bk = pvkNull) then
-    raise EXQEvaluationException.create('err:XPTY0004', 'json null is not allowed in arithmetic expressions');
-  if (ak in NonNumericKind) or (bk in NonNumericKind) then exit(xqvalue());
+  if (ak in NonNumericKind) or (bk in NonNumericKind) then begin
+    if (ak = pvkArray) or (bk = pvkArray) then
+      exit(binaryOperatorOnUnwrappedArrays(@xquery__functions.xqvalueDivideInt, cxt, a, b));
+    if (ak = pvkNull) or (bk = pvkNull) then
+      raise EXQEvaluationException.create('err:XPTY0004', 'json null is not allowed in arithmetic expressions');
+    exit(xqvalue());
+  end;
 
   if not (bk in [pvkInt64, pvkBigDecimal]) then begin
     bf := b.toFloat;
@@ -517,9 +563,13 @@ begin
     exit(xqvalueI(i, a, b));
   end;
 
-  if (ak = pvkNull) or (bk = pvkNull) then
-    raise EXQEvaluationException.create('err:XPTY0004', 'json null is not allowed in arithmetic expressions');
-  if (ak in NonNumericKind) or (bk in NonNumericKind) then exit(xqvalue());
+  if (ak in NonNumericKind) or (bk in NonNumericKind) then begin
+    if (ak = pvkArray) or (bk = pvkArray) then
+      exit(binaryOperatorOnUnwrappedArrays(@xquery__functions.xqvalueMod, cxt, a, b));
+    if (ak = pvkNull) or (bk = pvkNull) then
+      raise EXQEvaluationException.create('err:XPTY0004', 'json null is not allowed in arithmetic expressions');
+    exit(xqvalue());
+  end;
 
 
   if ak in [pvkInt64, pvkBigDecimal] then
@@ -527,7 +577,7 @@ begin
   else begin
     tempf := a.toFloat;
     if isNan(tempf) then exit(a);
-    if IsInfinite(tempf) then exit(XQValueF(getNaN, a, b));
+    if IsInfinite(tempf) then exit(XQValueF(xqfloat.NaN, a, b));
     ad := a.toDecimal;
   end;
 
@@ -541,13 +591,13 @@ begin
   end;
 
 
-  if isZero(bd) then  exit(XQValueF(getNaN, a, b));
+  if isZero(bd) then  exit(XQValueF(xqfloat.NaN, a, b));
   if isZero(ad) then exit(a);
 
   t := TXSType.commonDecimalType(a, b);
   rd := ad mod bd;
   if (ak = pvkFloat) and isZero(rd) and ((t = baseSchema.double) or (t = baseSchema.float)) then
-    if isSignedXQFloat(a.toFloat) then exit(t.createValue(-0.0));
+    if a.toFloat.sign then exit(t.createValue(-0.0));
   result := t.createValue(rd);
 end;
 
@@ -565,71 +615,73 @@ end;
 
 function xqvalueEqualAtomic(const cxt: TXQEvaluationContext; const a, b: IXQValue): IXQValue;
 begin
-  if not (a.kind in [pvkUndefined]) and not (b.kind in [pvkUndefined]) then
-    result := xqvalue(cxt.staticContext.equalAtomic(a,b,nil))
-  else
-    result := xqvalue();
+  cxt.staticContext.compareAtomic(a,b,result,xqcrEqual);
 end;
 
 function xqvalueUnequalAtomic(const cxt: TXQEvaluationContext; const a, b: IXQValue): IXQValue;
+var
+ compres: TXQCompareResult;
 begin
-  if not (a.kind in [pvkUndefined]) and not (b.kind in [pvkUndefined]) then
-    result := xqvalue(not cxt.staticContext.equalAtomic(a,b,nil))
-  else
-    result := xqvalue;
+  compres := cxt.staticContext.compareAtomic(a,b, nil);
+  case compres of
+    //xqcrNaN, xqcrLessThan, xqcrGreaterThan: result := xqvalueTrue;
+    xqcrEqual: result := xqvalueFalse;
+    xqcrEmptySequence: result := xqvalue;
+    else result := xqvalueTrue;
+  end;
 end;
 
 
 function xqvalueLessThanAtomic(const cxt: TXQEvaluationContext; const a, b: IXQValue): IXQValue;
 begin
   result := nil;
-  cxt.staticContext.compareAtomic(a,b,result,-1,9999);
+  cxt.staticContext.compareAtomic(a,b,result,xqcrLessThan,xqcrReservedInvalid);
 end;
 function xqvalueGreaterThanAtomic(const cxt: TXQEvaluationContext; const a, b: IXQValue): IXQValue;
 begin
   result := nil;
-  cxt.staticContext.compareAtomic(a,b,result,1,9999);
+  cxt.staticContext.compareAtomic(a,b,result,xqcrGreaterThan,xqcrReservedInvalid);
 end;
 function xqvalueLessEqualAtomic(const cxt: TXQEvaluationContext; const a, b: IXQValue): IXQValue;
 begin
   result := nil;
-  cxt.staticContext.compareAtomic(a,b,result,-1,0);
+  cxt.staticContext.compareAtomic(a,b,result,xqcrLessThan,xqcrEqual);
 end;
 function xqvalueGreaterEqualAtomic(const cxt: TXQEvaluationContext; const a, b: IXQValue): IXQValue;
 begin
   result := nil;
-  cxt.staticContext.compareAtomic(a,b,result,1,0);
+  cxt.staticContext.compareAtomic(a,b,result,xqcrGreaterThan,xqcrEqual);
 end;
 
 function xqvalueEqualGeneric(const cxt: TXQEvaluationContext; const a, b: IXQValue): IXQValue;
 begin
   result := nil;
-  cxt.staticContext.compareGeneral(a,b,result,0);
+  cxt.staticContext.compareGeneral(a,b,result,xqcrEqual);
 end;
 function xqvalueUnequalGeneric(const cxt: TXQEvaluationContext; const a, b: IXQValue): IXQValue;
 begin
   result := nil;
-  cxt.staticContext.compareGeneral(a,b,result,-1,1);
+  cxt.staticContext.compareGeneral(a,b,result,xqcrLessThan,xqcrGreaterThan);
 end;
 function xqvalueLessThanGeneric(const cxt: TXQEvaluationContext; const a, b: IXQValue): IXQValue;
 begin
   result := nil;
-  cxt.staticContext.compareGeneral(a,b,result,-1);
+  cxt.staticContext.compareGeneral(a,b,result,xqcrLessThan);
 end;
 function xqvalueGreaterThanGeneric(const cxt: TXQEvaluationContext; const a, b: IXQValue): IXQValue;
 begin
   result := nil;
-  cxt.staticContext.compareGeneral(a,b,result,1);
+  cxt.staticContext.compareGeneral(a,b,result,xqcrGreaterThan);
 end;
 function xqvalueLessEqualGeneric(const cxt: TXQEvaluationContext; const a, b: IXQValue): IXQValue;
 begin
   result := nil;
-  cxt.staticContext.compareGeneral(a,b,result,-1,0);
+  cxt.staticContext.compareGeneral(a,b,result,xqcrLessThan,xqcrEqual);
 end;
 function xqvalueGreaterEqualGeneric(const cxt: TXQEvaluationContext; const a, b: IXQValue): IXQValue;
 begin
   result := nil;
-  cxt.staticContext.compareGeneral(a,b,result,1,0);
+  cxt.staticContext.compareGeneral(a,b,result,xqcrGreaterThan,xqcrEqual);
 end;
 
 function xqvalueToSingleNode(const v: IXQValue): TTreeNode;
@@ -834,7 +886,7 @@ function xqFunctionNumber(const context: TXQEvaluationContext; argc: SizeInt; ar
   begin
     if v.instanceOf(baseSchema.Double) then exit(v);
     if baseSchema.double.tryCreateValue(v,  @temp) = xsceNoError then exit(temp)
-    else exit(baseSchema.double.createValue(getNaN));
+    else exit(baseSchema.double.createValue(xqfloat.NaN));
   end;
 begin
   if argc = 0 then begin
@@ -881,7 +933,7 @@ begin
     pvkBigDecimal: result := baseType.createValue(round(args[0].toDecimal, 0, bfrmCeil));
     else begin
       v := args[0].toFloat;
-      if IsNan(v) or IsInfinite(v) then exit(baseType.createValue(v));
+      if not v.isFinite() then exit(baseType.createValue(v));
       if frac(v) > 0 then result := baseType.createValue(v - frac(v) + 1)
       else result := baseType.createValue(v - frac(v));
     end
@@ -901,7 +953,7 @@ begin
     pvkBigDecimal: result := baseType.createValue(round(args[0].toDecimal, 0, bfrmFloor));
     else begin
       v := args[0].toFloat;
-      if IsNan(v) or IsInfinite(v) then exit(baseType.createValue(v));
+      if not v.isFinite() then exit(baseType.createValue(v));
       if frac(v) < 0 then result := baseType.createValue(v - frac(v) - 1)
       else result := baseType.createValue(v - frac(v));
     end
@@ -997,7 +1049,7 @@ begin
       f := args[0].toFloat;
       if prec < -4933 {approximately extended range} then result := baseType.createValue(f)
       else if prec > 4933 then result := baseType.createValue(0)
-      else result := baseType.createValue(xqfloatRounded(f, prec));
+      else result := baseType.createValue(f.round(prec));
     end;
     else begin raiseXPTY0004TypeError(args[0], 'numeric?'); result := nil; end;
   end;
@@ -1064,7 +1116,7 @@ begin
      end;
     else begin
       f := args[0].toFloat;
-      if IsNan(f) or IsInfinite(f) then exit(baseType.createValue(f));
+      if not f.isFinite then exit(baseType.createValue(f));
 
       if argc = 1 then exit(baseType.createValue(floatRoundHalfToEven(f)));
 
@@ -1086,8 +1138,8 @@ end;
 function xqFunctionString(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
 begin
   if argc <> 1 then result := xqvalue(context.SeqValueAsString)
-  else begin
-    if args[0].kind = pvkFunction then begin raiseXQEvaluationError('FOTY0014', 'Cannot pass function item to fn:string', args[0]); result := nil; end
+  else case args[0].kind of
+    pvkFunction, pvkArray: begin raiseXQEvaluationError('FOTY0014', 'Cannot pass function item to fn:string', args[0]); result := nil; end;
     else result := xqvalue(args[0].toString);
   end;
 end;
@@ -1291,108 +1343,389 @@ begin
 end;
 
 
-procedure urlEncodingFromValue(value: IXQValue; cmp: TStringComparisonFunc; urlEncoded: boolean; charset: TSystemCodePage;
-                               out names, values: TStringArray;
-                               out specialNames: TStringArray; out specialValues: TXQVArray); //-> special objects
-  procedure addSingleValue(temp: string);
+type
+THttpRequestParam = record
+  key, value: string;
+  hasValue: boolean;
+  mimeHeaders: TStringArray;
+end;
+PHttpRequestParam = ^THttpRequestParam;
+EHttpRequestParamsException = Exception;
+THttpRequestParams = object //This could completely replace TMIMEMultipartData
+  urlencoded: boolean;
+  charset: TSystemCodePage;
+
+  size: sizeint;
+  data: array of THttpRequestParam;
+  firstKeyIndex: TXQHashmapStrSizeInt;
+  keysToRemove: TXQHashsetStr;
+  function addRawKey(const k: string): PHttpRequestParam;
+  function addRawParam(const p: THttpRequestParam): PHttpRequestParam;
+  function addRawKeyValue(const k, v: string): PHttpRequestParam;
+
+  function  addKeyValue(const n, v: string): PHttpRequestParam; //not encoded
+  procedure addUrlEncodedList(s: string); //encoded
+  procedure addXQValue(const value: IXQValue; const staticContext: TXQStaticContext);
+  procedure addMime(const mime: TMIMEMultipartData);
+
+  //returns true if a value has been overridden
+  function mergeOverride(const requestOverride: THttpRequestParams): boolean;
+  //returns true if a value has been overridden
+  function addFormAndMerge(form: TTreeNode; cmp: TStringComparisonFunc; const requestOverride: THttpRequestParams): boolean;
+
+  function toUrlEncodedRequest: string;
+  function toMimeRequest(const staticContext: TXQStaticContext; out header: string): string;
+  function toMimeRequest(const staticContext: TXQStaticContext): TMIMEMultipartData;
+
+  procedure compress;
+  procedure clear;
+  constructor init;
+  destructor done;
+end;
+
+function THttpRequestParams.addRawKey(const k: string): PHttpRequestParam;
+begin
+  if size = length(data) then
+    if length(data) > 0 then SetLength(data, 2*length(data))
+    else SetLength(data, 16);
+  result := @data[size];
+  result.key := k;
+  result.hasValue := true;
+  keysToRemove.exclude(k);
+  firstKeyIndex.include(k, size, false);
+  inc(size);
+end;
+
+function THttpRequestParams.addRawParam(const p: THttpRequestParam): PHttpRequestParam;
+begin
+  result := addRawKey(p.key);
+  result.value := p.value;
+  result.mimeHeaders := p.mimeHeaders;
+end;
+
+function THttpRequestParams.addRawKeyValue(const k, v: string): PHttpRequestParam;
+begin
+  result := addRawKey(k);
+  result.value := v;
+end;
+
+procedure THttpRequestParams.compress;
+begin
+  if length(data) <> size then
+    SetLength(data, size);
+end;
+
+procedure THttpRequestParams.clear;
+begin
+  size := 0;
+  data := nil;
+  firstKeyIndex.clear;
+  keysToRemove.Clear;
+end;
+
+constructor THttpRequestParams.init;
+begin
+  keysToRemove.init;
+  firstKeyIndex.init;
+  charset := CP_UTF8;
+  urlencoded := false;
+  size := 0;
+  data := nil;
+end;
+
+destructor THttpRequestParams.done;
+begin
+  keysToRemove.done;
+  firstKeyIndex.done;
+end;
+
+function THttpRequestParams.addKeyValue(const n, v: string): PHttpRequestParam; //not encoded
+begin
+  if urlEncoded then result := addRawKeyValue(formEncode(n, charset), formEncode(v, charset))
+  else result := addRawKeyValue(n, v);
+end;
+
+procedure THttpRequestParams.addUrlEncodedList(s: string);
+  procedure addUrlEncodedPair(temp: string);
+  var
+    key: String;
   begin
-    if urlEncoded then begin
-      arrayAdd(names, strSplitGet('=', temp));
-      arrayAdd(values, temp);
-    end else begin
-      arrayAdd(names,  urlHexDecode(strSplitGet('=', temp)));
-      arrayAdd(values, urlHexDecode(temp));
-    end;
+    key := strSplitGet('=', temp);
+    if urlEncoded then addRawKeyValue(key, temp)
+    else addRawKeyValue(urlHexDecode(key), urlHexDecode(temp));
   end;
 
-  procedure add(s: string);
+var
+  split: TStringArray;
+  i: Integer;
+begin
+  if s = '' then exit;
+  split := strSplit(s, '&');
+  for i:=0 to high(split) do addUrlEncodedPair(split[i]);
+end;
+
+
+procedure THttpRequestParams.addXQValue(const value: IXQValue; const staticContext: TXQStaticContext);
+  procedure addSpecialPair(n: string; v: TXQValueMapLike);
   var
-    split: TStringArray;
+    param: PHttpRequestParam;
+    value, filename, contenttype, headers, h: String;
+    temp: TXQValue;
     i: Integer;
   begin
-    if s = '' then exit;
-    split := strSplit(s, '&');
-    for i:=0 to high(split) do addSingleValue(split[i]);
+    if urlEncoded then n := formEncode(n, charset);
+
+    if v.hasProperty('x', @temp) and v.hasProperty('y', nil) then begin
+      addRawKey(n + '.x').value:=temp.toString;
+      addRawKey(n + '.y').value:=v.getProperty('y').toString;
+      exit;
+    end;
+
+    param := addRawKey(n);
+
+    headers := '';
+    value := '';
+    param.hasValue := false;
+    filename := '';
+    contenttype := '';
+    if v.hasProperty('file', @temp) then begin
+      filename := temp.toString;
+      value := staticContext.retrieveFromFile(filename, contenttype, 'FOUT1170');
+      param.hasValue := true;
+    end;
+    if v.hasProperty('filename', @temp) then filename := temp.toString;
+    if v.hasProperty('type', @temp) then contenttype := temp.toString;
+    if v.hasProperty('value', @temp) then begin
+      value := temp.toString;
+      param.hasValue := true;
+    end;
+
+    if v.hasProperty('headers', @temp) then begin
+      for i := 1 to temp.getSequenceCount do begin
+        h := temp.get(i).toString;
+        if i > 1 then h := TMIMEMultipartData.HeaderSeparator + h;
+        headers += h;
+      end;
+    end;
+
+    if urlEncoded then value := formEncode(value, charset);
+
+    param.value := value;
+    param.mimeHeaders := TMIMEMultipartData.buildHeaders(n, filename, contenttype, headers);
   end;
 
-  procedure addPair(const n, v: string);
+  procedure addSingletonXQValue(name: string; v: TXQValue);
   begin
-    if urlEncoded then begin
-      arrayAdd(names, formEncode(n, charset));
-      arrayAdd(values, formEncode(v, charset));
-    end else begin
-      arrayAdd(names, n);
-      arrayAdd(values, v);
-    end;
+    if v.kind <> pvkObject then
+      addKeyValue(name, v.toString)
+    else
+      addSpecialPair(name, v as TXQValueMapLike);
+  end;
+
+  procedure markUnusedKeyForDeletion(name: string);
+  begin
+    if urlEncoded then name := formEncode(name, charset);
+    if firstKeyIndex.contains(name) then
+      exit; //not unused
+    keysToRemove.include(name);
   end;
 
   procedure addObject(const v: IXQValue);
   var
     p: TXQProperty;
+    w: PIXQValue;
   begin
-    for p in v.getPropertyEnumerator do begin
-      if p.Value.kind <> pvkObject then
-        addPair(p.Name, p.Value.toString)
-       else begin
-         arrayAdd(specialNames, p.Name);
-         setlength(specialValues, length(specialValues) + 1);
-         specialValues[high(specialValues)] := p.Value;
-       end;
+    for p in v.getEnumeratorStringPropertiesUnsafe do begin
+      case p.value.kind of
+        pvkUndefined: markUnusedKeyForDeletion(p.key);
+        pvkSequence: case p.value.getSequenceCount of
+          0: markUnusedKeyForDeletion(p.key);
+          1: addSingletonXQValue(p.key, p.value);
+          else for w in p.value.GetEnumeratorPtrUnsafe do
+            addSingletonXQValue(p.key, w.toValue);
+        end;
+        else addSingletonXQValue(p.key, p.value);
+      end;
     end;
   end;
 
-var temp: IXQValue;
+var
   v: PIXQValue;
   sname: string;
   svalue: string;
+  nodeCompare: TStringComparisonFunc;
 begin
-  names := nil;
-  values := nil;
-  specialNames := nil;
-  specialValues := nil;
+  nodeCompare := @staticContext.NodeCollation.equal;
   for v in value.GetEnumeratorPtrUnsafe do
     case v^.kind of
       pvkObject: addObject(v^);
       pvkNode:
-        if nodeToFormData(v^.toNode, cmp, true, sname, svalue) then
-          addPair(sname, svalue)
-       else add(v^.toString);
-     else add(v^.toString)
+        if nodeToFormData(v^.toNode, nodeCompare, true, sname, svalue) then
+          addKeyValue(sname, svalue)
+       else addUrlEncodedList(v^.toString);
+     else addUrlEncodedList(v^.toString)
    end;
 end;
 
-procedure addSpecialValue(const staticContext: TXQStaticContext; var mime: TMIMEMultipartData; n: string; v: TXQValueObject; defaultValue: string = '');
+procedure THttpRequestParams.addMime(const mime: TMIMEMultipartData);
 var
-  temp: TXQValue;
-  value, filename, contenttype, headers: String;
-  h: String;
-  i: integer;
+  i: SizeInt;
+  param: PHttpRequestParam;
 begin
-  headers := '';
-  value := defaultValue;
-  filename := '';
-  contenttype := '';
-  if v.hasProperty('file', @temp) then begin
-    filename := temp.toString;
-    value := staticContext.retrieveFromFile(filename, contenttype, 'FOUT1170');
+  //if urlencoded then raise EHttpRequestParamsException.Create('Cannot add mime data to urlencoded request');
+  for i := 0 to high(mime.data) do begin
+    param := addKeyValue(mime.data[i].getFormDataName, mime.data[i].data);
+    param.mimeHeaders := mime.data[i].headers;
   end;
-  if v.hasProperty('filename', @temp) then filename := temp.toString;
-  if v.hasProperty('type', @temp) then contenttype := temp.toString;
-  if v.hasProperty('value', @temp) then value := temp.toString;
+end;
 
-  if v.hasProperty('headers', @temp) then begin
-    for i := 1 to temp.getSequenceCount do begin
-      h := temp.get(i).toString;
-      if i > 1 then h := #13#10 + h;
-      headers += h;
+function THttpRequestParams.mergeOverride(const requestOverride: THttpRequestParams): boolean;
+var
+  requestOverrideUsed: array of boolean = nil;
+  requestOverrideNextKeyOccurrence: array of SizeInt = nil; //this is used to build a multimap
+  requestOverrideKeyIndex: TXQhashmapStrSizeInt;
+
+  procedure initRequestOverrideInfo;
+  var lastKeyIndex: TXQhashmapStrSizeInt;
+    i, last: SizeInt;
+    k: string;
+  begin
+    SetLength(requestOverrideUsed, requestOverride.size);
+    SetLength(requestOverrideNextKeyOccurrence, requestOverride.size);
+    requestOverrideKeyIndex.init;
+    lastKeyIndex.init;
+    for i := 0 to requestOverride.size - 1 do begin
+      requestOverrideNextKeyOccurrence[i] := -1;
+      last := lastKeyIndex.get(requestOverride.data[i].key, -1);
+      if last >= 0 then requestOverrideNextKeyOccurrence[last] := i;
+      lastKeyIndex[requestOverride.data[i].key] := i;
+    end;
+    lastKeyIndex.done;
+
+    requestOverrideKeyIndex.init;
+    requestOverrideKeyIndex.assign(requestOverride.firstKeyIndex);
+    for k in requestOverride.keysToRemove do
+      requestOverrideKeyIndex.include(k, -1, false);
+  end;
+
+  procedure mergeHeaders(var p: THttpRequestParam; const over: THttpRequestParam);
+  var
+    i, j: sizeint;
+    name: String;
+  begin
+    if p.mimeHeaders = nil then begin
+      p.mimeHeaders := over.mimeHeaders;
+      exit;
+    end;
+    for i := 0 to high(p.mimeHeaders) do begin
+      name := TMIMEMultipartData.nameFromHeader(p.mimeHeaders[i]);
+      j := TMIMEMultipartData.indexOfHeader(over.mimeHeaders, name);
+      if j >= 0 then p.mimeHeaders[i] := over.mimeHeaders[j];
+    end;
+    for j := 0 to high(over.mimeHeaders) do begin
+      name := TMIMEMultipartData.nameFromHeader(over.mimeHeaders[j]);
+      i := TMIMEMultipartData.indexOfHeader(p.mimeHeaders, name);
+      if i < 0 then begin
+        SetLength(p.mimeHeaders, length(p.mimeHeaders) + 1);
+        p.mimeHeaders[high(p.mimeHeaders)] := over.mimeHeaders[j];
+      end;
     end;
   end;
 
-  if (value <> '') or (headers <> '') then
-    mime.addFormData(n, value, filename, contenttype, headers);
+var oldData: array of THttpRequestParam;
+  oldSize, i, replaced: SizeInt;
+begin
+  result := false;
+  if (requestOverride.urlencoded <> urlencoded) or
+     (urlencoded and (requestOverride.charset <> charset)) then
+    raise EHttpRequestParamsException.Create('Incompatible http params');
+  initRequestOverrideInfo;
 
+  oldData := data;
+  oldSize := size;
+  clear;
+  SetLength(data, oldSize + requestOverride.size);
+  for i := 0 to oldSize - 1 do begin
+    replaced := requestOverrideKeyIndex.get(oldData[i].key, -2);
+    //replaced = -2: not overridden; replaced = -1: to remove; >= 0: override
+    if replaced <> -1 then begin
+      addRawParam(oldData[i]);
+      if replaced > -1 then begin
+        result := true;
+        requestOverrideKeyIndex.include(oldData[i].key, requestOverrideNextKeyOccurrence[replaced]);
+        requestOverrideUsed[replaced] := true;
+        if requestOverride.data[replaced].hasValue then data[size-1].value := requestOverride.data[replaced].value;
+        if requestOverride.data[replaced].mimeHeaders <> nil then mergeHeaders(data[size-1], requestOverride.data[replaced]);
+      end;
+    end;
+  end;
+  for i := 0 to high(requestOverrideUsed) do
+    if not requestOverrideUsed[i] then
+      addRawParam(requestOverride.data[i]);
+  requestOverrideKeyIndex.done;
+  compress;
 end;
 
+function THttpRequestParams.addFormAndMerge(form: TTreeNode; cmp: TStringComparisonFunc; const requestOverride: THttpRequestParams
+  ): boolean;
+var temp: TTreeNode;
+  name, value: string;
+begin
+  for temp in form.getEnumeratorDescendants do begin
+    if nodeToFormData(temp, cmp, false, name, value) then begin
+      addKeyValue(name, value);
+    end else if (cmp(temp.value, 'input') or cmp(temp.value, 'button')) and cmp(temp.getAttribute('type'), 'submit') then begin
+      name := temp.getAttribute('name');
+      if (name <> '') and requestOverride.firstKeyIndex.contains(name) then
+        addKeyValue(name, temp.getAttribute('value'));
+    end;
+  end;
+
+  result := mergeOverride(requestOverride);
+end;
+
+function THttpRequestParams.toUrlEncodedRequest: string;
+var sb: TStrBuilder;
+  i: sizeint;
+begin
+  sb.init(@result);
+  for i := 0 to size - 1 do begin
+    if i <> 0 then sb.append('&');
+    if urlencoded then begin
+      sb.append(data[i].key);
+      sb.append('=');
+      sb.append(data[i].value);
+    end else begin
+      sb.append(formEncode(data[i].key,  charset));
+      sb.append('=');
+      sb.append(formEncode(data[i].value, charset));
+    end;
+  end;
+  sb.final;
+end;
+
+
+
+
+function THttpRequestParams.toMimeRequest(const staticContext: TXQStaticContext; out header: string): string;
+var mime: TMIMEMultipartData;
+begin
+  if urlencoded then raise EHttpRequestParamsException.Create('MIME Request needs unencoded params');
+  mime := toMimeRequest(staticContext);
+  result := mime.compose(header);
+end;
+
+function THttpRequestParams.toMimeRequest(const staticContext: TXQStaticContext): TMIMEMultipartData;
+var
+  i: SizeInt;
+begin
+  result := default(TMIMEMultipartData);
+  SetLength(result.data, size);
+  for i := 0 to size - 1 do begin
+    result.data[i].data := data[i].value;
+    result.data[i].headers := TMIMEMultipartData.insertMissingNameToHeaders(data[i].key, data[i].mimeHeaders);
+  end;
+end;
 
 //see https://html.spec.whatwg.org/multipage/forms.html and https://html.spec.whatwg.org/multipage/form-control-infrastructure.html#form-submission-2
 {todo:
@@ -1402,191 +1735,173 @@ check for <form method=dialog>
 enctype=text/plain
 }
 function xqFunctionForm(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
-var replaceNames, replaceValues: TStringArray;
-    specialReplaceValues: TXQVArray;
-    specialReplaceNames: TStringArray;
+var onlyFormsWithOverriddenValue: boolean = false;
+    procedure failedToFindForm();
+    begin
+      raise EXQEvaluationException.create('XPDY0002', 'Could not find a form element');
+    end;
+
+    function findForms(n: TTreeNode): IXQValue;
+    var
+      nodeseq: TXQValueSequence;
+      nlast: TTreeNode;
+    begin
+      nodeseq := TXQValueSequence.create();
+      result := nodeseq;
+      if n.typ in [tetOpen, tetDocument] then nlast := n.reverse
+      else nlast := n.next;
+      while (n <> nlast) and (n <> nil) do begin
+        if (n.typ = tetOpen) and (n.hash = HTMLNodeNameHashs.form) and striEqual(n.value, 'form') then nodeseq.add(xqvalue(n));
+        n := n.next;
+      end;
+      if nodeseq.seq.Count = 0 then failedToFindForm();
+      xqvalueSeqSqueeze(result);
+    end;
+
+var requestOverride: THttpRequestParams;
     cmp: TStringComparisonFunc;
+    lastFormHadOverriddenValue: boolean = false;
 
     function encodeForm(const form: TTreeNode): IXQValue;
     var
-      temp: TTreeNode;
-      method: string;
-      name, value: String;
-      request: string;
-      used: TStringList;
-      i: Integer;
-      mime: TMIMEMultipartData;
       multipart: boolean;
+    var
       header: string;
       post: Boolean;
-      encoding: TSystemCodePage;
-      resultobj: TXQValueObject;
-
-      procedure addPair(n: string; v: string);
-      begin
-        if not multipart then begin
-          if request <> '' then request += '&';
-          request += formEncode(n,encoding) + '=' + formEncode(v, encoding);
-        end else begin
-          mime.addFormData(n, v);
-        end;
-      end;
-
-
-      procedure addToRequest(n: string; v: string; addToUsed: boolean = true);
-      var
-        replaced: Integer;
-      begin
-        if addToUsed then begin
-          replaced := arrayIndexOf(replaceNames, n);
-          if replaced >= 0 then v := replaceValues[replaced]
-          else if multipart then begin
-            replaced := arrayIndexOf(specialReplaceNames, n);
-            if replaced >= 0 then begin
-              addSpecialValue(context.staticContext, mime, n, specialReplaceValues[replaced] as TXQValueObject, v);
-              used.Add(n);
-              exit;
-            end;
-          end;
-          used.Add(n);
-        end;
-        addPair(n, v);
-      end;
-
+      method: string;
+      actionURI: String;
+      resultobj: TXQValueStringMap;
+      request: THttpRequestParams;
+      encodedRequest: string;
     begin
       if form = nil then exit(xqvalue());
+      request.init;
+
       method := UpperCase(form.getAttribute('method', 'GET', cmp));
       post := striEqual(method, 'POST');
-      request := '';
-      mime.data := nil;
       multipart := post and striEqual( form.getAttribute('enctype', cmp), ContentTypeMultipart);
-      encoding := getFormEncoding(form);
+      request.charset := getFormEncoding(form);
 
-      used := TStringList.Create;
-      used.CaseSensitive:=true;
-      for temp in form.getEnumeratorDescendants do begin
-        if nodeToFormData(temp, cmp, false, name, value) then begin
-          addToRequest(name, value);
-        end else if (cmp(temp.value, 'input') or cmp(temp.value, 'button')) and cmp(temp.getAttribute('type'), 'submit') then begin
-          name := temp.getAttribute('name');
-          if (name <> '') then begin
-            i := arrayIndexOf(replaceNames, name);
-            if (i >= 0) and (replaceValues[i] = temp.getAttribute('value')) and (used.IndexOf(name) < 0) then
-              addToRequest(name, '');
-          end;
-        end;
-      end;
+      lastFormHadOverriddenValue := request.addFormAndMerge(form, cmp, requestOverride);
+      request.done;
 
-      for i:=0 to high(replaceNames) do
-        if used.IndexOf(replaceNames[i]) < 0 then
-          addToRequest(replaceNames[i], replaceValues[i], false);
-      for i:=0 to high(specialReplaceNames) do
-        if used.IndexOf(specialReplaceNames[i]) < 0 then
-          addSpecialValue(context.staticContext, mime, specialReplaceNames[i], specialReplaceValues[i] as TXQValueObject, '');
-      used.free;
+      actionURI := form.getAttribute('action', cmp);
 
-      value := form.getAttribute('action', cmp);
-
-      resultobj := TXQValueObject.create();
+      resultobj := TXQValueStringMap.create();
       result := resultobj;
 
       resultobj.setMutable('method', method);
 
+      if not multipart then encodedRequest := request.toUrlEncodedRequest
+      else begin
+        encodedRequest := request.toMimeRequest(context.staticContext, header);
+        resultobj.setMutable('headers', TMIMEMultipartData.HeaderForBoundary(header))
+      end;
+
       if post then begin
-        if multipart then begin
-          request := mime.compose(header);
-          resultobj.setMutable('headers', TMIMEMultipartData.HeaderForBoundary(header))
-        end;
-        resultobj.setMutable('post', request)
-      end else if request <> '' then
-        if strContains(value, '?') then value += '&' + request
-        else value += '?' + request;
+        resultobj.setMutable('post', encodedRequest)
+      end else if encodedRequest <> '' then
+        if strContains(actionURI, '?') then actionURI += '&' + encodedRequest
+        else actionURI += '?' + encodedRequest;
 
 
       {$IFDEF ALLOW_EXTERNAL_DOC_DOWNLOAD}
-      if (form.getDocument() <> nil) then value := strResolveURI(value, form.getDocument().baseURI);
-      value := strResolveURI(value, context.staticContext.baseURI);
+      if (form.getDocument() <> nil) then actionURI := strResolveURI(actionURI, form.getDocument().baseURI);
+      actionURI := strResolveURI(actionURI, context.staticContext.baseURI);
       {$ENDIF}
-      resultobj.setMutable('url', value);
-      if encoding <> CP_UTF8 then resultobj.setMutable('charset', 'CP' + IntToStr(encoding));
+      resultobj.setMutable('url', actionURI);
+      if request.charset <> CP_UTF8 then resultobj.setMutable('charset', 'CP' + IntToStr(request.charset));
+
     end;
 
 var v: PIXQValue;
   resseq: TXQValueSequence;
+  form, overrideOptions, nresult: IXQValue;
 begin
-  requiredArgCount(argc, 1, 2);
+  requiredArgCount(argc, 0, 2);
+  case argc of
+    0: begin
+      form := findForms(context.contextNode(true));
+      overrideOptions := xqvalue;
+    end;
+    1: begin
+      overrideOptions := nil; //hide uninitialized warning
+      form := args[0];
+      if (form.kind = pvkSequence) and (form.count = 1) then form := args[0].get(1);
+      case form.kind of
+        pvkNode, pvkSequence, pvkUndefined: overrideOptions := xqvalue;
+        pvkObject, pvkString: begin
+          overrideOptions := form;
+          form := findForms(context.contextNode(true));
+          onlyFormsWithOverriddenValue := true;
+        end;
+        else raiseXPTY0004TypeError(form, 'form argument');
+      end;
+    end;
+    2: begin
+      form := args[0];
+      overrideOptions := args[1];
+    end;
+    else exit(nil);
+  end;
 
-  if args[0].getSequenceCount = 0 then
+  if form.getSequenceCount = 0 then
     exit(xqvalue);
 
   cmp := @context.staticContext.nodeCollation.equal;
-
-  if argc = 2 then
-    urlEncodingFromValue(args[1], cmp, false,{<-false=>no encoding} CP_NONE, replaceNames, replaceValues, specialReplaceNames, specialReplaceValues);
-
+  requestOverride.init;
+  requestOverride.addXQValue(overrideOptions, context.staticContext);
 
   resseq := TXQValueSequence.create();
   result := resseq;
-  for v in args[0].GetEnumeratorPtrUnsafe do
-    resseq.add(encodeForm(v^.toNode));
+  for v in form.GetEnumeratorPtrUnsafe do begin
+    nresult := encodeForm(v^.toNode);
+    if lastFormHadOverriddenValue or not onlyFormsWithOverriddenValue then begin
+      resseq.add(nresult);
+    end;
+  end;
   xqvalueSeqSqueeze(result);
+  requestOverride.done;
+  if onlyFormsWithOverriddenValue and (result.Count = 0) then failedToFindForm();
 end;
 
 function xqFunctionUri_combine(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
-var names, values: array of TStringArray;
-    used: array of array of boolean = nil;
-    rep: Integer;
-    res: String;
-    cmp: TStringComparisonFunc;
-    i: Integer;
-    specialNames: TStringArray;
-    specialValues: TXQVArray;
+var i: Integer;
     encoding: TSystemCodePage;
+    requests: array[0..1] of THttpRequestParams;
 begin
-  names := nil; values := nil;
-  setlength(names, 2); setlength(values, 2);
-  cmp := @context.staticContext.nodeCollation.equal; ignore(context);
   encoding := CP_UTF8;
   if argc = 3 then begin
     encoding := strEncodingFromName(args[2].toString);
     if encoding = CP_NONE then encoding := CP_UTF8;
   end;
-  urlEncodingFromValue(args[0], cmp, true, encoding, names[0], values[0], specialNames, specialValues); //todo: handle specials
-  urlEncodingFromValue(args[1], cmp, true, encoding, names[1], values[1], specialNames, specialValues);
-  setlength(used, 2);
 
-  setlength(used[1], length(values[1]));
-  for i := 0 to high(used[1]) do used[1][i] := false;
-
-
-  res := '';
-  for i := 0 to high(names[0]) do begin
-    rep := arrayIndexOf(names[1], names[0][i]);
-    if rep < 0 then res += IfThen(res = '', '', '&') + names[0][i] + '=' + values[0][i]
-    else begin
-      res += IfThen(res = '', '', '&') + names[1][rep] + '=' + values[1][rep];
-      used[1][rep] := true;
-    end;
+  for i := 0 to 1 do begin
+    requests[i] := default(THttpRequestParams);
+    requests[i].init;
+    requests[i].urlencoded := true;
+    requests[i].charset:=encoding;
+    requests[i].addXQValue(args[i], context.staticContext);
   end;
 
-  for i := 0 to high(names[1]) do begin
-    if used[1][i] then continue;
-    res += IfThen(res = '', '', '&') + names[1][i] + '=' + values[1][i];
-  end;
+  requests[0].mergeOverride(requests[1]);
 
-  result := xqvalue(res);
+  result := xqvalue(requests[0].toUrlEncodedRequest);
+
+  requests[0].done;
+  requests[1].done;
 end;
 
 function getMultipartHeader(const v: IXQValue): string;
 var
   headers: IXQValue;
-  h: PIXQValue;
+  h: TXQValue;
   tempstr: String;
 begin
   result := '';
   headers := v.getProperty('headers');
-  for h in headers.GetEnumeratorPtrUnsafe do begin
-    tempstr := h^.toString;
+  for h in headers.GetEnumeratorArrayTransparentUnsafe do begin
+    tempstr := h.toString;
     if striBeginsWith(tempstr, 'Content-Type') and striContains(tempstr, ContentTypeMultipart) then begin
       result := tempstr;
       result := trim(strCopyFrom(result, pos('=', result) + 1));
@@ -1598,7 +1913,7 @@ end;
 
 
 function xqFunctionForm_combine(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
-  function combineHttpEncoded(obj: TXQValueObject): IXQValue;
+  function combineHttpEncoded(obj: TXQValue): IXQValue;
   var temp: TXQVArray = nil;
       propName, oldUrl, prefix: String;
       newEncoded: IXQValue;
@@ -1642,49 +1957,39 @@ function xqFunctionForm_combine(const context: TXQEvaluationContext; argc: SizeI
 
 var
   headers: IXQValue;
-  h: PIXQValue;
+  h: TXQValue;
   multipart, tempstr: String;
   mime: TMIMEMultipartData;
-  obj: TXQValueObject;
+  obj: TXQValueMapLike;
   tempSeq: TXQValueSequence;
   procedure mimeCombine;
   var
-    cmp: TStringComparisonFunc;
-    names: TStringArray;
-    values: TStringArray;
-    specialNames: TStringArray;
-    specialValues: TXQVArray;
-    i, j: Integer;
-    temps: String;
+    baseRequest, requestOverride: THttpRequestParams;
   begin
-    cmp := @context.staticContext.nodeCollation.equal;
-    urlEncodingFromValue(args[1], cmp, false, CP_NONE, names, values, specialNames, specialValues);
-    for i := 0 to high(names) do begin
-      j := mime.getFormDataIndex(names[i]);
-      if j < 0 then mime.addFormData(names[i], values[i])
-      else mime.data[j].data := values[i];
-    end;
-    for i := 0 to high(specialNames) do begin
-      j := mime.getFormDataIndex(specialNames[i]);
-      temps := '';
-      if j >= 0 then temps := mime.data[j].data;
-      addSpecialValue(context.staticContext, mime, specialNames[i], specialValues[i] as TXQValueObject, temps);
-      if j >= 0 then begin
-        mime.data[j] := mime.data[high(mime.data)];
-        SetLength(mime.data, length(mime.data) - 1);
-      end
-    end;
+    baseRequest.init;
+    baseRequest.addMime(mime);
+
+    requestOverride.init;
+    requestOverride.addXQValue(args[1], context.staticContext);
+
+    baseRequest.mergeOverride(requestOverride);
+
+    mime := baseRequest.toMimeRequest(context.staticContext);
+
+    baseRequest.done;
+    requestOverride.done;
   end;
 
 begin
   requiredArgCount(argc, 2);
-  if args[0] is TXQValueObject then begin
+  if args[0].kind  = pvkObject then begin
     multipart := getMultipartHeader(args[0]);
-    obj := args[0].toValue as TXQValueObject;
+    obj := args[0].toValue as TXQValueMapLike;
+    result := obj
   end else begin
     multipart:='';
-    obj := TXQValueObject.create();
-    obj.setMutable('url', args[0].toString);
+    obj := TXQValueStringMap.create();
+    TXQValueStringMap(obj).setMutable('url', args[0].toString);
     result := obj;
   end;
 
@@ -1694,25 +1999,24 @@ begin
   end else begin
     mime.parse(args[0].getProperty('post').toString, multipart);
     mimeCombine();
-    obj := obj.setImmutable('post', mime.compose(tempstr, multipart));
+    result := result.setImmutable('post', mime.compose(tempstr, multipart));
 
     if tempstr <> multipart then begin
       headers := obj.getProperty('headers');
       tempSeq := TXQValueSequence.create(headers.getSequenceCount);
       tempSeq.add(xqvalue(TMIMEMultipartData.HeaderForBoundary(tempstr)));
-      for h in headers.GetEnumeratorPtrUnsafe do begin
-        tempstr := h^.toString;
+      for h in headers.GetEnumeratorArrayTransparentUnsafe do begin
+        tempstr := h.toString;
         if not striBeginsWith(tempstr, 'Content-Type') then
-          tempSeq.add(h^);
+          tempSeq.add(h);
       end;
-      obj := obj.setImmutable('headers', tempSeq);
+      result := result.setImmutable('headers', tempSeq);
     end;
-    result := obj;
   end;
 end;
 
 function xqFunctionRequest_decode(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
-var paramobj: TXQValueObject;
+var paramobj: TXQValueStringMap;
   procedure addParam(const name, value: string);
   var tempseq: TXQValueSequence;
       v: txqvalue;
@@ -1727,20 +2031,21 @@ var paramobj: TXQValueObject;
 
   procedure parseParamsUriEncoded(const q: ixqvalue);
   var
-    names, values, specialNames: TStringArray;
-    specialValues: TXQVArray;
+    request: THttpRequestParams;
     i: Integer;
   begin
-    if paramobj = nil then paramobj := TXQValueObject.create();
-    urlEncodingFromValue(q, @context.staticContext.nodeCollation.equal, false, CP_NONE, names, values, specialNames, specialValues);
-    for i := 0 to high(names) do
-      addParam(names[i], values[i]);
+    if paramobj = nil then paramobj := TXQValueStringMap.create();
+    request.init;
+    request.addXQValue(q, context.staticContext);
+    for i := 0 to request.size - 1 do
+      addParam(request.data[i].key, request.data[i].value);
+    request.done;
   end;
   procedure parseParamsMime(const data, boundary: string);
   var mime: TMIMEMultipartData;
     i: Integer;
   begin
-    if paramobj = nil then paramobj := TXQValueObject.create();
+    if paramobj = nil then paramobj := TXQValueStringMap.create();
     mime.parse(data, boundary);
     for i := 0 to high(mime.data) do
       addParam(mime.data[i].getFormDataName, mime.data[i].data);
@@ -1749,12 +2054,10 @@ var paramobj: TXQValueObject;
 var
   url, multipart: String;
   decoded: TDecodedUrl;
-  resobj: TXQValueObject;
-
-
+  resobj: TXQValueStringMapPendingUpdate;
 begin
   requiredArgCount(argc, 1);
-  resobj := TXQValueObject.create();
+  resobj := TXQValueStringMapPendingUpdate.create();
   result := resobj;
   paramobj := nil;
   if args[0].kind = pvkObject then begin
@@ -1811,7 +2114,7 @@ var resseq: TXQValueSequence;
     n: TTreeNode;
     tempv: IXQValue;
     resolvedUri: RawByteString;
-    tempobj: TXQValueObject;
+    tempobj: TXQValueStringMapPendingUpdate;
   begin
     for iv in seq.GetEnumeratorPtrUnsafe do
       case iv^.kind of
@@ -1856,9 +2159,9 @@ var resseq: TXQValueSequence;
           if not tempv.isUndefined then begin
             resolvedUri := strResolveURI(tempv.toString, baseUri);
             if resolvedUri <> tempv.toString then begin
-              tempobj := TXQValueObject.create();
+              tempobj := TXQValueStringMapPendingUpdate.create();
               tempobj.prototype := iv^;
-              tempobj.values.add('url', resolvedUri);
+              tempobj.setMutable('url', resolvedUri);
               resseq.add(tempobj);
             end else resseq.add(iv^);
           end else resseq.add(iv^);
@@ -1908,7 +2211,7 @@ begin
 end;
 
 {$ImplicitExceptions off}
-function tryValueToInteger(const v: IXQValue; out outv: integer): boolean;
+function tryValueToInteger(const v: TXQValue; out outv: integer): boolean;
 var
   i64: Int64;
   f: xqfloat;
@@ -1981,15 +2284,15 @@ end;
 function xqFunctionCodepoints_to_string({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 var temp: TStrBuilder;
   res: string;
- v: PIXQValue;
+ v: TXQValue;
  codepoint: integer;
  ok: Boolean;
 begin
   temp.init(@res);
-  for v in args[0].GetEnumeratorPtrUnsafe do begin
-    ok := tryValueToInteger(v^, codepoint);
+  for v in args[0].GetEnumeratorArrayTransparentUnsafe do begin
+    ok := tryValueToInteger(v, codepoint);
     if ok then ok := isValidXMLCharacter(codepoint);
-    if not ok then raise EXQEvaluationException.create('FOCH0001', 'Invalid character: '+v^.toXQuery());
+    if not ok then raise EXQEvaluationException.create('FOCH0001', 'Invalid character: '+v.toXQuery());
     temp.appendCodePoint(codepoint);
   end;
   temp.final;
@@ -2035,7 +2338,7 @@ begin
   //(string, encoding?) => binary
   data := args[0].toString;
   if argc > 1 then data := strConvert(data, CP_UTF8, strEncodingFromName(args[1].toString));
-  result := TXQValueString.create(baseSchema.hexBinary, data.encodeHex);
+  result := TXQValueBinary.create(baseSchema.hexBinary, data.encodeHex);
 end;
 function xqFunctionString_To_base64Binary(argc: SizeInt; args: PIXQValue): IXQValue;
 var
@@ -2044,7 +2347,7 @@ begin
   //(string, encoding?) => binary
   data := args[0].toString;
   if argc > 1 then data := strConvert(data, CP_UTF8, strEncodingFromName(args[1].toString));
-  result := TXQValueString.create(baseSchema.base64Binary, base64.EncodeStringBase64(data));
+  result := TXQValueBinary.create(baseSchema.base64Binary, base64.EncodeStringBase64(data));
 end;
 
 
@@ -2183,7 +2486,7 @@ begin
   if argc = 3 then collation := TXQueryEngine.getCollation(args[2].toString, context.staticContext.baseURI)
   else collation := context.staticContext.collation;
   if args[0].isUndefined  or args[1].isUndefined then exit(xqvalue);
-  result := xqvalue(collation.compare(args[0].toString, args[1].toString));
+  result := xqvalue(ord(collation.compare(args[0].toString, args[1].toString)));
 end;
 
 function xqFunctionCodePoint_Equal({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
@@ -2236,19 +2539,18 @@ end;
 
 function xqFunctionSubstring_after(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 var a,b: string;
-    i:integer;
     collation: TXQCollation;
+    start, len: SizeInt;
 begin
   if argc = 3 then collation := TXQueryEngine.getCollation(args[2].toString, context.staticContext.baseURI)
   else collation := context.staticContext.collation;
   a := args[0].toString;
   b := args[1].toString;
   if b = '' then result := xqvalue(a)
-  else begin
-    i := collation.indexOf(a,b);
-    if i = 0 then result := xqvalue('')
-    else result := xqvalue(strcopyfrom(a,i+length(b)));
-  end;
+  else if collation.find(a,b,start, len) then
+    result := xqvalue(strcopyfrom(a,start + len))
+   else
+    result := xqvalue('')
 end;
 
 
@@ -2324,40 +2626,6 @@ begin
 
 end;
 
-type TUnicodeNormalizationForm = (unfNFC, unfNFD, unfNFKC, unfNFKD,
-                                  //do nothing (three variants for error handling)
-                                  unfNone, unfEmpty, unfUnknown);
-function unicodeNormalizationForm(const s: string): TUnicodeNormalizationForm;
-begin
-  case s of
-    'NFC':  result := unfNFC;
-    'NFD':  result := unfNFD;
-    'NFKC': result := unfNFKC;
-    'NFKD': result := unfNFKD;
-    //'FULLY-NORMALIZED': ??
-    'none': result := unfNone;
-    '': result := unfEmpty;
-    else result := unfUnknown;
-  end;
-end;
-
-function normalizeString(str: string; method: TUnicodeNormalizationForm): UTF8String;
-var
-  p: pchar;
-begin
-  p := pchar(str);
-  case method of
-    unfNFC:  p := utf8proc_NFC(p);
-    unfNFD:  p := utf8proc_NFD(p);
-    unfNFKC: p := utf8proc_NFKC(p);
-    unfNFKD: p := utf8proc_NFKD(p);
-    //'FULLY-NORMALIZED': ??
-    else exit(str);
-  end;
-
-  result := UTF8String(p);
-  Freemem(p);
-end;
 
 function xqFunctionNormalizeUnicode({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 var
@@ -2433,7 +2701,7 @@ begin
   end;
   term := context.staticContext.sender.parseTermH(args[0].toString, model);
   try
-    result := term.evaluate(PXQEvaluationContext(@context)^);
+    result := term.evaluateInConstContext(context);
   finally
     term.free;
   end;
@@ -2504,13 +2772,13 @@ function xqFunctionObject(const context: TXQEvaluationContext; argc: SizeInt; ar
 var
   seq: TXQVList;
   i: Integer;
-  obj: TXQValueObject;
+  obj: TXQValueStringMap;
   v: IXQValue;
 begin
   if assigned(context.staticContext.sender.OnWarningDeprecated) then
     context.staticContext.sender.OnWarningDeprecated(context.staticContext.sender, 'object() function is DEPRECATED.');
   requiredArgCount(argc, 0, 1);
-  obj := TXQValueObject.create();
+  obj := TXQValueStringMap.create();
   if argc = 1 then begin
     v := args[0];
     if (v.kind <> pvkSequence) or (v.getSequenceCount mod 2 = 1) then raise EXQEvaluationException.Create('pxp:OBJECT', 'Argument to object constructor must be a sequence with an even number of elements');
@@ -2926,7 +3194,7 @@ var
   prefix: String;
 begin
   prefix := args[0].toString;
-  if prefix = 'xml' then exit(xqvalue(XMLNamespaceUrl_XML));
+  if prefix = 'xml' then exit(baseSchema.anyURI.createValue(XMLNamespaceUrl_XML));
   if args[1].toNode = nil then exit(xqvalue);
   temp := TNamespaceList.Create;
   args[1].toNode.getAllNamespaces(temp);
@@ -3069,12 +3337,21 @@ end;
 
 function xqFunctionCollection(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 var url: string;
+  td: TTreeDocument;
+  pv: PIXQValue;
 begin
   if (argc = 0) or (args[0].isUndefined) then url := ''
   else url := strResolveURI(args[0].toString, context.staticContext.baseURI);
   result := nil;
-  if Assigned(context.staticContext.sender) and assigned(context.staticContext.sender.OnCollection) then context.staticContext.sender.OnCollection(context.staticContext.sender, url, result);
+  td := context.staticContext.needTemporaryNodes.documentCache[url];
+  if td <> nil then
+    result := xqvalue(td);
+  if Assigned(context.staticContext.sender) and assigned(context.staticContext.sender.OnCollection) then
+    context.staticContext.sender.OnCollection(context.staticContext.sender, url, result);
   if result = nil then raise EXQEvaluationException.create('FODC0002', 'No collection entry for ' + url);
+  for pv in result.GetEnumeratorPtrUnsafe do
+    if (pv.kind = pvkNode) and ( pv.toNode is TTreeDocument) then
+      context.staticContext.needTemporaryNodes.documentCache[TTreeDocument(pv.toNode).documentURI] := TTreeDocument(pv.toNode);
 end;
 
 function xqFunctionUri_Collection(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
@@ -3108,21 +3385,21 @@ var
   end;
 
 var  i: Integer;
-     v: PIXQValue;
+     v: TXQValue;
      resseq: TXQValueSequence;
 begin
   if argc = 3 then collationOverride := TXQueryEngine.getCollation(args[2].toString, context.staticContext.baseURI)
   else collationOverride := nil;
-  if args[0].kind <> pvkSequence then begin
+  if not (args[0].kind in [pvkSequence, pvkArray]) then begin
     if {%H-}equal(args[0], args[1]) then result := xqvalue(1)
     else result := xqvalue();
   end else begin
     i := 0;
     result := nil;
     resseq := nil;
-    for v in args[0].GetEnumeratorPtrUnsafe do begin
+    for v in args[0].GetEnumeratorArrayTransparentUnsafe do begin
       i += 1;
-      if equal(v^, args[1]) then
+      if equal(v, args[1]) then
         xqvalueSeqConstruct(result, resseq, xqvalue(i));
     end;
     if result = nil then result := xqvalue();
@@ -3143,7 +3420,7 @@ end;
 function xqFunctionDistinct_values(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 var
  i: Integer;
- v: PIXQValue;
+ v: TXQValue;
  resseq: TXQValueSequence;
  collation: TXQCollation;
  found: Boolean;
@@ -3155,14 +3432,14 @@ begin
   if atom.kind <> pvkSequence then
     exit(xqvalueAtomize(atom));
   resseq := TXQValueSequence.create(atom.getSequenceCount);
-  for v in atom.GetEnumeratorPtrUnsafe do begin
+  for v in atom.GetEnumeratorArrayTransparentUnsafe do begin
     found := false;
     for i:= 0 to resseq.seq.Count - 1 do
-      if context.staticContext.equalDeepAtomic(resseq.seq[i], v^, collation) then begin
+      if context.staticContext.equalDeepAtomic(resseq.seq[i], v, collation) then begin
         found := true;
         break;
       end;
-    if not found then resseq.seq.add(v^);
+    if not found then resseq.seq.add(v);
   end;
   result := resseq;
   xqvalueSeqSqueeze(result);
@@ -3299,10 +3576,11 @@ function castUntypedToDouble(const v: IXQValue): IXQValue; //for sum,min,max
 var x: PIXQValue;
   found: Boolean;
   list: TXQVList;
+  y: TXQValue;
 begin
   found := false;
   for x in v.GetEnumeratorPtrUnsafe do begin
-    if x^.instanceOf(baseSchema.untypedOrNodeUnion) then begin
+    if (x.kind = pvkArray) or x^.instanceOf(baseSchema.untypedOrNodeUnion) then begin
       found := true;
       break;
     end;
@@ -3311,27 +3589,28 @@ begin
 
   list := TXQVList.create(v.getSequenceCount);
   result := TXQValueSequence.create(list); //in case of exceptions
-  for x in v.GetEnumeratorPtrUnsafe do
-    if x^.instanceOf(baseSchema.untypedOrNodeUnion) then
-      list.add(baseSchema.double.createValue(x^))
+  for y in v.GetEnumeratorArrayTransparentUnsafe do
+    if y.instanceOf(baseSchema.untypedOrNodeUnion) then
+      list.add(baseSchema.double.createValue(y))
      else
-      list.add(x^);
+      list.add(y);
   xqvalueSeqSqueeze(result);
 end;
 
 function xqFunctionProduct(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 var
-  v: PIXQValue;
+  v: TXQValue;
 begin
   if args[0].isUndefined then exit(args[0]);
   result := nil;
-  for v in args[0].GetEnumeratorPtrUnsafe do
-    if result = nil then result := v^
-    else result := xqvalueMultiply(context, result, v^);
+  for v in args[0].GetEnumeratorArrayTransparentUnsafe do
+    if result = nil then result := v
+    else result := xqvalueMultiply(context, result, v);
 end;
 
 
-//**< Returns the lowest type that all items in the list can be converted to
+//**< Returns the lowest type that all items in the list can be converted to, for sum/min/max/avg
+//**assumes v contains no array
 function getPromotedType(const v: IXQValue): TXQValueKind;
   function commonTyp(const a, b: TXQValueKind): TXQValueKind;
   begin
@@ -3346,6 +3625,7 @@ function getPromotedType(const v: IXQValue): TXQValueKind;
     //leafes
     if (a = pvkDateTime) or (b = pvkDateTime) then if a = b then exit(pvkDateTime) else exit(pvkUndefined);
     if (a = pvkBoolean) or (b = pvkBoolean) then if a = b then exit(pvkBoolean) else exit(pvkUndefined);
+    if (a = pvkBinary) or (b = pvkBinary) then if a = b then exit(pvkBinary) else exit(pvkUndefined);
     if (a in [pvkString,pvkNode]) or (b in [pvkString,pvkNode]) then
       if (a in [pvkString,pvkNode]) = (b in [pvkString,pvkNode]) then exit(pvkString) else exit(pvkUndefined);
 
@@ -3357,6 +3637,7 @@ function getPromotedType(const v: IXQValue): TXQValueKind;
     if (a = pvkFloat) or (b = pvkFloat) then exit(pvkFloat);
     if (a = pvkBigDecimal) or (b = pvkBigDecimal) then exit(pvkBigDecimal);
     if (a = pvkInt64) or (b = pvkInt64) then exit(pvkInt64);
+
 
     result := pvkUndefined;
   end;
@@ -3383,6 +3664,7 @@ begin
 end;                     }
 
 //** Returns the lowest type derived by decimal that all items in the list can be converted to
+//assumes v contains no array
 function getPromotedDecimalType(const v: ixqvalue): TXSType;
 var
   iterator: TXQValueEnumeratorPtrUnsafe;
@@ -3399,6 +3681,7 @@ begin
 end;
 
 //** Returns the lowest type with datetime storage that all items in the list can be converted to
+//** assumes v contains no array
 function getPromotedDateTimeType(const v: ixqvalue; needDuration: boolean): TXSType;
 var
   pv: PIXQValue;
@@ -3446,7 +3729,7 @@ begin
        and not (args[0].instanceOf(baseSchema.untypedAtomic)) then
       raise EXQEvaluationException.Create('FORG0006', 'Wrong type for sum');
     if result.instanceOf(baseSchema.untypedOrNodeUnion) then result := baseSchema.double.createValue(result.toDecimal);
-    exit();
+    if ak <> pvkArray then exit();
   end;
 
   seq := castUntypedToDouble(args[0]);
@@ -3505,12 +3788,15 @@ begin
 end;
 
 function xqFunctionavg({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
+procedure raiseError;
+begin
+  raise EXQEvaluationException.Create('FORG0006', 'Invalid types for avg', nil, args[0]);
+end;
 var tempf: xqfloat;
     tempf2: xqfloat;
     tempd: BigDecimal;
  i: Integer;
  seq: IXQValue;
- kind: TXQValueKind;
  enumerable: TXQValueEnumeratorPtrUnsafe;
  pv: PIXQValue;
 begin
@@ -3519,14 +3805,15 @@ begin
   if i = 1 then begin
     result := args[0];
     xqvalueSeqSqueeze(result);
-    if result.instanceOf(baseSchema.untypedOrNodeUnion) then result := baseSchema.double.createValue(result)
-    else begin
-      kind := result.kind;
-      if not (kind in [pvkInt64, pvkBigDecimal, pvkFloat])
-         or ((kind = pvkDateTime) and not (result.instanceOf(baseSchema.yearMonthDuration)) and not (result.instanceOf(baseSchema.dayTimeDuration))) then
-         raise EXQEvaluationException.Create('FORG0006', 'Invalid type for fn:avg');
+    if result.instanceOf(baseSchema.untypedOrNodeUnion) then exit(baseSchema.double.createValue(result))
+    else case result.kind of
+      pvkInt64, pvkBigDecimal, pvkFloat: exit;
+      pvkDateTime: if (result.instanceOf(baseSchema.yearMonthDuration)) or (result.instanceOf(baseSchema.dayTimeDuration)) then
+        exit
+        else raiseError;
+      pvkArray: ; //later
+      else raiseError;
     end;
-    exit;
   end;
 
   seq := castUntypedToDouble(args[0]);
@@ -3546,8 +3833,8 @@ begin
       tempf:=0;
       for pv in enumerable do begin
         tempf2 := pv^.toFloat;;
-        if (isnan(tempf2)) or (isPosInf(tempf2) and isNegInf(tempf)) or (isNegInf(tempf2) and isPosInf(tempf))  then
-          exit(getPromotedDecimalType(seq).createValue(getNaN));
+        if (tempf2.IsNan()) or (tempf2.IsPositiveInfinity and tempf.IsNegativeInfinity()) or (tempf2.IsNegativeInfinity() and tempf.IsPositiveInfinity)  then
+          exit(getPromotedDecimalType(seq).createValue(xqfloat.NaN));
         tempf += tempf2;
       end;
       result := getPromotedDecimalType(seq).createValue(tempf / seq.getSequenceCount);
@@ -3559,7 +3846,7 @@ end;
 function xqFunctionminmax(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue; const asmin: boolean): IXQValue;
 procedure raiseError;
 begin
-  raise EXQEvaluationException.Create('FORG0006', 'Incompatible types for fn:min/max');
+  raise EXQEvaluationException.Create('FORG0006', 'Invalid types for fn:min/max', nil, args[0]);
 end;
 
 var tempf: xqfloat;
@@ -3570,11 +3857,11 @@ var tempf: xqfloat;
  collation: TXQCollation;
  tempf2: xqfloat;
  tempd: BigDecimal;
- kind: TXQValueKind;
  baseType: TXSType;
  seq: IXQValue;
  enumerable: TXQValueEnumeratorPtrUnsafe;
  pv: PIXQValue;
+ tempv: TXQValue;
 begin
   if argc = 2 then collation := TXQueryEngine.getCollation(args[1].toString, context.staticContext.baseURI)
   else collation := context.staticContext.collation;
@@ -3583,14 +3870,18 @@ begin
     Result := args[0];
     if result.kind = pvkSequence then result := args[0].get(1);
     if result.getSequenceCount > 0 then begin
-      if result.instanceOf(baseSchema.untypedOrNodeUnion) then result := baseSchema.double.createValue(result);
-      kind := result.kind;
-      if (not (kind in [pvkUndefined, pvkDateTime, pvkBoolean, pvkInt64, pvkBigDecimal, pvkFloat, pvkString]))
-         or ((kind = pvkDateTime) and (result.typeAnnotation as TXSDateTimeType).isDuration and ( not result.instanceOf(baseSchema.yearMonthDuration)) and (not result.instanceOf(baseSchema.dayTimeDuration)))
-         then
-        raise EXQEvaluationException.Create('FORG0006', 'Invalid type for fn:min/max');
-    end;
-    exit();
+      if result.instanceOf(baseSchema.untypedOrNodeUnion) then exit(baseSchema.double.createValue(result));
+      case result.kind of
+        pvkUndefined, pvkBoolean, pvkInt64, pvkBigDecimal, pvkFloat, pvkString, pvkBinary: exit; //ok
+        pvkDateTime:
+          if (result.typeAnnotation as TXSDateTimeType).isDuration and not (result.instanceOf(baseSchema.yearMonthDuration) or result.instanceOf(baseSchema.dayTimeDuration)) then
+            raiseError
+          else
+            exit;
+        pvkArray: ; //below
+        else raiseError;
+      end;
+    end else exit;
   end;
 
   seq := castUntypedToDouble(args[0]);
@@ -3606,7 +3897,7 @@ begin
         else if not result.typeAnnotation.derivedFrom(baseSchema.dayTimeDuration) then raiseError;
 
       for pv in enumerable do begin
-        if (context.staticContext.compareAtomic(result, pv^, nil) < 0) <> asmin then
+        if (ord(context.staticContext.compareAtomic(result, pv^, nil)) < 0) <> asmin then
           result := pv^;
         if ((pv^.typeAnnotation as TXSSimpleType).primitive <> baseType) then
           raiseError;
@@ -3677,7 +3968,7 @@ begin
       result := nil;
       for pv in enumerable do begin
         temps2 := pv^.toString;
-        if (collation.compare(temps2, temps) < 0) = asmin then begin
+        if (ord(collation.compare(temps2, temps)) < 0) = asmin then begin
           temps := temps2;
           xqvalueMoveNoRefCount(pv^, result);
         end;
@@ -3689,6 +3980,13 @@ begin
             result := xqvalue(temps);
             exit;
           end;
+    end;
+    pvkBinary: begin
+      tempv := seq.get(1).toValue;
+      for pv in enumerable do
+        if (ord(TXQValueBinary.compare(pv^.toValue, tempv)) < 0) = asmin then
+          tempv := pv^.toValue;
+      result := tempv;
     end;
     else begin raiseError; result := nil; end;
   end;
@@ -4276,989 +4574,36 @@ begin
     context.splitRawQName(namespace, localpart, kind);
     namespaceURL := namespaceGetURL(namespace);
     result := namespaceURL <> '';
-  end else if kind <> xqdnkUnknown then begin
+  end{ else if kind <> xqdnkUnknown then begin
     namespaceURL := namespaceGetURL(context.findNamespace('', kind));
-  end;
+  end};
 end;
 
 
-type
-TTrackOwnedXQHashsetStr = record
-  class procedure addRef(o: PXQHashsetStr); static; inline;
-  class procedure release(o: PXQHashsetStr); static; inline;
-end;
-TXQHashsetQName = object(specialize TXQHashmapStrOwning<PXQHashsetStr, TTrackOwnedXQHashsetStr>)
-  function contains(namespace: TNamespace; const local: string): boolean;
-  procedure include(namespace: TNamespace; const local: string);
-  function contains(const namespace,local: string): boolean;
-  procedure include(const namespace,local: string);
-  function includeAll(const v: IXQValue): boolean;
-  function includeAll(const context: TXQEvaluationContext; const s: string): boolean;
-end;
-PXQHashsetQName = ^TXQHashsetQName;
-class procedure TTrackOwnedXQHashsetStr.addRef(o: PXQHashsetStr);
-begin
-  //empty
-end;
-class procedure TTrackOwnedXQHashsetStr.release(o: PXQHashsetStr);
-begin
-  dispose(o, done);
-end;
-function TXQHashsetQName.contains(namespace: TNamespace; const local: string): boolean;
-begin
-  result := contains(namespaceGetURL(namespace), local);
-end;
-procedure TXQHashsetQName.include(namespace: TNamespace; const local: string);
-begin
-  include(namespaceGetURL(namespace), local);
-end;
-function TXQHashsetQName.contains(const namespace, local: string): boolean;
-var
-  s: PXQHashsetStr;
-begin
-  s := getOrDefault(namespace);
-  result := assigned(s) and s.contains(local);
-end;
-procedure TXQHashsetQName.include(const namespace, local: string);
-var
-  ent: PHashMapEntity;
-begin
-  ent := findEntity(namespace, true);
-  if ent.Value = nil then new(PXQHashsetStr(ent.Value), init);
-  PXQHashsetStr(ent.Value)^.include(local);
-end;
 
-function TXQHashsetQName.includeAll(const v: IXQValue): boolean;
-var
-  qname: TXQValueQName;
-  pw: PIXQValue;
-begin
-  for pw in v.GetEnumeratorPtrUnsafe do begin
-    if v.kind <> pvkQName then exit(false);
-    qname := v.toValue as TXQValueQName;
-    include(qname.url, qname.local);
-  end;
-  result := true;
-end;
 
-function TXQHashsetQName.includeAll(const context: TXQEvaluationContext; const s: string): boolean;
-var
-  t, namespaceUrl, name: String;
-begin
-  for t in strTrimAndNormalize(s, WHITE_SPACE).Split(' ') do begin
-    splitEQName(context, t, namespaceUrl, name, xqdnkElementType);
-    include(namespaceUrl, name);
-  end;
-  result := true;
-end;
 
 
-type
-TSerializationMethod = (xqsmXML, xqsmXHTML, xqsmHTML, xqsmText, xqsmJSON, xqsmAdaptive);
-TSerializationParams = record
-  isAbsentMarker: string;
-  method: TSerializationMethod;
-  encoding: string;
-  encodingCP: TSystemCodePage;
-  indent: TXQSerializerInsertWhitespace;
-  itemSeparator: string;
-  normalizationForm: TUnicodeNormalizationForm;
-  characterMaps: ^TXQHashmapStrStr;
 
-  //xml only
-  version: string;
-  htmlVersion, doctypePublic, doctypeSystem: string;
-  omitXmlDeclaration: boolean;
-  standalone: TXMLDeclarationStandalone;
-  cdataSectionElements, suppressIndentation: PXQHashsetQName;
 
 
-  //json only
-  jsonNodeOutputMethod: string;
-  allowDuplicateNames: boolean;
 
-  procedure done;
-
-  procedure setDefault(isFromMap: boolean);
-  procedure setFromNode(const context: TXQEvaluationContext; paramNode: TTreeNode; isStatic: boolean);
-  procedure setFromMap(const context: TXQEvaluationContext;const v: IXQValue);
-  procedure setFromXQValue(const context: TXQEvaluationContext; const v: IXQValue);
-
-  procedure setMethod(const s: string);
-  procedure setStandalone(s: string; fromMap: boolean);
-  procedure setStandalone(s: boolean);
-  procedure setNormalizationForm(const s: string);
-  function hasNormalizationForm: boolean;
-  procedure setEncoding(const s: string);
-  function needQNameList(var list: PXQHashsetQName): PXQHashsetQName;
-end;
-
-
-procedure TSerializationParams.done;
-begin
-  if assigned(characterMaps) then Dispose(characterMaps,done);
-  if assigned(cdataSectionElements) then Dispose(cdataSectionElements,done);
-  if assigned(suppressIndentation) then Dispose(suppressIndentation,done);
-end;
-
-procedure TSerializationParams.setDefault(isFromMap: boolean);
-begin
-  isAbsentMarker := #0;
-  method := xqsmXML;
-  if isFromMap then version := '1.0' else version := isAbsentMarker;
-  encoding := 'UTF-8';
-  encodingCP := CP_UTF8;
-  htmlVersion := isAbsentMarker;
-  doctypePublic := isAbsentMarker;
-  doctypeSystem := isAbsentMarker;
-  omitXmlDeclaration := true;
-  standalone := xdsOmit;
-  itemSeparator := isAbsentMarker;
-  if isFromMap then indent := xqsiwNever
-  else indent := xqsiwConservative;
-  jsonNodeOutputMethod := 'xml';
-  normalizationForm := unfUnknown;
-  characterMaps := nil;
-  allowDuplicateNames := true;
-  cdataSectionElements := nil;
-  suppressIndentation := nil;
-end;
-
-function toSerializationBool(const s:string; fromMap: boolean): boolean;
-begin
-  case trim(s) of
-    'true', 'yes', '1': result := true;
-    'false', 'no', '0': result := false;
-    else raiseXQEvaluationException(IfThen(fromMap, 'SEPM0016', 'SEPM0017'), 'Expected boolean, got '+s);
-  end;
-end;
-
-
-procedure TSerializationParams.setFromNode(const context: TXQEvaluationContext;paramNode: TTreeNode; isStatic: boolean);
-  procedure error;
-  begin
-    raise EXQEvaluationException.create(IfThen(isStatic, 'XQST0109', 'SEPM0017'), 'Invalid serialization parameter: '+paramNode.outerXML());
-  end;
-  procedure error(code: string);
-  begin
-    raise EXQEvaluationException.create(code, 'Invalid serialization parameter: '+paramNode.outerXML());
-  end;
-
-const XMLNamespace_Output = 'http://www.w3.org/2010/xslt-xquery-serialization';
-
-  procedure checkNoAttributes(node: ttreenode; allowValue: boolean = false);
-  var att: TTreeAttribute;
-  begin
-    for att in node.getEnumeratorAttributes do
-      if ((att.value <> 'value') or not allowValue) and not att.isNamespaceNode then
-        error;
-  end;
-
-  procedure setCharacterMaps();
-  var mapNode: TTreeNode;
-      att: TTreeAttribute;
-      mapString, character: String;
-  begin
-    if characterMaps = nil then new(characterMaps,init);
-    if paramNode.hasAttribute('value') then error;
-    mapNode := paramNode.getFirstChild();
-    for mapnode in paramNode.getEnumeratorChildren do begin
-      case mapnode.typ of
-        tetOpen: begin
-          if mapnode.namespace = nil then error;
-          if not equalNamespaces(namespaceGetURL(mapNode.namespace), XMLNamespace_Output) then continue;
-          if mapNode.value <> 'character-map' then error;
-          mapString := '';
-          character := '';
-          for att in mapnode.getEnumeratorAttributes do
-            case att.value of
-              'map-string': mapString := att.realvalue;
-              'character': character := att.realvalue ;
-              else if not att.isNamespaceNode then error;
-            end;
-          if character.lengthInUtf8CodePoints <> 1 then error;
-          if characterMaps.contains(character) then error('SEPM0018');
-          characterMaps.include(character, mapString);
-        end;
-      end;
-    end;
-  end;
-
-  function toSerializationBool(const s:string): boolean; overload;
-  begin
-    result := toSerializationBool(s, false);
-  end;
-
-var duplicateValueCheck: TXQHashsetStr;
-begin
-  if paramNode = nil then exit;
-  if isStatic and (paramNode.typ = tetDocument) then paramNode := paramnode.getFirstChild();
-  if paramNode = nil then exit;
-  if not equalNamespaces(namespaceGetURL(paramNode.namespace), XMLNamespace_Output)
-     or (paramNode.value <> 'serialization-parameters')
-     or (paramNode.typ <> tetOpen) then error('XPTY0004');
-   checkNoAttributes(paramNode);
-   duplicateValueCheck.init;
-   for paramNode in paramNode.getEnumeratorChildren do begin
-     if paramnode.typ <> tetOpen then continue;
-     if paramnode.namespace = nil then error;
-     if duplicateValueCheck.contains(paramNode.getNodeName()) then
-       error('SEPM0019');
-     duplicateValueCheck.include(paramNode.getNodeName());
-     if equalNamespaces(namespaceGetURL(paramNode.namespace), XMLNamespace_Output) then begin
-       checkNoAttributes(paramNode, true);
-       case paramNode.value of
-         'allow-duplicate-names': allowDuplicateNames := toSerializationBool(paramNode.getAttribute('value'));
-         'byte-order-mark': ; //todo
-         'cdata-section-elements': needQNameList(cdataSectionElements).includeAll(context, paramNode.getAttribute('value'));
-         'doctype-public': doctypePublic := paramNode.getAttribute('value');
-         'doctype-system': doctypeSystem := paramNode.getAttribute('value');
-         'encoding':       setEncoding(paramNode.getAttribute('value'));
-         'escape-uri-attributes': ;//todo
-         'html-version':   htmlVersion := paramNode.getAttribute('value');
-         'include-content-type': ;//todo
-         'indent': if toSerializationBool(paramNode.getAttribute('value')) then indent := xqsiwIndent
-                   else indent := xqsiwNever;
-         'item-separator': itemSeparator := paramNode.getAttribute('value');
-         'json-node-output-method': jsonNodeOutputMethod := paramNode.getAttribute('value');
-         'media-type': ;//todo
-         'method':         setMethod(paramNode.getAttribute('value'));
-         'normalization-form': setNormalizationForm(paramNode.getAttribute('value'));
-         'omit-xml-declaration': omitXmlDeclaration := toSerializationBool(paramNode.getAttribute('value'));
-         'standalone': setStandalone(paramNode.getAttribute('value'), false);
-         'suppress-indentation': needQNameList(suppressIndentation).includeAll(context, paramNode.getAttribute('value'));
-         'undeclare-prefixes': ;//todo
-         'use-character-maps': setCharacterMaps;
-         'version':        version := paramNode.getAttribute('value');
-         else error();
-       end;
-     end;
-   end;
-   duplicateValueCheck.done;
-end;
-
-procedure TSerializationParams.setFromMap(const context: TXQEvaluationContext; const v: IXQValue);
-var
-  pp, characterp: TXQProperty;
-  staticOptions: boolean = false;
-  procedure raiseInvalidParameter(typeError: boolean = true);
-  begin
-    raiseXQEvaluationError(ifthen(typeError, 'XPTY0004', 'SEPM0016'), 'Invalid parameter for '+ pp.Name, pp.Value);
-  end;
-
-  function toSerializationBool(const s:string): boolean; overload;
-  begin
-    result := toSerializationBool(s, true);
-  end;
-
-  function valueBool: Boolean;
-  begin
-    if pp.Value.kind = pvkBoolean then exit(pp.value.toBoolean);
-    if staticOptions and (pp.Value.kind = pvkString) then begin
-      exit(toSerializationBool(pp.value.toString));
-    end;
-
-    result := false;
-    raiseInvalidParameter();
-  end;
-  function valueString(): string;
-  begin
-    if pp.Value.kind = pvkString then result := pp.value.toString
-    else begin raiseInvalidParameter; result := ''; end
-  end;
-  procedure setQNameList(var list: PXQHashsetQName);
-  var
-    ok: Boolean;
-  begin
-    needQNameList(list);
-    if not staticOptions then ok := list.includeAll(pp.Value)
-    else ok := list.includeAll(context, pp.Value.toString);
-    if not ok then raiseInvalidParameter();
-  end;
-
-begin
-  for pp in v.getPropertyEnumerator do begin
-    case pp.Value.getSequenceCount of
-      0: continue;
-      1: ; //fine
-      else case pp.Name of
-        'cdata-section-elements', 'suppress-indentation': ; //fine
-        else raiseXPTY0004TypeError(v, 'Invalid parameter');
-      end;
-    end;
-    case pp.Name of
-      'allow-duplicate-names': allowDuplicateNames := valueBool();
-      'byte-order-mark': valueBool(); //todo
-      'cdata-section-elements': setQNameList(cdataSectionElements);
-      'doctype-public': begin doctypePublic := valueString(); if doctypePublic = '' then doctypePublic := isAbsentMarker; end;
-      'doctype-system': begin doctypeSystem := valueString(); if doctypeSystem = '' then doctypeSystem := isAbsentMarker; end;
-      'encoding': setEncoding(valueString());
-      'escape-uri-attributes': valueBool(); //todo
-      'html-version':
-        if pp.value.kind in [pvkInt64, pvkBigDecimal] then htmlVersion := inttostr(pp.value.toInt64)
-        else if staticOptions and (pp.Value.kind = pvkString) then htmlVersion := pp.Value.toString
-        else raiseInvalidParameter;
-      'include-content-type': valueBool(); //todo
-      'indent': if valueBool() then indent := xqsiwIndent
-                else indent := xqsiwNever;
-      'item-separator': itemSeparator := valueString();
-      'json-node-output-method': jsonNodeOutputMethod := valueString();
-      'media-type': valueString(); //todo
-      'method': setMethod(valueString());
-      'normalization-form': setNormalizationForm(valueString());
-      'omit-xml-declaration': omitXmlDeclaration := valueBool();
-      'standalone': if staticOptions and (pp.Value.toString = 'omit') then standalone := xdsOmit
-                    else setStandalone(valueBool());
-      'suppress-indentation': setQNameList(suppressIndentation);
-      'undeclare-prefixes': valueBool(); //todo
-      'use-character-maps': begin
-        if characterMaps = nil then new(characterMaps,init);
-        if pp.value.kind <> pvkObject then raiseXPTY0004TypeError(pp.value, 'Map for serialization param use-character-maps.');
-        for characterp in pp.value.getPropertyEnumerator do
-          characterMaps.include(characterp.Name, characterp.Value.toString);
-      end;
-      'version': version := valueString();
-      #0'static-options': begin
-        staticOptions := true;
-        allowDuplicateNames := false;
-        omitXmlDeclaration := false;
-      end;
-      'parameter-document': if staticOptions then
-        setFromNode(context, pp.Value.toNode, true);
-      else if staticOptions then raiseXQEvaluationException('XQST0109', 'Unknown serialization option.');
-    end;
-  end;
-end;
-
-procedure TSerializationParams.setFromXQValue(const context: TXQEvaluationContext;const v: IXQValue);
-begin
-  case v.kind of
-    pvkObject: begin
-      setDefault(true);
-      setFromMap(context, v);
-    end;
-    pvkNode: begin
-      setDefault(false);
-      setFromNode(context, v.toNode, false);
-    end
-    else if v.getSequenceCount > 0 then raiseXPTY0004TypeError(v, 'serialize params must be map() or node')
-    else setDefault(true);
-  end;
-end;
-
-procedure TSerializationParams.setMethod(const s: string);
-begin
-  case s of
-    'xml': method := xqsmXML;
-    'html': method := xqsmHTML;
-    'xhtml': method := xqsmXHTML;
-    'text': method := xqsmText;
-    'json': method := xqsmJSON;
-    'adaptive': method := xqsmAdaptive;
-  end;
-end;
-
-procedure TSerializationParams.setStandalone(s: string; fromMap: boolean);
-begin
-  s := trim(s);
-  if s = 'omit' then standalone := xdsOmit
-  else setStandalone(toSerializationBool(s, fromMap));
-end;
-
-procedure TSerializationParams.setStandalone(s: boolean);
-begin
-  if s then standalone := xdsYes
-  else standalone := xdsNo;
-end;
-
-procedure TSerializationParams.setNormalizationForm(const s: string);
-begin
-  normalizationForm := unicodeNormalizationForm(s);
-  case normalizationForm of
-    unfEmpty, unfUnknown: raise EXQEvaluationException.Create('SESU0011', 'Unknown normalization method: '+s);
-  end;
-end;
-
-function TSerializationParams.hasNormalizationForm: boolean;
-begin
-  result := not (normalizationForm in [unfNone, unfUnknown, unfEmpty])
-end;
-
-procedure TSerializationParams.setEncoding(const s: string);
-begin
-  encoding := s;
-  encodingCP := strEncodingFromName(s);
-  if encodingCP = $FFFF then raiseXQEvaluationException('SESU0007', 'Unknown encoding: '+s);
-end;
-
-function TSerializationParams.needQNameList(var list: PXQHashsetQName): PXQHashsetQName;
-begin
-  if list = nil then new(list,init);
-  result := list;
-end;
-
-type TSpecialStringHandler = object
-  serializer: ^TXQSerializer;
-  params: ^TSerializationParams;
-  htmlNodes, isUnicodeEncoding: boolean;
-  function normalizeString(p: pchar; len: sizeint): string; overload;
-  function normalizeString(const s: string): string; inline; overload;
-  procedure appendJSONStringWithoutQuotes(const s: string);
-  procedure appendXMLHTMLCharacterMappedText(const s: string; attrib: boolean);
-  function appendXMLHTMLText(const n: TTreeNode): boolean;
-  function appendXMLHTMLAttribute(const n: TTreeAttribute): boolean;
-  procedure init;
-end;
-procedure TSpecialStringHandler.init;
-begin
-  //calling this procedure silences an object never used warning
-end;
-
-function TSpecialStringHandler.normalizeString(p: pchar; len: sizeint): string;
-begin
-  result := xquery__functions.normalizeString(strFromPchar(p, len), params^.normalizationForm)
-end;
-
-function TSpecialStringHandler.normalizeString(const s: string): string;
-begin
-  result := normalizeString(pchar(s), length(s));
-end;
-
-procedure TSpecialStringHandler.appendJSONStringWithoutQuotes(const s: string);
-var needNormalization, needEscaping: Boolean;
-var enumerator: TUTF8StringCodePointBlockEnumerator;
-  entity: TXQHashmapStrStr.PHashMapEntity;
-  hadNext: Boolean;
-begin
-  if params^.characterMaps = nil then begin
-    serializer^.appendJSONStringWithoutQuotes(normalizeString(s));
-  end else begin
-    needNormalization := params^.hasNormalizationForm;
-    needEscaping := false;
-    enumerator.init(s);
-    repeat
-      hadNext := enumerator.MoveNext;
-      entity := params^.characterMaps.findEntity(enumerator.currentPos, enumerator.currentByteLength);
-      if (not hadNext) or (entity <> nil) then begin
-        if needNormalization or needEscaping then serializer^.appendJSONStringWithoutQuotes(normalizeString(enumerator.markedPos, enumerator.markedByteLength))
-        else serializer^.append(enumerator.markedPos, enumerator.markedByteLength);
-        needEscaping := false;
-        enumerator.markNext;
-        if entity <> nil then
-          serializer^.append(string(entity^.Value));
-      end else case enumerator.currentPos^ of
-        #0..#31, '"', '\', '/': needEscaping := true;
-      end;
-    until not hadNext;
-  end;
-end;
-
-procedure TSpecialStringHandler.appendXMLHTMLCharacterMappedText(const s: string; attrib: boolean);
-var needNormalization, needEscaping: Boolean;
-var entity: TXQHashmapStrStr.PHashMapEntity;
-    enumerator: TUTF8StringCodePointBlockEnumerator;
-    hadNext: Boolean;
-    temp: String;
-begin
-  needNormalization := params.hasNormalizationForm;
-  needEscaping := false;
-  enumerator.init(s);
-  repeat
-    hadNext := enumerator.MoveNext;
-    entity := params^.characterMaps.findEntity(enumerator.currentPos, enumerator.currentByteLength);
-    if (not hadNext) or (entity <> nil) then begin
-      if needNormalization or needEscaping then begin
-        temp := normalizeString(enumerator.markedPos, enumerator.markedByteLength);
-        if attrib then begin
-          if htmlNodes then serializer^.appendHTMLAttrib(temp)
-          else serializer^.appendXMLAttrib(temp)
-        end else
-          if htmlNodes then serializer^.appendHTMLText(temp)
-          else serializer^.appendXMLText(temp)
-      end else begin
-        serializer^.append(enumerator.markedPos, enumerator.markedByteLength);
-      end;
-      needEscaping := false;
-
-      enumerator.markNext;
-      if entity <> nil then
-        serializer^.append(string(entity^.Value));
-    end else case enumerator.currentPos^ of
-      '<', '>', '&': needEscaping := true;
-      '''', '"': needEscaping := needEscaping or attrib;
-      #0..#$1F: needEscaping := true;
-      #$C2: needEscaping := needEscaping or (  (enumerator.currentByteLength = 2) and ((enumerator.currentPos + 1)^ in [#$80..#$9F]));
-      #$E2: needEscaping := needEscaping or ( (enumerator.currentByteLength = 3) and ((enumerator.currentPos + 1)^ = #$80) and ((enumerator.currentPos + 2)^ = #$A8));
-    end;
-  until not hadNext;
-end;
-
-function TSpecialStringHandler.appendXMLHTMLText(const n: TTreeNode): boolean;
-  procedure appendXMLCDATATextASCII(const s: string);
-  var enumerator: TUTF8StringCodePointBlockEnumerator;
-    hadNext: Boolean;
-  begin
-    enumerator.init(s);
-    repeat
-      hadNext := enumerator.MoveNext;
-      if enumerator.currentByteLength <> 1 then begin
-        serializer.appendXMLCDATAText(enumerator.markedPos, enumerator.markedByteLength);
-        if enumerator.currentByteLength > 0 then
-          serializer.appendHexEntity(enumerator.current);
-        enumerator.markNext;
-      end;
-    until not hadNext;
-  end;
-
-  procedure appendCDATA(const s: string);
-  begin
-    if isUnicodeEncoding then serializer.appendXMLCDATAText(s)
-    else appendXMLCDATATextASCII(s);
-  end;
-  procedure appendNormalizedCDATA(const s: string);
-  begin
-    appendCDATA(normalizeString(s));
-  end;
-
-var
-  parent: TTreeNode;
-begin
-  if assigned(params.cdataSectionElements) then begin
-    parent := n.getParent();
-    if assigned(parent) and params.cdataSectionElements.contains(parent.namespace, parent.value) then begin
-      if params^.hasNormalizationForm then appendNormalizedCDATA(n.value)
-      else appendCDATA(n.value);
-      exit(true);
-    end;
-  end;
-  if assigned(params^.characterMaps) then begin
-    appendXMLHTMLCharacterMappedText(n.value, false);
-    exit(true);
-  end;
-  result := false;
-end;
-
-function TSpecialStringHandler.appendXMLHTMLAttribute(const n: TTreeAttribute): boolean;
-begin
-  serializer.append(' ');
-  serializer.append(n.getNodeName());
-  serializer.append('="');
-  appendXMLHTMLCharacterMappedText(n.realvalue, true);
-  serializer.append('"');
-  result := true;
-end;
-
-function isUnicodeEncoding(e: TSystemCodePage): boolean;
-begin
-  e := strActualEncoding(e);
-  case e of
-    CP_UTF8, CP_UTF16, CP_UTF16BE, CP_UTF32, CP_UTF32BE: result := true;
-    else result := false;
-  end;
-end;
-
-procedure serializeNodes(base: TTreeNode; var builder: TXQSerializer; nodeSelf: boolean; html: boolean);
-var known: TNamespaceList;
-
-  function htmlElementIsImplicitCDATA(const name: string): boolean;
-  begin
-    result := simplehtmlparser.htmlElementIsCDATA(pchar(name), length(name));
-  end;
-
-  function requireNamespace(n: TNamespace): string;
-  begin //that function is useless the namespace should always be in known. But just for safety...
-    if (n = nil) or (n.getURL = XMLNamespaceUrl_XML) or (n.getURL = XMLNamespaceUrl_XMLNS) or (known.hasNamespace(n)) then exit('');
-    known.add(n);
-    result := ' ' + n.serialize;
-  end;
-
-  procedure inner(n: TTreeNode); forward;
-
-  procedure outer(n: TTreeNode);
-  var attrib: TTreeAttribute;
-      oldnamespacecount: integer;
-      i: Integer;
-      temp: TNamespace;
-  begin
-    with n do with builder do
-    case typ of
-      tetText: begin
-        if assigned(builder.onInterceptAppendXMLHTMLText) and builder.onInterceptAppendXMLHTMLText(n) then begin
-          //empty
-        end else if not html then append(xmlStrEscape(value)) //using appendXMLText fails (lacking automatic encoding conversion?)
-        else if (getParent() <> nil) and htmlElementIsImplicitCDATA(getParent().value) then append(value)
-        else appendHTMLText(value);
-      end;
-      tetClose:
-        if (namespace = nil) or (namespace.getPrefix = '') then appendXMLElementEndTag(value)
-        else appendXMLElementEndTag(getNodeName());
-      tetComment: begin
-        append('<!--');
-        append(value);
-        append('-->');
-      end;
-      tetProcessingInstruction:
-        if attributes <> nil then appendXMLProcessingInstruction(value, getAttribute(''))
-        else appendXMLProcessingInstruction(value, '');
-      tetOpen: begin
-        oldnamespacecount:=known.Count;
-        append('<');
-        append(getNodeName());
-
-        {
-        writeln(stderr,'--');
-         if attributes <> nil then
-          for attrib in attributes do
-            if attrib.isNamespaceNode then
-             writeln(stderr, value+': '+attrib.toNamespace.serialize);
-        }
-        if oldnamespacecount = 0 then n.getAllNamespaces(known)
-        else n.getOwnNamespaces(known);
-        for i:=oldnamespacecount to known.Count - 1 do
-          if (known.items[i].getURL <> '') or
-             (known.hasNamespacePrefixBefore(known.items[i].getPrefix, oldnamespacecount)
-                and (isNamespaceUsed(known.items[i])
-                     or ((known.items[i].getPrefix = '') and (isNamespaceUsed(nil))))) then begin
-                       append(' ');
-                       append(known.items[i].serialize);
-                     end;
-
-        if namespace <> nil then append(requireNamespace(namespace))
-        else if known.hasNamespacePrefix('', temp) then
-          if temp.getURL <> '' then begin
-            known.add(TNamespace.Make('', ''));
-            append(' xmlns=""');
-          end;
-        if attributes <> nil then
-          for attrib in getEnumeratorAttributes do
-            append(requireNamespace(attrib.namespace));
-
-
-        if attributes <> nil then
-          for attrib in getEnumeratorAttributes do
-            if not attrib.isNamespaceNode then begin
-              if assigned(builder.onInterceptAppendXMLHTMLAttribute) and builder.onInterceptAppendXMLHTMLAttribute(attrib) then begin
-                //empty
-              end else if html then appendHTMLElementAttribute(attrib.getNodeName(), attrib.realvalue)
-              else appendXMLElementAttribute(attrib.getNodeName(), attrib.realvalue);
-            end;
-
-        if (n.next = reverse) and (not html or (TTreeParser.htmlElementIsChildless(value))) then begin
-          if html then append('>')
-          else append('/>');
-          if builder.insertWhitespace = xqsiwIndent then append(LineEnding);
-          while known.count > oldnamespacecount do
-            known.Delete(known.count-1);
-          exit();
-        end;
-        append('>');
-        if builder.insertWhitespace = xqsiwIndent then append(LineEnding);
-        inner(n);
-        append('</'); append(n.getNodeName()); append('>');
-        if builder.insertWhitespace = xqsiwIndent then append(LineEnding);
-        while known.count > oldnamespacecount do
-          known.Delete(known.count-1);
-      end;
-      tetDocument: inner(n);
-      else; //should not happen
-    end;
-  end;
-
-  procedure inner(n: TTreeNode);
-  var sub: TTreeNode;
-  begin
-    if not (n.typ in TreeNodesWithChildren) then exit;
-    sub := n.next;
-    while sub <> n.reverse do begin
-      outer(sub);
-      if not (sub.typ in TreeNodesWithChildren) then sub:=sub.next
-      else if sub.reverse = nil then raise ETreeParseException.Create('Failed to serialize, no closing tag for '+sub.value)
-      else sub := sub.reverse.next;
-    end;
-  end;
-begin
-  known := TNamespaceList.Create;
-  if nodeSelf then outer(base)
-  else inner(base);
-  known.free;
-end;
-
-
-function serializeJSON(const params: TSerializationParams; const v: IXQValue): IXQValue;
-var serializer: TXQSerializer;
-  temp, temp2: string;
-  interceptor: TSpecialStringHandler;
-  cp: Integer;
-begin
-  serializer.init(@temp);
-  serializer.standard := true;
-
-  serializer.allowDuplicateNames := params.allowDuplicateNames;
-  serializer.insertWhitespace := params.indent;
-  case params.jsonNodeOutputMethod of
-    'xml': serializer.nodeFormat := tnsXML;
-    'xhtml': serializer.nodeFormat := tnsXML;
-    'html': serializer.nodeFormat := tnsHTML;
-    'text': serializer.nodeFormat := tnsText;
-    else serializer.error('SEPM0016', v.toValue);
-  end;
-
-  if params.hasNormalizationForm or (params.characterMaps <> nil) then begin
-    interceptor.init;
-    interceptor.params := @params;
-    interceptor.serializer := @serializer;
-    serializer.onInterceptAppendJSONString := @interceptor.appendJSONStringWithoutQuotes;
-  end;
-
-  v.jsonSerialize(serializer);
-  serializer.final;
-
-  if not isUnicodeEncoding(params.encodingCP) then begin
-    serializer.init(@temp2);
-    for cp in temp.enumerateUtf8CodePoints do begin
-      if cp <= $7F then serializer.append(chr(cp))
-      else serializer.appendJSONStringUnicodeEscape(cp);
-    end;
-    serializer.final;
-    temp := temp2;
-  end;
-
-  result := xqvalue(temp);
-end;
-
-function serializeAdaptive(const params: TSerializationParams; const v: IXQValue): IXQValue;
-var serializer: TXQSerializer;
-  temp, itemSeparator: string;
-  w: PIXQValue;
-  first: Boolean;
-begin
-  serializer.init(@temp);
-  serializer.standard := true;
-
-  serializer.nodeFormat:=tnsXML;
-  serializer.insertWhitespace := params.indent;
-  serializer.insertWhitespace := xqsiwNever;
-  itemSeparator := params.itemSeparator;
-  if itemSeparator = params.isAbsentMarker then itemSeparator := #10;
-
-  first := true;
-  for w in v.GetEnumeratorPtrUnsafe do begin
-    if not first then serializer.append(itemSeparator);
-    w^.adaptiveSerialize(serializer);
-    first := false;
-  end;
-  serializer.final;
-  result := xqvalue(temp);
-end;
-
-const XMLNamespaceUrl_XHTML = 'http://www.w3.org/1999/xhtml';
-
-function serializeXMLHTMLText(var params: TSerializationParams; const v: IXQValue): IXQValue;
-var serializer: TXQSerializer;
-
-var firstElement: TTreeNode = nil;
-
-  function findRootNodeCount(const v: IXQValue): integer;
-  var
-    w, m: PIXQValue;
-    n: TTreeNode;
-  begin
-    result := 0;
-    for w in v.GetEnumeratorPtrUnsafe do begin
-      case w^.kind of
-        pvkNode: n := w^.toNode;
-        pvkArray: begin
-          for m in w^.GetEnumeratorMembersPtrUnsafe do begin
-            result := findRootNodeCount(m^);
-            if result > 1 then exit;
-          end;
-          continue;
-        end
-        else continue;
-      end;
-      if n.typ = tetDocument then n := n.getFirstChild();
-      if n.typ <> tetAttribute then begin
-        while (n <> nil) do begin
-          case n.typ of
-            tetText: if n.value.Trim() <> '' then inc(result);
-            tetOpen: begin
-              inc(result);
-              if firstElement = nil then firstElement := n;
-              if result > 1 then exit();
-            end;
-          end;
-          n := n.getNextSibling();
-        end;
-      end;
-    end;
-  end;
-
-var
-  hasItemSeparator: Boolean;
-  wasNodeOrFirst: Boolean;
-
-  procedure addItemStart;
-  begin
-    if hasItemSeparator then begin
-      if not wasNodeOrFirst then serializer.append(params.itemSeparator);
-      wasNodeOrFirst := false;
-    end;
-  end;
-
-  procedure addAtomicString(const s: string);
-  begin
-    addItemStart;
-    if not hasItemSeparator then begin
-      if not wasNodeOrFirst then serializer.append(' ');
-      wasNodeOrFirst := false;
-    end;
-    serializer.append(s);
-  end;
-
-  procedure add(const v: IXQValue);
-  var
-    w, m: PIXQValue;
-    n: TTreeNode;
-  begin
-    for w in v.GetEnumeratorPtrUnsafe do begin
-      case w^.kind of
-        pvkNode: begin
-          addItemStart;
-          //this might be incomplete
-          n := w^.toNode;
-          if n.typ in [tetAttribute] then raiseXQEvaluationException('SENR0001', 'Cannot serialize attribute');
-          case params.method of
-            xqsmXML: serializeNodes(n, serializer, true, false);
-           // 'xhtml':;
-            xqsmHTML: serializeNodes(n, serializer, true, true);
-            xqsmText: serializer.append(w^.toString);
-          end;
-          if not hasItemSeparator then wasNodeOrFirst := true;
-        end;
-        pvkArray: for m in v.GetEnumeratorMembersPtrUnsafe do
-          add(m^);
-        pvkNull: addAtomicString('');
-        pvkObject, pvkFunction: raiseXQEvaluationError('SENR0001', 'Cannot serialize with XML/HTML/Text method', w^);
-        else addAtomicString(w^.toString);
-      end;
-    end;
-  end;
-
-var temp: string;
-  hasDoctypeSystem: Boolean;
-  interceptor: TSpecialStringHandler;
-begin
-  serializer.init(@temp);
-  serializer.standard := true;
-
-  with params do
-    if method in [xqsmHTML, xqsmXHTML] then begin
-      if (htmlVersion = isAbsentMarker) then htmlVersion := version;
-      if (htmlVersion = isAbsentMarker) then htmlVersion := '5.0';
-      if (method = xqsmHTML) and assigned(cdataSectionElements) then begin
-        cdataSectionElements.exclude('');
-        if htmlVersion >= '5.0' then cdataSectionElements.exclude(XMLNamespaceUrl_XHTML);
-      end;
-    end;
-
-  if params.hasNormalizationForm or (params.characterMaps <> nil) or assigned(params.cdataSectionElements) then begin
-    interceptor.init;
-    interceptor.params := @params;
-    interceptor.serializer := @serializer;
-    interceptor.htmlNodes := params.method = xqsmHTML;
-    interceptor.isUnicodeEncoding := isUnicodeEncoding(params.encodingCP);
-    if params.hasNormalizationForm or (params.characterMaps <> nil) then
-      serializer.onInterceptAppendXMLHTMLAttribute := @interceptor.appendXMLHTMLAttribute;
-    serializer.onInterceptAppendXMLHTMLText := @interceptor.appendXMLHTMLText;
-  end;
-
-  with params do begin
-    hasItemSeparator := params.itemSeparator <> params.isAbsentMarker;
-    hasDoctypeSystem := params.doctypeSystem <> params.isAbsentMarker;
-    standalone := params.standalone;
-    if findRootNodeCount(v) > 1 then begin
-      if hasDoctypeSystem then hasDoctypeSystem := false;
-      if standalone <> xdsOmit then standalone := xdsOmit;
-    end;
-
-
-    case params.method of
-      xqsmXML, xqsmXHTML, xqsmHTML: begin
-        //initialize missing default parameters
-        if (method <> xqsmHTML) then begin
-          if omitXmlDeclaration then
-            if (standalone <> xdsOmit) or ( (version <> '1.0') and (version <> isAbsentMarker) and hasDoctypeSystem ) then
-              raiseXQEvaluationException('SEPM0009', 'Invalid serialization parameter');
-
-          if version = isAbsentMarker then version := '1.1';
-        end;
-
-        //headers
-        if (method <> xqsmHTML) then begin
-          if not omitXmlDeclaration then
-            serializer.appendXMLHeader(version, encoding, standalone);
-        end;
-        if (htmlVersion = '5.0') and (not hasDoctypeSystem)
-           and (firstElement <> nil) and striEqual(firstElement.value, 'html')  {todo and only whitespace before firstelement}
-           and ( (method = xqsmXHTML) or ( (method = xqsmHTML) and (doctypePublic = isAbsentMarker) )) then begin
-           if method = xqsmHTML then serializer.append('<!DOCTYPE html>')
-           else serializer.append('<!DOCTYPE '+firstElement.value+'>')
-        end else if hasDoctypeSystem then begin
-          if method = xqsmHTML then serializer.append('<!DOCTYPE html ')
-          else if firstElement <> nil then
-            serializer.append('<!DOCTYPE '+firstElement.value + ' ');
-          if doctypePublic <> isAbsentMarker then serializer.append('PUBLIC "' + doctypePublic + '" ')
-          else serializer.append('SYSTEM ');
-          serializer.append('"'+doctypeSystem+'">');
-        end else if (method = xqsmHTML) and (doctypePublic <> isAbsentMarker) then
-          serializer.append('<!DOCTYPE html PUBLIC "'+doctypePublic+'">');
-
-        if method = xqsmXHTML then method := xqsmXML;
-      end;
-      xqsmText: begin
-        //encoding: string;
-      end;
-      //xqsmJSON, xqsmAdaptive: ;
-    end;
-  end;
-
-  wasNodeOrFirst := true;
-  add(v);
-
-  serializer.final;
-  result := xqvalue(temp);
-end;
 
 function xqFunctionSerialize(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
-var
-  arg: IXQValue;
-  params: TSerializationParams;
-
 begin
-  params.characterMaps := nil;
-  //this is incomplete, but the options that it handles should be handled completely (except for some invalid value checking)
-  arg := args[0];
-  if argc = 2 then params.setFromXQValue(context, args[1])
-  else params.setDefault(false);
-
-  case params.method of
-    xqsmJSON: result := serializeJSON(params, arg);
-    xqsmAdaptive: result := serializeAdaptive(params, arg);
-    else result := serializeXMLHTMLText(params, arg);
-  end;
-
-  params.done
+  if argc = 2 then result := xqvalue(serialize(context, args[0], args[1]))
+  else result := xqvalue(serialize(context, args[0]));
 end;
 
 function xqFunctionSerialize_Json(const context: TXQEvaluationContext;argc: SizeInt; args: PIXQValue): IXQValue;
 var serializer: TXQSerializer;
     res: string;
   procedure setParams;
-  var p: TSerializationParams;
+  var p: TXQSerializationParams;
   begin
-    p.setDefault(false);
-    p.setFromXQValue(context, args[1]);
+    p.initFromXQValue(context, args[1]);
     serializer.insertWhitespace := p.indent;
+    p.done;
   end;
 
 begin
@@ -5278,7 +4623,7 @@ begin
   serializer.init(@result);
   if insertLineBreaks then serializer.insertWhitespace := xqsiwIndent
   else serializer.insertWhitespace := xqsiwNever;
-  serializeNodes(node, serializer, includeSelf, html);
+  serializeNodes(node, serializer, includeSelf, html, nil);
   serializer.final;
 end;
 
@@ -5328,6 +4673,7 @@ end;
 
 function xqFunctionUnparsed_Text_Available(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 begin
+  if args[0].isUndefined then exit(xqvalueFalse);
   result := xqvalueTrue;
   try
     xqFunctionUnparsed_Text(context, argc, args);
@@ -5356,7 +4702,7 @@ type
       function clone: TXQTerm; override;
     end;
 
-function makeRandomNumberGenerator(const context: TXQEvaluationContext; const state: TRandomNumberGenerator): TXQValueObject;
+function makeRandomNumberGenerator(const context: TXQEvaluationContext; const state: TRandomNumberGenerator): TXQValueStringMap;
 var newstate: TRandomNumberGenerator;
   function makeFunction(mode: TXQTermRNGMode): TXQValueFunction;
   var
@@ -5375,7 +4721,7 @@ var newstate: TRandomNumberGenerator;
       result.parameters[0].seqtype := TXQTermSequenceType(globalTypes.itemStar.clone);
       result.resulttype := TXQTermSequenceType(globalTypes.itemStar.clone);
     end else begin
-      result.resulttype := TXQTermSequenceType.create(baseJSONiqSchema.object_);
+      result.resulttype := TXQTermSequenceType.create(tikMapTest);
       result.resulttype.push(TXQTermSequenceType.create(baseSchema.string_));
       result.resulttype.push(TXQTermSequenceType.create(tikAny));
     end;
@@ -5383,7 +4729,7 @@ var newstate: TRandomNumberGenerator;
 
 begin
   newstate := state;
-  result := TXQValueObject.create();
+  result := TXQValueStringMap.create();
   result.setMutable('number', xqvalue(newstate.nextDouble));
   result.setMutable('next', makeFunction(xqtrngmNext));
   result.setMutable('permute', makeFunction(xqtrngmPermute));
@@ -6063,29 +5409,25 @@ var
     format: string;
     minwidth, maxwidth: integer;
   end = nil;
-  picturedlength: Integer;
+  picturedlength: Integer = 0;
   commapos: SizeInt;
   tempstrmin, tempstrmax: string;
-  last: Integer;
+  last: Integer = 1;
   i, j: SizeInt;
-  calendarNamespace: string;
+  calendarNamespace: string = '';
   dateTime: PXQValueDateTimeData;
   number: Integer;
   component, format: String;
   sublang: String;
   formatted: String;
   missingCharacterCount: Integer;
-  zerocp: Integer;
+  zerocp: Integer = ord('0');
   allDigits: Boolean;
   tz, tempcount: Integer;
-  fallbackOccured: String;
+  fallbackOccured: String = '';
   tempcountopt: LongInt;
   tempxqv: array of IXQValue;
-
-
 begin
-  calendarNamespace := '';
-  fallbackOccured := '';
   if argc = 5 then begin
     lang := args[2].toString;
     calendar := args[3].toString;
@@ -6124,8 +5466,6 @@ begin
   picture := args[1].toString;
   //writeln('>>',picture);
   SetLength(pictured, 32);
-  picturedlength := 0;
-  last := 1;
   i := 1;
   while i <= length(picture) do begin
     case picture[i] of
@@ -6430,7 +5770,7 @@ begin
   result := xqFunctionFormat_DateTimeC(context, argc, args, false, true);
 end;
 
-type TXQSubPosition = (spInPrefix, spInInteger, spInFraction, spExponentItself, spInExponent, spInSuffix);
+type TXQSubPosition = (spInPrefix, spInInteger, spInFraction, spExponentSeparator, spInExponent, spInSuffix);
 
 function xqFunctionFormat_Number(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 var
@@ -6438,7 +5778,8 @@ var
   picture: String;
   c: integer;
   numberf: xqfloat;
-  number: BigDecimal;
+  number: BigDecimal; //mantissa
+  exponent: integer = 0;
   currentPictureParser: integer;
   pictureParser: array[0..1] of record
     foundChar: array[TXQDecimalFormatProperty] of boolean;
@@ -6453,6 +5794,7 @@ var
     exponentOptional: Integer;
     activeChar: Boolean;
     prefix, suffix: string;
+    scalingFactor: integer;// = integerMandatory
   end;
   arabic: String;
   dot: LongInt;
@@ -6476,10 +5818,23 @@ var
   procedure checkPictureFinal;
   begin
     with pictureParser[currentPictureParser] do begin
+      scalingFactor := integerMandatory;
       if (not  foundChar[xqdfpDigit]) and (not foundChar[xqdfpZeroDigit]) then raiseInvalidPicture;
       if (foundChar[xqdfpExponentSeparator] and (exponentMandatory + exponentOptional > 0))
          and (foundChar[xqdfpPercent] or foundChar[xqdfpPerMille]) then raiseInvalidPicture;
       if (arrayLast(integerGroups, -1) = integerMandatory + integerOptional) then raiseInvalidPicture; //no grouping symbol next to decimal or at string end
+
+      if foundChar[xqdfpExponentSeparator] then begin
+        if (integerMandatory = 0) and (fractionMandatory + fractionOptional = 0) then
+          fractionMandatory := 1;
+        if (integerMandatory = 0) and (integerOptional > 0) then begin
+          integerMandatory := 1;
+          dec(integerOptional);
+        end else if (integerMandatory = 0) and (fractionMandatory = 0) and (fractionOptional > 0) then begin
+          fractionMandatory := 1;
+          dec(fractionOptional);
+        end;
+      end;
     end;
   end;
 
@@ -6519,11 +5874,10 @@ begin
     if c = data^.chars[xqdfpDecimalSeparator] then begin
       checkDuplicate(xqdfpDecimalSeparator);
       case subPosition of
-        spExponentItself: raiseInvalidPicture;
         spInPrefix, spInInteger: subPosition := spInFraction;
+        spInExponent, spExponentSeparator: raiseInvalidPicture;
       end;
     end else if c = data^.chars[xqdfpGroupingSeparator] then begin
-      if subPosition = spExponentItself then raiseInvalidPicture;
       case subPosition of
         spInPrefix, spInInteger: begin
           subPosition := spInInteger;
@@ -6536,7 +5890,7 @@ begin
           if (i = 0) {<- adjacent to decimal sep} or (arrayLast(fractionGroups, -1) = i) then raiseInvalidPicture;
           arrayAdd(fractionGroups, i);
         end;
-        //exponent?
+        spInExponent, spExponentSeparator: raiseInvalidPicture;
       end;
     end {else if c = data^.chars[xqdfpMinusSign] then begin it is just a passive character
     end }else if (c = data^.chars[xqdfpPercent]) or (c = data^.chars[xqdfpPerMille]) then begin
@@ -6551,7 +5905,7 @@ begin
           if fractionOptional > 0 then raiseInvalidPicture;
           inc(fractionMandatory);
         end;
-        spInExponent,spExponentItself: begin
+        spInExponent,spExponentSeparator: begin
           inc(exponentMandatory);
           subPosition := spInExponent
         end;
@@ -6564,22 +5918,28 @@ begin
           inc(integerOptional);
         end;
         spInFraction: inc(fractionOptional);
-        spInExponent,spExponentItself: begin
+        spInExponent,spExponentSeparator: begin
           inc(exponentOptional);
           subPosition := spInExponent
         end;
       end;
     end else if c = data^.chars[xqdfpPatternSeparator] then begin
       checkPictureFinal;
-      if (currentPictureParser = 1) or (subPosition = spExponentItself) then raiseInvalidPicture;
+      if (currentPictureParser = 1) or (subPosition = spExponentSeparator) then raiseInvalidPicture;
       currentPictureParser := 1;
       continue;
-    end else if (c = data^.chars[xqdfpExponentSeparator]) and false {this is 3.1 syntax} then begin
+    end else if activeChar and (c = data^.chars[xqdfpExponentSeparator]) and (context.staticContext.model in PARSING_MODEL3_1) then begin
       case subPosition of
         spInPrefix: activeChar := false;
-        spInInteger, spInFraction, spInExponent, spExponentItself: begin
-          subPosition := spInFraction;
+        spInInteger, spInFraction: begin
+          if (not  foundChar[xqdfpDigit]) and (not foundChar[xqdfpZeroDigit]) then raiseInvalidPicture;
+          subPosition := spExponentSeparator;
           checkDuplicate(xqdfpExponentSeparator);
+        end;
+        spExponentSeparator: raiseInvalidPicture;
+        spInExponent: begin
+          activeChar := false;
+          subPosition := spInSuffix;
         end;
         spInSuffix: activeChar := false;
       end;
@@ -6587,14 +5947,17 @@ begin
     if not activeChar then begin
       if subPosition = spInPrefix then prefix += strGetUnicodeCharacter(c)
       else begin
-        if subPosition = spExponentItself then suffix += strGetUnicodeCharacter(data^.chars[xqdfpExponentSeparator]);
+        if subPosition = spExponentSeparator then begin //exponent not followed by active char becomes part of suffix
+          foundChar[xqdfpExponentSeparator] := false;
+          suffix += strGetUnicodeCharacter(data^.chars[xqdfpExponentSeparator]);
+        end;
         suffix += strGetUnicodeCharacter(c);
         subPosition := spInSuffix;
       end;
     end;
     case subPosition of
       spInPrefix: if activeChar then subPosition := spInInteger;
-      spInInteger, spInFraction, spInExponent, spExponentItself: if not activeChar then subPosition := spInSuffix;
+      spInInteger, spInFraction, spInExponent, spExponentSeparator: if not activeChar then subPosition := spInSuffix;
       spInSuffix: if activeChar then raiseInvalidPicture;
     end;
   end;
@@ -6605,7 +5968,7 @@ begin
     pvkFloat: begin
       numberf := args[0].toFloat;
       if IsNan(numberf) then exit(xqvalue(data^.nan));
-      if not isSignedXQFloat(numberf) then currentPictureParser := 0
+      if not numberf.sign then currentPictureParser := 0
       else if currentPictureParser = 0 then pictureParser[0].prefix := strGetUnicodeCharacter(data^.chars[xqdfpMinusSign]) + pictureParser[0].prefix;
       with pictureParser[currentPictureParser] do
         if foundChar[xqdfpPercent] then begin
@@ -6632,8 +5995,14 @@ begin
   with pictureParser[currentPictureParser] do begin
     number.signed := false;
 
-    //todo: exponent (5,6)
+    if foundChar[xqdfpExponentSeparator] then begin
+      exponent := mostSignificantExponent(number) - scalingFactor + 1;
+      if (exponent <> 0) and (isZero(number)) then exponent := 0;
+      shift10(number, -exponent);
+    end;
+
     number := round(number, -(fractionMandatory + fractionOptional) );
+
 
     arabic := BigDecimalToStr(number);
     if (integerMandatory = 0) and (fractionOptional + fractionMandatory > 0) and strBeginsWith(arabic, '0') then begin
@@ -6692,6 +6061,19 @@ begin
       end;
     end;
 
+    if foundChar[xqdfpExponentSeparator] then begin
+      resstr += strGetUnicodeCharacter(data^.chars[xqdfpExponentSeparator]);
+      if exponent < 0 then begin
+        resstr += strGetUnicodeCharacter(data^.chars[xqdfpMinusSign]);
+        exponent := -exponent;
+      end;
+      arabic := inttostr(exponent);
+      if length(arabic) < exponentMandatory then
+        resstr += strDup( strGetUnicodeCharacter(data^.chars[xqdfpZeroDigit]), exponentMandatory - length(arabic) );
+      for i := 1 to length(arabic) do
+        resstr += strGetUnicodeCharacter(data^.chars[xqdfpZeroDigit] + ord(arabic[i]) - ord('0') );
+    end;
+
     result := xqvalue(prefix + resstr + suffix);
   end;
 end;
@@ -6717,7 +6099,7 @@ begin
     end;
     pvkObject: begin
       if 1 <> args[1].Size then raise EXQEvaluationException.create('FOAP0001', 'Invalid size');
-      result := args[0].getProperty(args[1].toString);
+      result := args[0].getProperty(args[1]);
     end;
     pvkArray: begin
       if 1 <> args[1].Size then raise EXQEvaluationException.create('FOAP0001', 'Invalid size');
@@ -6732,7 +6114,7 @@ var
   collation: TXQCollation;
   input, token: string;
   splitted: TStringArray;
-  v: PIXQValue;
+  v: TXQValue;
   i: Integer;
 begin
   if argc = 3 then collation := TXQueryEngine.getCollation(args[2].toString, context.staticContext.baseURI)
@@ -6742,8 +6124,8 @@ begin
   token := trim(args[1].toString);
   if (token = '') then exit(xqvalue(false));
 
-  for v in args[0].GetEnumeratorPtrUnsafe do begin
-    input := strTrimAndNormalize(v^.toString, WHITE_SPACE);
+  for v in args[0].GetEnumeratorArrayTransparentUnsafe do begin
+    input := strTrimAndNormalize(v.toString, WHITE_SPACE);
 
     splitted := strSplit(input, ' ');
     for i := 0 to high(splitted) do
@@ -6992,23 +6374,66 @@ end;
    PXPair = ^TXPair;
 
 function compareDirect(self: TObject; p1,p2: pointer): integer;
-var v1: PIXQValue absolute p1;
-    v2: PIXQValue absolute p2;
-    sortingContext: PSortingContext absolute self;
-    i, c1, c2: Integer;
-begin
-  c1 := v1^.getSequenceCount;
-  c2 := v2^.getSequenceCount;
-  if (c1 = 1 ) and (c2 = 1) then exit( sortingContext^.staticContext.compareDeepAtomic(v1^, v2^, sortingContext^.collation) );
-
-  for i := 1 to min(c1, c2) do begin
-    result := sortingContext^.staticContext.compareDeepAtomic(v1^.get(i), v2^.get(i), sortingContext^.collation);
-    if result <> 0 then begin
-      if (result > 0) and (v1^.get(i).kind = pvkFloat) and (sortingContext^.staticContext.compareAtomic(v1^.get(i), v1^.get(i)) <> 0) then result := -1; //nan check
-      exit;
-    end;
+  procedure error(v1, v2: TXQValue);
+  begin
+    raise EXQEvaluationException.Create('XPTY0004', 'Sorting failed, cannot compare ' + v1.toXQuery + ' with ' +v2.toXQuery, nil, nil, nil);
   end;
-  result := sign(c1 - c2);
+var sortingContext: PSortingContext absolute self;
+  function compare(v1, v2: TXQValue): TXQCompareResult;
+    procedure error; overload;
+    begin
+      error(v1,v2);
+    end;
+    function compareStrings: TXQCompareResult;
+    begin
+      result := sortingContext.collation.compare(v1.toString, v2.toString)
+    end;
+
+  begin
+    if v1.kind = pvkNode then begin
+      if (v2.kind = pvkNode) or (TXQValueOwnershipTracker.isStringKeyLike(v2)) then
+        exit(compareStrings)
+       else
+        error;
+    end;
+    if v2.kind = pvkNode then begin
+      if TXQValueOwnershipTracker.isStringKeyLike(v1) then
+        exit(compareStrings)
+       else
+        error;
+    end;
+    result := sortingContext^.staticContext.compareDeepAtomic(v1, v2, sortingContext^.collation);
+    if result <= xqcrIncomparable then error;
+  end;
+
+var pv1: PIXQValue absolute p1;
+    pv2: PIXQValue absolute p2;
+    c1, c2: Integer;
+    v1, v2: TXQValue;
+    k1, k2: TXQValueKind;
+    e1, e2: TXQValueEnumeratorArrayTransparentUnsafe;
+
+begin
+  v1 := pv1^.toValue;
+  v2 := pv2^.toValue;
+  k1 := v1.kind;
+  k2 := v2.kind;
+  c1 := v1.getSequenceCount;
+  c2 := v2.getSequenceCount;
+  if (k1 <> pvkArray) and (k2 <> pvkArray) and (c1 = 1 ) and (c2 = 1) then begin
+    result := ord(compare(v1, v2));
+    exit;
+  end;
+
+  e1 := v1.GetEnumeratorArrayTransparentUnsafe;
+  e2 := v2.GetEnumeratorArrayTransparentUnsafe;
+  while e1.MoveNext do begin
+    if not e2.MoveNext then exit(1);
+    result := ord(compare(e1.current, e2.current));
+    if result <> 0 then exit;
+  end;
+  if e2.MoveNext then result := -1
+  else result := 0
 end;
 function compareWithKey(self: TObject; p1,p2: pointer): integer;
 begin
@@ -7017,17 +6442,30 @@ end;
 
 
 procedure sortXQList(list: TXQVList; const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue);
+
+  procedure errorFOTY0013(v: TXQValue);
+  begin
+    raise EXQEvaluationException.create('FOTY0013', 'Cannot sort list containing non-comparable value: '+v.toXQuery);
+  end;
+
 var
   sortContext: TSortingContext;
   keyfunc: TXQValueFunction;
   tempArray: array of TXPair = nil;
   count, i, stacksize: Integer;
   stack: TXQEvaluationStack;
+  w: TXQValue;
 begin
   if (argc >= 2) and not (args[1].isUndefined) then sortContext.collation := TXQueryEngine.getCollation(args[1].toString, context.staticContext.baseURI)
   else sortContext.collation := context.staticContext.collation;
   sortContext.staticContext := context.staticContext;
   if argc < 3 then begin
+    for i := 0 to list.Count - 1 do
+      case list[i].kind of
+        pvkObject, pvkFunction: errorFOTY0013(list[i].toValue);
+        pvkArray: for w in list[i].GetEnumeratorArrayTransparentUnsafe do
+          if w.kind in [pvkObject, pvkFunction] then errorFOTY0013(w);
+      end;
     list.sort(@compareDirect, TObject(@sortContext));
   end else begin
     count := list.count;
@@ -7072,7 +6510,7 @@ var
 begin
   if argc = 2 then collation := TXQueryEngine.getCollation(args[1].toString, context.staticContext.baseURI)
   else collation := context.staticContext.collation;
-  result := TXQValueString.create(baseSchema.base64Binary, base64.EncodeStringBase64(collation.key(args[0].toString)))
+  result := TXQValueBinary.create(baseSchema.base64Binary, base64.EncodeStringBase64(collation.key(args[0].toString)))
 end;
 
 function wregexprParse(argc: SizeInt; argv: PIXQValue; flagsPos: integer; allowEmptyMatch: boolean;  toescape: PBoolean = nil;  all: PBoolean = nil): TWrappedRegExpr; overload;
@@ -7297,10 +6735,6 @@ end;
 
 
 
-function arrayAsList(const a: IXQValue): TXQVList;
-begin
-  result := (a as TXQValueJSONArray).seq;
-end;
 
 procedure raiseInvalidArrayOutOfBounds(const a: IXQValue; index: Int64);
 begin
@@ -7350,7 +6784,7 @@ end;
 function xqFunctionArraySubarray(argc: SizeInt; argv: PIXQValue): IXQValue;
 var
   a: TXQValueJSONArray;
-  p, len: SizeInt;
+  p, len: SizeInt64;
   iter: TXQValueEnumeratorPtrUnsafe;
   list: TXQVList;
 begin
@@ -7361,6 +6795,7 @@ begin
     if len < 0 then raise EXQEvaluationException.create('FOAY0002', 'Negative length', nil, argv^);
   end else begin
     len := a.Size - p;
+    if len < 0 then len := 0;
   end;
   if (p < 0) or (p + len >= a.Size + 1) then raiseInvalidArrayOutOfBounds(argv^, p);
   iter := a.GetEnumeratorMembersPtrUnsafe;
@@ -7531,8 +6966,7 @@ var
   i: Integer;
 begin
   list := arrayAsList(argv^);
-  f.init(context, argv[2]);
-  f.stack.topptr(0)^ := argv[1];
+  f.init(context, argv[2], argv[1]);
   for i := list.count -1 downto 0 do with f do begin
     stack.topptr(1)^ := list[i];
     stack.topptr(0)^ := call();
@@ -7581,7 +7015,7 @@ var
 begin
   for pv in iter do begin
     case pv^.kind of
-      pvkArray: flatten( (pv^ as TXQValueJSONArray).GetEnumeratorMembersPtrUnsafe, outlist);
+      pvkArray: flatten( pv^.GetEnumeratorMembersPtrUnsafe, outlist);
       pvkSequence: flatten( pv^.GetEnumeratorPtrUnsafe, outlist);
       else outlist.add(pv^);
     end;
@@ -7600,67 +7034,115 @@ end;
 
 function xqFunctionMapMerge(argc: SizeInt; argv: PIXQValue): IXQValue;
 var duplicates: TXQMapDuplicateResolve = xqmdrUseFirst;
+  function mergeStringMaps: IXQValue;
+  var
+    pv: PIXQValue;
+    value: TXQValue;
+    resobj: TXQValueStringMap;
+    pprop: TXQProperty;
+    tempseq: TXQValueSequence;
+  begin
+    resobj := TXQValueStringMap.create();
+    result := resobj;
+    for pv in argv[0].GetEnumeratorPtrUnsafe do begin
+      for pprop in pv^.getEnumeratorStringPropertiesUnsafe do begin
+        if resobj.hasProperty(pprop.key, @value) then begin
+          case duplicates of
+            xqmdrReject: raise EXQEvaluationException.create('FOJS0003', 'Duplicate keys', nil, argv[0]);
+            xqmdrUseFirst: ;
+            xqmdrUseLast: resobj.setMutable(pprop.key, pprop.Value);
+            xqmdrCombine: begin
+              tempseq := TXQValueSequence.create(value.getSequenceCount + pprop.Value.getSequenceCount);
+              tempseq.add(value);
+              tempseq.add(pprop.Value);
+              resobj.setMutable(pprop.key, tempseq);
+            end;
+          end;
+        end else resobj.setMutable(pprop.key, pprop.Value);
+      end;
+    end;
+  end;
+  function mergeStandardMaps: IXQValue;
+  var
+    pv: PIXQValue;
+    value: TXQValue;
+    resmap: TXQValueStandardMap;
+    tempseq: TXQValueSequence;
+    pprop: TXQStandardProperty;
+  begin
+    resmap := TXQValueStandardMap.create();
+    result := resmap;
+    for pv in argv[0].GetEnumeratorPtrUnsafe do begin
+      for pprop in pv^.getEnumeratorPropertiesUnsafe do begin
+        if resmap.hasProperty(pprop.key, @value) then begin
+          case duplicates of
+            xqmdrReject: raise EXQEvaluationException.create('FOJS0003', 'Duplicate keys', nil, argv[0]);
+            xqmdrUseFirst: ;
+            xqmdrUseLast: resmap.setMutable(pprop.key, pprop.Value);
+            xqmdrCombine: begin
+              tempseq := TXQValueSequence.create(value.getSequenceCount + pprop.Value.getSequenceCount);
+              tempseq.add(value);
+              tempseq.add(pprop.Value);
+              resmap.setMutable(pprop.key, tempseq);
+            end;
+          end;
+        end else resmap.setMutable(pprop.key, pprop.Value);
+      end;
+    end;
+  end;
+
+var
   value: TXQValue;
+  stringOnly: Boolean;
   pv: PIXQValue;
-  resobj: TXQValueObject;
-  pprop: TXQProperty;
-  tempseq: TXQValueSequence;
 begin
   if argc >= 2 then begin
     if argv[1].hasProperty('duplicates', @value) then
       duplicates.setFromString(value.toString);
   end;
   if argv[0].getSequenceCount = 1 then exit(argv[0]);
-  resobj := TXQValueObject.create();
-  result := resobj;
-  for pv in argv[0].GetEnumeratorPtrUnsafe do begin
-    for pprop in pv^.getPropertyEnumerator do begin
-      if resobj.hasProperty(pprop.Name, @value) then begin
-        case duplicates of
-          xqmdrReject: raise EXQEvaluationException.create('FOJS0003', 'Duplicate keys', nil, argv[0]);
-          xqmdrUseFirst: ;
-          xqmdrUseLast: resobj.setMutable(pprop.Name, pprop.Value);
-          xqmdrCombine: begin
-            tempseq := TXQValueSequence.create(value.getSequenceCount + pprop.Value.getSequenceCount);
-            tempseq.add(value);
-            tempseq.add(pprop.Value);
-            resobj.setMutable(pprop.Name, tempseq);
-          end;
-        end;
-      end else resobj.setMutable(pprop.Name, pprop.Value);
+
+  stringOnly := true;
+  for pv in argv[0].GetEnumeratorPtrUnsafe do
+    if pv.getPropertyKeyKind <> xqmpkkStringKeys then begin
+      stringOnly := false;
+      break;
     end;
-  end;
+
+  if stringOnly then
+    result := mergeStringMaps
+   else
+    result := mergeStandardMaps;
 end;
+
 
 function xqFunctionMapSize({%H-}argc: SizeInt; argv: PIXQValue): IXQValue;
 begin
-  result := xqvalue((argv[0] as TXQValueObject).size);
+  result := xqvalue(argv[0].Size);
 end;
 
 function xqFunctionMapKeys({%H-}argc: SizeInt; argv: PIXQValue): IXQValue;
-var
-  keys: TStringList;
 begin
-  keys := TStringList.Create;
-  (argv[0] as TXQValueObject).enumerateKeys(keys);
-  result := xqvalue(keys);
-  keys.free;
+  result := argv[0].enumeratePropertyKeys();
 end;
 
 function xqFunctionMapContains({%H-}argc: SizeInt; argv: PIXQValue): IXQValue;
 begin
-  result := xqvalue(argv[0].hasProperty(argv[1].toString, nil));
+  result := xqvalue(argv[0].hasProperty(argv[1], nil));
 end;
 
 function xqFunctionMapGet({%H-}argc: SizeInt; argv: PIXQValue): IXQValue;
 begin
-  result := xqvalue(argv[0].getProperty(argv[1].toString));
+  result := xqvalue(argv[0].getProperty(argv[1]));
 end;
 
-procedure mapFind(outseq: TXQVList; const key: string; const v: IXQValue);
+procedure mapFind(outseq: TXQVList; const key: IXQValue; const v: IXQValue);
 var
   pv, pw: PIXQValue;
-  pp: TXQProperty;
+  mp: TXQStandardProperty;
+  smp: TXQProperty;
+  skey: String;
+  isStringKey: Boolean;
 begin
   for pv in v.GetEnumeratorPtrUnsafe do begin
     case pv^.kind of
@@ -7668,9 +7150,22 @@ begin
         for pw in (pv^ as TXQValueJSONArray).GetEnumeratorMembersPtrUnsafe do
           mapFind(outseq, key, pw^);
       pvkObject:
-        for pp in pv^.getPropertyEnumerator do begin
-          if pp.Name = key then outseq.addInArray(pp.Value)
-          else mapFind(outseq, key, pp.Value);
+        case pv^.getPropertyKeyKind of
+          xqmpkkStandardKeys: begin
+            for mp in pv^.getEnumeratorPropertiesUnsafe do begin
+              if TXQValueOwnershipTracker.equal(mp.key, key) then outseq.addInArray(mp.Value);
+              mapFind(outseq, key, mp.Value);
+            end;
+          end;
+          xqmpkkStringKeys: begin
+            isStringKey := TXQValueOwnershipTracker.isStringKeyLike(key.toValue);
+            if isStringKey then
+              skey := key.toString;
+            for smp in pv^.getEnumeratorStringPropertiesUnsafe do begin
+              if isStringKey and ( smp.key = skey) then outseq.addInArray(smp.Value);
+              mapFind(outseq, key, smp.Value);
+            end;
+          end;
         end;
     end;
   end;
@@ -7682,60 +7177,109 @@ var
 begin
   l := TXQVList.create();
   result := TXQValueJSONArray.create(l);
-  mapFind(l, argv[1].toString, argv[0]);
+  mapFind(l, argv[1], argv[0]);
 end;
 
 function xqFunctionMapPut({%H-}argc: SizeInt; argv: PIXQValue): IXQValue;
 begin
-  result := (argv[0] as TXQValueObject).setImmutable(argv[1].toString, argv[2]);
+  result := argv[0].setImmutable(argv[1], argv[2]);
 end;
 
 function xqFunctionMapEntry({%H-}argc: SizeInt; argv: PIXQValue): IXQValue;
 var
-  obj: TXQValueObject;
+  obj: TXQValueStringMap;
+  map: TXQValueStandardMap;
 begin
-  obj := TXQValueObject.create();
-  obj.setMutable(argv[0].toString, argv[1]);
-  result := obj;
+  if argv[0].typeAnnotation = baseSchema.string_ then begin
+    obj := TXQValueStringMap.create();
+    obj.setMutable(argv[0].toString, argv[1]);
+    result := obj;
+  end else begin
+    map := TXQValueStandardMap.create();
+    map.setMutable(argv[0], argv[1]);
+    result := map;
+  end;
 end;
 
 function xqFunctionMapRemove({%H-}argc: SizeInt; argv: PIXQValue): IXQValue;
-var
-  obj: TXQValueObject;
-  pp: TXQProperty;
-  keys: array of String = nil;
-  i: Integer;
-  pv: PIXQValue;
-  keep: Boolean;
+  function removeFromStringMap: IXQValue;
+  var
+    stringkeys: array of string = nil;
+    obj: TXQValueStringMap;
+    pp: TXQProperty;
+    i: Integer;
+    v: TXQValue;
+    keep: Boolean;
+  begin
+    SetLength(stringkeys, argv[1].getSequenceCount);
+    i := 0;
+    for v in argv[1].GetEnumeratorArrayTransparentUnsafe do begin
+      if TXQValueOwnershipTracker.isStringKeyLike(v) then
+        stringkeys[i] := v.toString;
+      inc(i);
+    end;
+    if i = 0 then
+      exit(argv[0]);
+    if i < length(stringkeys) then
+      SetLength(stringkeys, i);
+    obj := TXQValueStringMap.create();
+    for pp in argv[0].getEnumeratorStringPropertiesUnsafe do begin
+      keep := true;
+      for i := 0 to high(stringkeys) do
+        if stringkeys[i] = pp.key then keep := false;
+      if keep then
+        obj.setMutable(pp.key, pp.Value);
+    end;
+    result := obj;
+  end;
+  function removeFromStandardMap: IXQValue;
+  var
+    map: TXQValueStandardMap;
+    keys: array of TXQValue = nil;
+    mp: TXQStandardProperty;
+    i: Integer;
+    v: TXQValue;
+    keep: Boolean;
+  begin
+    SetLength(keys, argv[1].getSequenceCount);
+    if length(keys) = 0 then
+      exit(argv[0]);
+    i := 0;
+    for v in argv[1].GetEnumeratorArrayTransparentUnsafe do begin
+      keys[i] := v;
+      inc(i);
+    end;
+    map := TXQValueStandardMap.create();
+    for mp in argv[0].getEnumeratorPropertiesUnsafe do begin
+      keep := true;
+      for i := 0 to high(keys) do
+        if TXQValueOwnershipTracker.equal(keys[i], mp.key) then keep := false;
+      if keep then
+        map.setMutable(mp.key, mp.Value);
+    end;
+    result := map;
+  end;
 begin
-  obj := TXQValueObject.create();
-  SetLength(keys, argv[1].getSequenceCount);
-  i := 0;
-  for pv in argv[1].GetEnumeratorPtrUnsafe do begin
-    keys[i] := pv^.toString;
-    inc(i);
+  case argv[0].getPropertyKeyKind of
+    xqmpkkStringKeys: result := removeFromStringMap;
+    xqmpkkStandardKeys: result := removeFromStandardMap;
+    else result := nil;
   end;
-  for pp in argv[0].getPropertyEnumerator do begin
-    keep := true;
-    for i := 0 to high(keys) do
-      if keys[i] = pp.Name then keep := false;
-    if keep then
-      obj.setMutable(pp.Name, pp.Value);
-  end;
-  result := obj;
 end;
 
 function xqFunctionMapFor_Each(const context: TXQEvaluationContext; {%H-}argc: SizeInt; argv: PIXQValue): IXQValue;
 var f: TXQBatchFunctionCall;
     l: TXQVList;
-    pp: TXQProperty;
+    pp: TXQStandardProperty;
+    map: TXQValue;
 begin
-  l := TXQVList.create((argv[0] as TXQValueObject).size);
+  l := TXQVList.create(argv[0].Size);
   result := TXQValueSequence.create(l);
+  map := argv[0].toValue;
   with f do begin
     init(context, argv[1]);
-    for pp in argv[0].getPropertyEnumerator do begin
-      l.add(call2(xqvalue(pp.Name), pp.Value));
+    for pp in map.getEnumeratorPropertiesUnsafe do begin
+      l.add(call2(pp.key, pp.Value));
     end;
     done;
   end;
@@ -7758,14 +7302,141 @@ var
   parser: TXQJsonParser;
 begin
   if args[0].isUndefined then exit(args[0]);
-  data := context.staticContext.retrieveFromURI(args[0].toString, contenttype, 'FODC0002');
+  data := context.staticContext.retrieveFromURI(args[0].toString, contenttype, 'FOUT1170');
 
   parser.init;
   parser.context := @context;
+  if (argc = 2) then
+    parser.setConfigFromMap(args[1]);
   result := parser.parse(data);
 end;
 
+function xqFunctionTransformPlaceholder(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
+begin
+  raise EXQEvaluationException.create('FOXT0004', 'XSLT is not supported');
+  result := xqvalue();
+end;
 
+type TLoadXQueryHelper = object
+  oldDeclareExternalVariable: TXQDeclareExternalVariableEvent;
+  externalVariables: IXQValue;
+  procedure OnDeclareExternalVariable(sender: TObject; const context: TXQStaticContext; const namespaceUrl, variable: string; var value: IXQValue);
+end;
+
+procedure TLoadXQueryHelper.OnDeclareExternalVariable(sender: TObject; const context: TXQStaticContext; const namespaceUrl, variable: string; var value: IXQValue);
+var
+  tempName: IXQValue;
+  tempValue: TXQValue;
+begin
+  ignore(sender); ignore(context);
+  tempName := TXQValueQName.create(namespaceUrl, variable);
+  if externalVariables.hasProperty(tempName, @tempValue) then
+    value := tempValue;
+  //oldDeclareExternalVariable(sender, context, namespaceUrl, variable, value);
+end;
+
+function xqFunctionLoadXQueryModule(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
+var
+  uri: String;
+  at: TStringArray = nil;
+  ps: TXQProperty;
+  i: Integer;
+  module: TXQuery;
+  moduleContext: TXQEvaluationContext;
+  helper: TLoadXQueryHelper;
+  resMap: TXQValueStringMap;
+  functionsMap, variablesMap, functionMap: TXQValueStandardMap;
+  sc: TXQStaticContext;
+  temp: IXQValue;
+  tempValue: TXQValue;
+  pp: TXQStandardProperty;
+begin
+  uri := args[0].toString;
+  if uri.IsEmpty then raise  EXQEvaluationException.create('FOQM0001', 'Empty module uri');
+
+  if argc >= 2 then begin
+    for ps in args[1].getEnumeratorStringPropertiesUnsafe do begin
+      case ps.key of
+        'location-hints': begin
+          SetLength(at, ps.value.getSequenceCount);
+          for i := 0 to high(at) do at[i]:= ps.value.get(i+1).toString;
+        end;
+        'xquery-version': begin
+          if not (ps.value.kind in [pvkBigDecimal, pvkInt64]) then
+            raiseXPTY0004TypeError(args[1], 'Invalid xquery version ');
+          if ps.value.toFloat > 3.1000000001 {floating point is not exact for 3.1} then
+            raise EXQEvaluationException.create('FOQM0006', 'Invalid xquery version ' + args[1].toXQuery);
+        end;
+        'vendor-options', 'variables': begin
+          if ps.value.kind <> pvkObject then raiseXPTY0004TypeError(args[1], ps.key);
+          for pp in ps.value.getEnumeratorPropertiesUnsafe do
+            if not (pp.key.kind in [pvkQName]) then raiseXPTY0004TypeError(args[1], ps.key);
+        end;
+      end;
+    end;
+  end;
+
+  try
+    module := context.staticContext.sender.findModule(context.staticContext, uri, at);
+  except
+    on e: EXQException do
+      raise EXQEvaluationException.create('FOQM0003', 'Failed to load module: ' + uri + LineEnding + e.Message);
+  end;
+  if module = nil then
+    raise EXQEvaluationException.create('FOQM0002', 'Failed to load module: ' + uri);
+
+  moduleContext := context.staticContext.sender.getEvaluationContext();
+  moduleContext.globallyDeclaredVariables := TXQVariableChangeLog.create();
+  helper.oldDeclareExternalVariable := context.staticContext.sender.OnDeclareExternalVariable;
+  if argc >= 2 then begin
+    temp := args[1].getProperty('context-item');
+    case temp.getSequenceCount of
+      1: begin
+        moduleContext.SeqValue := temp;
+        moduleContext.SeqLength := 1;
+        moduleContext.SeqIndex := 1;
+      end;
+    end;
+    helper.externalVariables := args[1].getProperty('variables');
+    context.staticContext.sender.OnDeclareExternalVariable := @helper.OnDeclareExternalVariable;
+  end;
+  try
+    moduleContext.staticContext := module.getstaticContext;
+    module.evaluate(moduleContext);
+
+
+    functionsMap := TXQValueStandardMap.create();
+    variablesMap := TXQValueStandardMap.create();
+    resMap := TXQValueStringMap.create();
+    resMap.setMutable('functions', functionsMap);
+    resMap.setMutable('variables', variablesMap);
+    result := resMap;
+
+    with moduleContext do
+      for i := 0 to globallyDeclaredVariables.count - 1 do begin
+        if globallyDeclaredVariables.getNamespace(i) <> uri then continue;
+        variablesMap.setMutable(TXQValueQName.create(globallyDeclaredVariables.getNamespace(i), globallyDeclaredVariables.getName(i)),
+                              globallyDeclaredVariables.get(i)
+                              );
+      end;
+    sc := module.getStaticContext;
+    for i := 0 to high(sc.functions) do begin
+      temp := TXQValueQName.create(sc.functions[i].namespaceURL, sc.functions[i].name);
+      if functionsMap.hasProperty(temp, @tempValue) then begin
+        functionMap := tempValue as TXQValueStandardMap;
+      end else
+        functionMap := TXQValueStandardMap.create();
+
+      functionMap.setMutable(xqvalue(length(sc.functions[i].parameters)), sc.functions[i].directClone);
+      functionsMap.setMutable(temp, functionMap);
+    end;
+    //todo: functions need to have their own context with globallyDeclaredVariables
+
+  finally
+    context.staticContext.sender.OnDeclareExternalVariable := helper.oldDeclareExternalVariable;
+    moduleContext.globallyDeclaredVariables.Free;
+  end;
+end;
 
 
 var fn3, fn3_1, fn, pxp, pxpold, op, op3_1, x, fnarray, fnmap: TXQNativeModule;
@@ -7835,7 +7506,7 @@ begin
   pxpold.registerFunction('inner-html',0,1,@xqFunctionInner_HTML, []);
   pxpold.registerFunction('inner-text',0,1,@xqFunctionInner_Text, []);
   pxpold.registerFunction('matched-text',0,0,@xqFunctionMatched_Text, []);
-  pxpold.registerFunction('form',1,2,@xqFunctionForm, []);
+  pxpold.registerFunction('form',0,2,@xqFunctionForm, []);
   pxpold.registerFunction('resolve-html',0,2,@xqFunctionResolve_Html, []);
   resolveHTMLCallback := @xqFunctionResolve_Html;
   pxpold.registerFunction('random',0,1,@xqFunctionRandom, []);
@@ -7877,6 +7548,10 @@ transform
   '             ) else . )');
   pxpold.registerInterpretedFunction('transform', '($root as item()*, $f as function(*)) as item()*', 'pxp:transform($root, $f, {})');
   pxpold.registerInterpretedFunction('transform', '($f as function(*)) as item()*', 'pxp:transform(., $f, {})');
+
+  x.registerInterpretedFunction('replace-nodes', '($nodes as item()*, $replacement as item()*) as item()*', 'pxp:transform(root($nodes[1]), function($i) {' +
+    ' if ($nodes[. is $i]) then if ($replacement instance of function(*)) then $replacement($i) else $replacement else $i'+
+  '})');
 
   pxp.registerFunction('serialize-json', @xqFunctionSerialize_Json, [xqcdContextOther]).setVersionsShared([itemStar, stringt],  [itemStar, itemOrEmpty, stringt]);
 
@@ -8067,7 +7742,7 @@ transform
   fn3.registerFunction('available-environment-variables', @xqFunctionAvailable_Environment_Variables).setVersionsShared([stringStar]);
 
   fn3.registerFunction('parse-xml', @xqFunctionParse_XML, [xqcdFocusItem,xqcdContextOther]).setVersionsShared([stringOrEmpty, documentElementNodeOrEmpty]);
-  fn3.registerFunction('parse-xml-fragment', @xqFunctionParse_XML_Fragment, [xqcdFocusItem,xqcdContextOther]).setVersionsShared([stringOrEmpty, documentElementNodeOrEmpty]);
+  fn3.registerFunction('parse-xml-fragment', @xqFunctionParse_XML_Fragment, [xqcdFocusItem,xqcdContextOther]).setVersionsShared([stringOrEmpty, documentNodeOrEmpty]);
   {pxp3}pxpold.registerFunction('parse-html', @xqFunctionParse_HTML, [xqcdFocusItem,xqcdContextOther]).setVersionsShared([stringOrEmpty, documentElementNodeOrEmpty]);
   fn3.registerFunction('serialize', @xqFunctionSerialize, [xqcdContextOther]).setVersionsShared([itemStar, stringt],  [itemStar, elementSerializationParamsOrEmpty, stringt]);
   fn3_1.registerFunction('serialize', @xqFunctionSerialize, [xqcdContextOther]).setVersionsShared([itemStar, stringt],  [itemStar, itemOrEmpty, stringt]);
@@ -8083,8 +7758,6 @@ transform
 
   fn3.registerFunction('generate-id', @xqFunctionGenerateId, dependencyAll).setVersionsShared([stringt],  [nodeOrEmpty, stringt]);
   fn3.registerFunction('random-number-generator', @xqFunctionRandom_Number_Generator, ['() as map(xs:string, item())', '($seed as xs:anyAtomicType?) as map(xs:string, item())'], [xqcdContextOther]);
-
-  //3.1 todo: collation-key, json-to-xml , load-xquery-module random-number-generator transform xml-to-json
 
   fn3_1.registerFunction('apply', @xqFunctionApply, dependencyNone).setVersionsShared([functiont, arrayt, itemStar]);
   fn3_1.registerFunction('contains-token', @xqFunctionContains_Token, [xqcdContextCollation]).setVersionsShared([stringStar, stringt, boolean],  [stringStar, stringt, stringt, boolean]);
@@ -8103,7 +7776,23 @@ transform
   fn3_1.registerFunction('json-doc', @xqFunctionJSON_doc, [xqcdContextOther]).setVersionsShared([stringOrEmpty, itemOrEmpty],  [stringOrEmpty, map, itemOrEmpty]);
   fn3_1.registerFunction('parse-json', @xqFunctionParseJSON, [xqcdContextOther]).setVersionsShared([stringOrEmpty, itemOrEmpty],  [stringOrEmpty, map, itemOrEmpty]);
 
+  fn3_1.registerFunction('transform', @xqFunctionTransformPlaceholder, [xqcdContextOther]).setVersionsShared([map, map]);
+  fn3_1.registerFunction('load-xquery-module', @xqFunctionLoadXQueryModule, [xqcdContextOther]).setVersionsShared([stringt, map], [stringt, map, map]);
+
+  //from https://gist.github.com/joewiz/d986da715facaad633db
+  fn3_1.registerInterpretedFunction('json-to-xml', '($json-text as xs:string?) as document-node()?', 'json-to-xml($json-text, map {})');
+  fn3_1.registerInterpretedFunction('json-to-xml', '($json-text as xs:string?, $options as map(*)) as document-node()?', '$json-text ! document { x:joewiz-json-to-xml-recurse(parse-json(., if ($options?duplicates = "retain") then map:put($options, "duplicates", "use-first") else $options )) }');
+  fn3_1.registerInterpretedFunction('xml-to-json', '($input as node()?) as xs:string?', ' xml-to-json($input, map {} )');
+  fn3_1.registerInterpretedFunction('xml-to-json', '($input as node()?, $options as map(*)) as xs:string?', ' $input ! (try { let $json := x:joewiz-xml-to-json-recurse(.) let $serialization-parameters := map { "method": "json", "indent": $options?indent } return serialize($json, $serialization-parameters) } catch *:FORG0001 | *:SERE0022 | *:SERE0020 { x:joewiz-FOJS0006($input) } )');
+  x.registerInterpretedFunction('joewiz-json-to-xml-recurse', '($json as item()*) as item()+',  'let $data-type := x:joewiz-json-data-type($json) return element { QName("http://www.w3.org/2005/xpath-functions", $data-type) } { if ($data-type eq "array") then for $array-index in 1 to array:size($json) let $array-member := $json($array-index) let $array-member-data-type := x:joewiz-json-data-type($array-member) return element {$array-member-data-type} { if ($array-member-data-type = ("array", "map")) then x:joewiz-json-to-xml-recurse($array-member)/node() else $array-member } else if ($data-type eq "map") then map:for-each( $json, function($object-name, $object-value) { let $object-value-data-type := x:joewiz-json-data-type($object-value) return element { QName("http://www.w3.org/2005/xpath-functions", $object-value-data-type) } { attribute key {$object-name}, if ($object-value-data-type = ("array", "map")) then x:joewiz-json-to-xml-recurse($object-value)/node() else $object-value } } ) else $json }');
+  x.registerInterpretedFunction('joewiz-json-data-type', '($json as item()?) as xs:string', ' if ($json instance of array(*)) then "array" else if ($json instance of map(*)) then "map" else if ($json instance of xs:string) then "string" else if ($json instance of xs:double) then "number" else if ($json instance of xs:boolean) then "boolean" else if (empty($json)) then "null" else error(xs:QName("ERR"), "Not a known data type for json data")');
+  x.registerInterpretedFunction('joewiz-xml-to-json-recurse', '($input as node()*) as item()*', 'for $node in $input return typeswitch ($node) case element(fn:map) return ( $node/text()[normalize-space(.) ne ""]/x:joewiz-FOJS0006($node), map:merge( $node/* ! (let $key := @key return if ($key) then map {$key: x:joewiz-xml-to-json-recurse(.)} else x:joewiz-FOJS0006($node) ) ) ) case element(fn:array) return ( $node/text()[normalize-space(.) ne ""]/x:joewiz-FOJS0006($node), array { $node/* } => array:for-each(x:joewiz-xml-to-json-recurse#1) ) case element(fn:string) return $node/string() case element(fn:number) return $node cast as xs:double case element(fn:boolean) return $node cast as xs:boolean case element(fn:null) return ($node/text()[normalize-space(.) ne ""]/x:joewiz-FOJS0006($node)) case document-node() return x:joewiz-xml-to-json-recurse($node/node()) (: Comments, processing instructions, and whitespace text node children of map and array are ignored :) case text() return if (normalize-space($node) eq "") then () else x:joewiz-FOJS0006($node) case comment() | processing-instruction() return () case element() return x:joewiz-FOJS0006($node) default return error(xs:QName("ERR"), "Does not match known node types for xml-to-json data") ');
+  x.registerInterpretedFunction('joewiz-FOJS0006', '($node as node()*) as item()*', 'error(fn:QName("http://www.w3.org/2005/xqt-errors", "FOJS0006"), "Invalid XML representation of JSON: "||serialize($node))');
+
+
+
   fnarray := TXQNativeModule.Create(XMLnamespace_XPathFunctionsArray);
+  fnarray.acceptedModels := PARSING_MODEL3_1;
   TXQueryEngine.registerNativeModule(fnarray);
   fnarray.registerFunction('size', @xqFunctionArraySize).setVersionsShared([arrayt, integer]);
   fnarray.registerFunction('get', @xqFunctionArrayGet).setVersionsShared([arrayt, integer, itemStar]);
@@ -8129,6 +7818,7 @@ transform
   fnarray.registerFunction('flatten', @xqFunctionArrayFlatten).setVersionsShared([itemStar, itemStar]);
 
   fnmap := TXQNativeModule.Create(XMLnamespace_XPathFunctionsMap);
+  fnmap.acceptedModels := PARSING_MODEL3_1;
   TXQueryEngine.registerNativeModule(fnmap);
   fnmap.registerFunction('merge', @xqFunctionMapMerge).setVersionsShared([mapStar, map],  [mapStar, map, map]);
   fnmap.registerFunction('size', @xqFunctionMapSize).setVersionsShared([map, integer]);
@@ -8305,8 +7995,8 @@ begin
   fnmap.free;
 end;
 
+
 initialization
   GlobalNodeSerializationCallback := @GlobalNodeSerializationCallbackImpl;
-
 end.
 

@@ -33,6 +33,7 @@ implementation
 uses Classes, SysUtils, xquery, bbutils, strutils, bigdecimalmath, base64, math, xquery__regex
   , internetaccess //it does not need internet access itself, just the URI encoding function there
   , xquery.internals.common, xquery.internals.lclexcerpt
+  , xquery__serialization
   {$ifdef unix},BaseUnix{$endif}
   {$ifdef windows},windows{$endif}
     ;
@@ -177,7 +178,7 @@ var
 {$endif}
 begin
   {$ifdef windows}
-  temp := FileGetAttr(Filename);
+  temp := DWORD(FileGetAttr(Filename));
   result := (temp <> $ffffffff) and ((temp and FILE_ATTRIBUTE_DIRECTORY) = 0);
   {$else}
   result := FileExists(Filename) and not DirectoryExists(Filename);
@@ -225,7 +226,7 @@ begin
   dateTime := FileDateToDateTime(search.Time);
   sysutils.FindClose(search);
   dt := TXQValueDateTime.create(baseSchema.dateTime, dateTime);
-  dt.value.timezone:=GetLocalTimeOffset;;
+  dt.value.timezone:=-GetLocalTimeOffset;;
   result := dt;
 end;
 
@@ -293,18 +294,18 @@ begin
   result := xqvalue();
 end;
 
-function writeOrAppendSerialized({%H-}argc: SizeInt; args: PIXQValue; append: boolean): IXQValue;
+function writeOrAppendSerialized(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue; append: boolean): IXQValue;
 var
-  temp: TXQueryEngine;
-  data: IXQValue;
+  params: TXQSerializationParams;
+  tempdata: RawByteString;
 begin
-  temp := TXQueryEngine.create;
-  temp.VariableChangelog.add('data', args[1]);
-  if argc = 3 then temp.VariableChangelog.add('args', args[2])
-  else temp.VariableChangelog.add('args', xqvalue());
-  data := temp.evaluateXQuery3('serialize($data, $args)'); //todo call serialization directly, handle encoding
-  temp.free;
-  result := writeOrAppendSomething(args[0], append, data.toString);
+  if argc = 3 then params.initFromXQValue(context, args[2])
+  else params.initFromXQValue(context, nil);
+  params.allowEncodingConversion := true;
+  tempdata := serialize(args[1], params);
+  params.done;
+
+  result := writeOrAppendSomething(args[0], append, tempdata);
 end;
 
 function writeOrAppendText({%H-}argc: SizeInt; args: PIXQValue; append: boolean; text: string): IXQValue;
@@ -323,13 +324,12 @@ end;
 
 function append(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 begin
-  ignore(context);
-  result := writeOrAppendSerialized(argc, args, true);
+  result := writeOrAppendSerialized(context, argc, args, true);
 end;
 function append_Binary(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 begin
   ignore(context);
-  result := writeOrAppendSomething(args[0], true, (args[1] as TXQValueString).toRawBinary);
+  result := writeOrAppendSomething(args[0], true, (args[1] as TXQValueBinary).toRawBinary);
 end;
 function append_Text(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 begin
@@ -344,8 +344,7 @@ end;
 
 function write(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 begin
-  ignore(context);
-  result := writeOrAppendSerialized(argc, args, false);
+  result := writeOrAppendSerialized(context, argc, args, false);
 end;
 function write_Binary(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 var
@@ -354,7 +353,7 @@ begin
   ignore(context);
   offset := -1;
   if argc >= 3 then if not xqToUInt64(args[2], offset) then raiseFileError(Error_Out_Of_Range, Error_Out_Of_Range, args[2]);
-  result := writeOrAppendSomething(args[0], argc >= 3, (args[1] as TXQValueString).toRawBinary, offset);
+  result := writeOrAppendSomething(args[0], argc >= 3, (args[1] as TXQValueBinary).toRawBinary, offset);
 end;
 function write_Text(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 begin
@@ -570,12 +569,9 @@ begin
     if FileExistsAsTrueFile(dest) then raiseFileError(Error_Exists, 'Target cannot be overriden', args[1]);
   end else begin
     if not FileOrDirectoryExists(source) then raiseFileError(Error_Not_Found, 'No source', args[0]);
-    {$ifdef windows}if FileExistsAsTrueFile(dest) then if not sysutils.DeleteFile(dest) then
-      raiseFileError(Error_Io_Error, 'Destination exists', args[1]);
-    {$endif}
   end;
 
-  if not RenameFile(source, dest) then raiseFileError(Error_Io_Error, 'Moving failed', args[0]);
+  if not fileMoveReplace(source, dest) then raiseFileError(Error_Io_Error, 'Moving failed', args[0]);
   result := xqvalue();
 end;
 
@@ -630,7 +626,7 @@ begin
   if argc >= 2 then rangeErr := rangeErr or not xqToUInt64(args[1], from);
   if argc >= 3 then rangeErr := rangeErr or not xqToUInt64(args[2], len);
   if rangeErr then raiseFileError(Error_Out_Of_Range, Error_Out_Of_Range, args[2]);
-  result := TXQValueString.create(baseSchema.base64Binary, base64.EncodeStringBase64(readFromFile(normalizePath(args[0]), from, len)));
+  result := TXQValueBinary.create(baseSchema.base64Binary, base64.EncodeStringBase64(readFromFile(normalizePath(args[0]), from, len)));
 end;
 
 function read_text(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
@@ -762,15 +758,15 @@ begin
     module.registerFunction('delete', @delete, dependencyFiles).setVersionsShared([stringt, empty],  [stringt, boolean, empty]);
     lastfn := module.registerFunction('list', @list, dependencyFiles);
     lastfn.setVersionsShared(3);
-    lastfn.setVersionsShared([stringt, stringStar]);
-    lastfn.setVersionsShared([stringt, boolean, stringStar]);
-    lastfn.setVersionsShared([stringt, boolean, stringt, stringStar]);
+    lastfn.setVersionsShared(0, [stringt, stringStar]);
+    lastfn.setVersionsShared(1, [stringt, boolean, stringStar]);
+    lastfn.setVersionsShared(2, [stringt, boolean, stringt, stringStar]);
     module.registerFunction('move', @move, dependencyFiles).setVersionsShared([stringt, stringt, empty]);
     lastfn := module.registerFunction('read-binary', @read_binary, dependencyFiles);
     lastfn.setVersionsShared(3);
-    lastfn.setVersionsShared([stringt, base64Binary]);
-    lastfn.setVersionsShared([stringt, integer, base64Binary]);
-    lastfn.setVersionsShared([stringt, integer, integer, base64Binary]);
+    lastfn.setVersionsShared(0, [stringt, base64Binary]);
+    lastfn.setVersionsShared(1, [stringt, integer, base64Binary]);
+    lastfn.setVersionsShared(2, [stringt, integer, integer, base64Binary]);
     module.registerFunction('read-text', @read_text, dependencyFiles).setVersionsShared([stringt, stringt],  [stringt, stringt, stringt]);
     //[stringt, stringStar]
     module.registerInterpretedFunction('read-text-lines', '($file as xs:string) as xs:string*',                          'x:lines(file:read-text($file           ))');

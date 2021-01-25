@@ -1,7 +1,7 @@
 {
 A collection of often needed functions missing in FPC
 
-Copyright (C) 2008 - 2019  Benito van der Zander (BeniBela)
+Copyright (C) 2008 - 2020  Benito van der Zander (BeniBela)
                            benito@benibela.de
                            www.benibela.de
 
@@ -211,7 +211,7 @@ procedure strMoveRef(var source: string; var dest: string; const size: SizeInt);
 //length limited
 function strlEqual(const p1,p2:pansichar;const l: SizeInt):boolean; overload; {$IFDEF HASINLINE} inline; {$ENDIF} //**< Tests if the strings are case-sensitive equal (same length and same characters) (null-terminated, stops comparison when meeting #0 )
 function strlEqual(const p1,p2:pansichar;const l1,l2: SizeInt):boolean; overload;  {$IFDEF HASINLINE} inline; {$ENDIF} //**< Tests if the strings are case-sensitive equal (same length and same characters) (null-terminated, stops comparison when meeting #0 )
-function strliEqual(const p1,p2:pansichar;const l: SizeInt):boolean; overload;  {$IFDEF HASINLINE} inline; {$ENDIF} //**< Tests if the strings are case-insensitive equal (same length and same characters) (null-terminated, stops comparison when meeting #0 )
+function strliEqual(const p1,p2:pansichar;const l: SizeInt):boolean; overload;  //**< Tests if the strings are case-insensitive equal (same length and same characters) (null-terminated, stops comparison when meeting #0 )
 function strliEqual(const p1,p2:pansichar;const l1,l2: SizeInt):boolean; overload; {$IFDEF HASINLINE} inline; {$ENDIF} //**< Tests if the strings are case-insensitive equal (same length and same characters) (null-terminated, stops comparison when meeting #0 )
 function strlsEqual(const p1,p2:pansichar;const l: SizeInt):boolean; overload; {$IFDEF HASINLINE} inline; {$ENDIF} //**< Tests if the strings are case-sensitive equal (same length and same characters) (strict-length, can continue comparison after #0)
 function strlsEqual(const p1,p2:pansichar;const l1,l2: SizeInt):boolean; overload;  {$IFDEF HASINLINE} inline; {$ENDIF} //**< Tests if the strings are case-sensitive equal (same length and same characters) (strict-length, can continue comparison after #0)
@@ -422,6 +422,7 @@ procedure strAnsi2UnicodeMoveProc(source:pchar;cp : TSystemCodePage;var dest:uni
 {$IFDEF fpc}
 procedure registerFallbackUnicodeConversion; {$ifndef HAS_CPSTRING} deprecated 'Codepage aware extension requires fpc >=3';{$endif}
 function strEncodingFromName(str:string):TSystemCodePage; //**< Gets the encoding from an encoding name (e.g. from http-equiv)
+function strEncodingName(e: TSystemCodePage): string;
 //this can return CP_ACP (perhaps i will change that)
 function strActualEncoding(const str: RawByteString): TSystemCodePage; {$ifdef HASINLINE} inline; {$endif}
 function strActualEncoding(e: TSystemCodePage): TSystemCodePage; {$ifdef HASINLINE} inline; {$endif}
@@ -451,7 +452,7 @@ function strUpperCaseSpecialUTF8(codePoint: integer): string;
 function strLowerCaseSpecialUTF8(codePoint: integer): string;
 
 
-type TDecodeHTMLEntitiesFlags = set of (dhefStrict, dhefAttribute);
+type TDecodeHTMLEntitiesFlags = set of (dhefStrict, dhefAttribute, dhefWindows1252Extensions, dhefNormalizeLineEndings);
      EDecodeHTMLEntitiesException = class(Exception);
 //**This decodes all html entities to the given encoding. If strict is not set
 //**it will ignore wrong entities (so e.g. X&Y will remain X&Y and you can call the function
@@ -564,6 +565,7 @@ public
   procedure appendHexNumber(number: integer);
   procedure appendHexNumber(number, digits: integer);
   procedure appendNumber(number: Int64);
+  procedure appendBOM(codepage: TSystemCodePage);
   procedure chop(removedCount: SizeInt);
 end;
 
@@ -579,6 +581,8 @@ end;
     function endsWith(const s: string): boolean; inline;
     function endsWithI(const s: string): boolean; inline;
     function containsI(const s: string): boolean; inline;
+
+    function isBlank: boolean; inline;
 
     function EncodeHex: String; inline;
     function DecodeHex: String; inline;
@@ -608,6 +612,7 @@ type
     end;
   private
     function getCapacity: SizeInt; inline;
+    procedure setCapacity(AValue: SizeInt);
   protected
     FBuffer: TArrayBuffer;
     FCount: SizeInt;
@@ -624,7 +629,7 @@ type
     procedure exchange(Index1, Index2: SizeInt);
     procedure expand;
     function toSharedArray: TArrayBuffer;
-    property capacity: SizeInt read getCapacity write setCount;
+    property capacity: SizeInt read getCapacity write setCapacity;
     property count: SizeInt read fcount write setCount;
   end;
 
@@ -645,11 +650,14 @@ type
       property Items[Index: SizeInt]: TElement read get write put; default;
   end;
   generic TCopyingPtrArrayList<TElement> = object(specialize TCopyingArrayList<TElement>)
+  public
+    function indexOf(const element: TElement): SizeInt;
+    function contains(const element: TElement): Boolean;
   end;
-  TPointerArrayList = specialize TCopyingArrayList<pointer>;
-  TObjectArrayList = specialize TCopyingArrayList<TObject>;
-  TSizeIntArrayList = specialize TCopyingArrayList<SizeInt>;
-  TStringArrayList = specialize TCopyingArrayList<String>;
+  TPointerArrayList = specialize TCopyingPtrArrayList<pointer>;
+  TObjectArrayList = specialize TCopyingPtrArrayList<TObject>;
+  TSizeIntArrayList = specialize TCopyingPtrArrayList<SizeInt>;
+  TStringArrayList = specialize TCopyingPtrArrayList<String>;
 
   generic TRecordArrayList<TElement> = object(specialize TBaseArrayList<TElement>)
     type TEnumerator = object(TBasePreEnumerator)
@@ -1059,6 +1067,21 @@ begin
   result := strDecodeUTF8Character(temp, pend)
 end;
 
+procedure TUTF8StringCodePointBlockEnumerator.mark;
+begin
+  markedPos := p;
+end;
+
+procedure TUTF8StringCodePointBlockEnumerator.markNext;
+begin
+  markedPos := p + FCurrentByteLength;
+end;
+
+function TUTF8StringCodePointBlockEnumerator.markedByteLength: SizeInt;
+begin
+  result := p - markedPos;
+end;
+
 
 procedure TUTF8StringCodePointBlockEnumerator.init(const s: string);
 begin
@@ -1102,20 +1125,6 @@ begin
   result.FCurrentByteLength:=0;
 end;
 
-procedure TUTF8StringCodePointBlockEnumerator.mark;
-begin
-  markedPos := p;
-end;
-
-procedure TUTF8StringCodePointBlockEnumerator.markNext;
-begin
-  markedPos := p + FCurrentByteLength;
-end;
-
-function TUTF8StringCodePointBlockEnumerator.markedByteLength: SizeInt;
-begin
-  result := p - markedPos;
-end;
 
 
 procedure TStrBuilder.appendWithEncodingConversion(const s: RawByteString);
@@ -1302,6 +1311,25 @@ begin
   append(@s[1], length(s));
 end;
 
+type TEncodingBOMs = class
+  const UTF8 = #$ef#$bb#$bf;
+  const UTF16 =  #$ff#$fe;
+  const UTF16BE =  #$fe#$ff;
+  const UTF32 =  #$ff#$fe#00#00;
+  const UTF32BE =  #00#00#$fe#$ff;
+end;
+
+procedure TStrBuilder.appendBOM(codepage: TSystemCodePage);
+begin
+  case codepage of
+     CP_UTF8: append(TEncodingBOMs.UTF8);
+     CP_UTF16: append(TEncodingBOMs.UTF16);
+     CP_UTF16BE: append(TEncodingBOMs.UTF16BE);
+     CP_UTF32: append(TEncodingBOMs.UTF32);
+     CP_UTF32BE: append(TEncodingBOMs.UTF32BE);
+  end;
+end;
+
 
 
 
@@ -1333,9 +1361,17 @@ begin
   result := length(FBuffer)
 end;
 
+procedure TBaseArrayList.setCapacity(AValue: SizeInt);
+begin
+  SetLength(FBuffer, AValue);
+  if AValue < FCount then FCount := AValue;
+end;
+
 procedure TBaseArrayList.setCount(NewCount: SizeInt);
 begin
-  SetLength(FBuffer, NewCount);
+  if (NewCount > length(FBuffer))
+      or (2 * NewCount < length(FBuffer)) then
+     SetLength(FBuffer, NewCount);
   FCount := NewCount;
 end;
 
@@ -1413,6 +1449,7 @@ begin
   else SetLength(FBuffer, cap + 512);
 end;
 
+
 function TBaseArrayList.toSharedArray: TArrayBuffer;
 begin
   SetLength(FBuffer, fcount);
@@ -1489,6 +1526,20 @@ begin
   initEnumerator(result);
 end;
 
+function TCopyingPtrArrayList.indexOf(const element: TElement): SizeInt;
+var
+  i: SizeInt;
+begin
+  for i := 0 to FCount - 1 do
+    if FBuffer[i] = element then
+      exit(i);
+  result := -1;
+end;
+
+function TCopyingPtrArrayList.contains(const element: TElement): Boolean;
+begin
+  result := indexOf(element) >= 0;
+end;
 
 {$endif}
 
@@ -2747,6 +2798,9 @@ end;
 var
   oldUnicode2AnsiMoveProc : procedure(source:punicodechar;var dest:RawByteString;cp : TSystemCodePage;len:SizeInt);
   oldAnsi2UnicodeMoveProc : procedure(source:pchar;cp : TSystemCodePage;var dest:unicodestring;len:SizeInt);
+  {$ifdef windows}
+  oldAnsi2WideMoveProc : procedure(source:pchar;cp : TSystemCodePage;var dest:widestring;len:SizeInt);
+  {$endif}
 
 procedure myUnicode2AnsiMoveProc(source:punicodechar;var dest:RawByteString;cp : TSystemCodePage;len:SizeInt);
 begin
@@ -2770,6 +2824,27 @@ begin
   end;
 end;
 
+{$ifdef windows}
+procedure myAnsi2WideMoveProc(source:pchar;cp : TSystemCodePage;var dest:WideString;len:SizeInt);
+var temp: UnicodeString;
+begin
+  if len = 0 then begin
+    dest := '';
+    exit;
+  end;
+  case strActualEncoding(cp) of
+    CP_UTF32, CP_UTF32BE,
+    CP_UTF16, CP_UTF16BE,
+    CP_UTF8,
+    CP_WINDOWS1252, CP_LATIN1: begin
+      strAnsi2UnicodeMoveProc(source, cp, temp, len);
+      setlength(dest, length(temp));
+      move(temp[1], dest[1], length(temp) * sizeof(temp[1])); //todo: do not make copy
+    end else oldAnsi2WideMoveProc(source, cp, dest, len);
+  end;
+end;
+{$endif}
+
 procedure registerFallbackUnicodeConversion;
 begin
   {$ifdef FPC_HAS_CPSTRING}
@@ -2777,6 +2852,13 @@ begin
   oldAnsi2UnicodeMoveProc := widestringmanager.Ansi2UnicodeMoveProc;
   widestringmanager.Unicode2AnsiMoveProc := @myUnicode2AnsiMoveProc;
   widestringmanager.Ansi2UnicodeMoveProc := @myAnsi2UnicodeMoveProc;
+  widestringmanager.Wide2AnsiMoveProc := @myUnicode2AnsiMoveProc;
+  {$ifdef windows}
+  oldAnsi2WideMoveProc := widestringmanager.Ansi2WideMoveProc;
+  widestringmanager.Ansi2WideMoveProc := @myAnsi2WideMoveProc;
+  {$else}
+  widestringmanager.Ansi2WideMoveProc := @myAnsi2UnicodeMoveProc;
+  {$endif}
   {$endif}
 end;
 
@@ -3098,23 +3180,39 @@ begin
     end;
   end;
 end;
+function strEncodingName(e: TSystemCodePage): string;
+begin
+  e := strActualEncoding(e);
+  case e of
+    CP_UTF8: result := 'UTF-8'; //XML prefers uppercase
+    CP_UTF16BE, CP_UTF16: result := 'UTF-16'; //XML does not need BE/LE in name
+    CP_UTF32BE, CP_UTF32: result := 'UTF-32';
+    1250..1258: result := 'windows-'+IntToStr(e);
+    else begin
+      result := CodePageToCodePageName(e);
+      if result = '' then
+        result := 'cp' + inttostr(e);
+    end;
+  end;
+end;
 {$ENDIF}
+
 
 function strEncodingFromBOMRemove(var str: RawByteString): TSystemCodePage;
 begin
-  if strbeginswith(str,#$ef#$bb#$bf) then begin
+  if strbeginswith(str,TEncodingBOMs.UTF8) then begin
     delete(str,1,3);
     result:=CP_UTF8;
-  end else if strbeginswith(str,#$fe#$ff) then begin
+  end else if strbeginswith(str,TEncodingBOMs.UTF16BE) then begin
     delete(str,1,2);
     result:=CP_UTF16BE;
-  end else if strbeginswith(str,#$ff#$fe) then begin
+  end else if strbeginswith(str,TEncodingBOMs.UTF16) then begin
     delete(str,1,2);
     result:=CP_UTF16;
-  end else if strbeginswith(str,#00#00#$fe#$ff) then begin
+  end else if strbeginswith(str,TEncodingBOMs.UTF32BE) then begin
     delete(str,1,4);
     result:=CP_UTF32BE;
-  end else if strbeginswith(str,#$ff#$fe#00#00) then begin
+  end else if strbeginswith(str,TEncodingBOMs.UTF32) then begin
     delete(str,1,4);
     result:=CP_UTF32;
   end else result := CP_NONE;
@@ -5268,16 +5366,29 @@ var
     nodeLen, i: Integer;
     acceptPos: pchar;
     nextNode: pchar;
+    noSpecialCharBlockStart: PAnsiChar;
 begin
   encoding := strActualEncoding(encoding);
   builder.init(@result, l, encoding);
+  noSpecialCharBlockStart := p;
   lastChar:=@p[l-1];
   with builder do begin
     while (p<=lastChar) do begin
       //see https://www.w3.org/TR/html5/syntax.html#tokenizing-character-references
       case p^ of
         //#0: break;
+        #13: begin
+          if noSpecialCharBlockStart < p then append(noSpecialCharBlockStart, p - noSpecialCharBlockStart);
+          inc(p);
+          if dhefNormalizeLineEndings in flags then begin
+            append(#10);
+            if (p <= lastChar) and (p^ = #10) then inc(p);
+          end else append(#13);
+          noSpecialCharBlockStart := p;
+        end;
+
         '&': begin
+          if noSpecialCharBlockStart < p then append(noSpecialCharBlockStart, p - noSpecialCharBlockStart);
           inc(p);
           marker := p;
           case p^ of
@@ -5305,6 +5416,7 @@ begin
                 //no characters match the range
                 append('&');
                 p := marker;
+                noSpecialCharBlockStart := p;
                 continue;
               end;
               case p^ of
@@ -5316,10 +5428,11 @@ begin
                 parseError;
               end else case entity of
                 $0001..$0008, $000B, $000D..$001F, $007F, $FDD0..$FDEF: parseError;
-                low(ENCODING_MAP_WINDOWS1252_TO_UNICODE)..high(ENCODING_MAP_WINDOWS1252_TO_UNICODE): begin
-                  entity := ENCODING_MAP_WINDOWS1252_TO_UNICODE[entity];
-                  parseError;
-                end;
+                low(ENCODING_MAP_WINDOWS1252_TO_UNICODE)..high(ENCODING_MAP_WINDOWS1252_TO_UNICODE):
+                  if dhefWindows1252Extensions in flags then begin
+                    entity := ENCODING_MAP_WINDOWS1252_TO_UNICODE[entity];
+                    parseError;
+                  end;
                 else if (entity and $FFFE) = $FFFE then parseError;
               end;
               appendCodePoint(entity);
@@ -5330,7 +5443,7 @@ begin
               case p^ of
                  'A'..'Z': entityCodeStartPtr := @entityCodeStarts[ord(p^)-ord('A'),0];
                  'a'..'z': entityCodeStartPtr := @entityCodeStarts[ord(p^)-ord('a') + 26,0];
-                 else begin append('&'); continue; end;
+                 else begin append('&'); noSpecialCharBlockStart := p; continue; end;
               end;
               inc(p);
               entity := -1;
@@ -5342,6 +5455,7 @@ begin
                  if p^ = ';' then parseError; //todo: add parse error, when digit and semicolon after arbitrary many alphas
                  append('&');
                  p := marker;
+                 noSpecialCharBlockStart := p;
                  continue;
               end;
 
@@ -5418,13 +5532,14 @@ begin
                 append('&');
             end;
           end;
+          noSpecialCharBlockStart := p;
         end;
-        else begin
-          append(p^);
-          inc(p);
-        end;
+
+
+        else inc(p);
       end;
     end;
+    if noSpecialCharBlockStart < p then append(noSpecialCharBlockStart, p - noSpecialCharBlockStart);
   end;
   builder.final;
 end;
@@ -5454,6 +5569,17 @@ end;
 function TBBStringHelper.containsI(const s: string): boolean;
 begin
   result := striContains(self, s);
+end;
+
+function TBBStringHelper.isBlank: boolean;
+var
+  temp: Pointer;
+  len: SizeInt;
+begin
+  temp := pointer(self);
+  len := self.Length;
+  strlTrimLeft(temp, len, [#9,#10,#13,' ']);
+  result := len = 0;
 end;
 
 function TBBStringHelper.EncodeHex: String;

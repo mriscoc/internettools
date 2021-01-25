@@ -817,8 +817,8 @@ begin
 
   t('form(<form><button name="a" value="AV" type="submit"/><input name="xxx" value="yyy"/><button name="b" value="BV" type="submit"/></form>).url', 'pseudo://test?xxx=yyy');
   t('form(<form><button name="a" value="AV" type="submit"/><input name="xxx" value="yyy"/><button name="b" value="BV" type="submit"/></form>, {"a": "AV"}).url', 'pseudo://test?a=AV&xxx=yyy');
-  t('form(<form><button name="a" value="AV" type="submit"/><input name="xxx" value="yyy"/><button name="b" value="BV" type="submit"/></form>, {"a": "XYZ"}).url', 'pseudo://test?xxx=yyy&a=XYZ');
-  t('form(<form><button name="a" value="AV" type="submit"/><input name="xxx" value="yyy"/><button name="b" value="BV" type="submit"/></form>, {"a": "BV"}).url', 'pseudo://test?xxx=yyy&a=BV');
+  t('form(<form><button name="a" value="AV" type="submit"/><input name="xxx" value="yyy"/><button name="b" value="BV" type="submit"/></form>, {"a": "XYZ"}).url', 'pseudo://test?a=XYZ&xxx=yyy');
+  t('form(<form><button name="a" value="AV" type="submit"/><input name="xxx" value="yyy"/><button name="b" value="BV" type="submit"/></form>, {"a": "BV"}).url', 'pseudo://test?a=BV&xxx=yyy');
   t('form(<form><input name="a" value="AV" type="submit"/><input name="xxx" value="yyy"/><button name="b" value="BV" type="submit"/></form>, {"a": "AV"}).url', 'pseudo://test?a=AV&xxx=yyy');
 
   t('uri-combine(<input name="c" value="foo"/>, <input name="d" value="bar"/>)', 'c=foo&d=bar');
@@ -962,6 +962,7 @@ begin
   m('declare namespace pre1 = "pp1"; declare namespace pre2 = "pp2"; declare default element namespace "pp2"; attribute foobar { } instance of attribute(foobar)', 'true');
   m('declare namespace pre1 = "pp1"; declare namespace pre2 = "pp2"; declare default element namespace "pp2"; attribute foobar { } instance of attribute(pre2:foobar)', 'false');
   m('declare namespace pre1 = "pp1"; declare namespace pre2 = "pp2"; declare default element namespace "pp2"; attribute foobar { } instance of attribute(pre1:foobar)', 'false');
+  m('declare default element namespace "xxx"; <a b="foo"/>/@b', 'foo');
   t('attribute foobar { } instance of attribute(*)', 'true');
   t('attribute foobar { } instance of attribute(*, xs:untypedAtomic)', 'true');
   t('attribute foobar { } instance of attribute(*, xs:integer)', 'false');
@@ -1209,32 +1210,32 @@ begin
   m('declare namespace a = "ANS"; declare namespace b = "BNS"; declare copy-namespaces no-preserve, no-inherit; let $a := <a:xyz xmlns="foobar" xmlns:t="u"/> return outer-xml(<b:x xmlns:b="BNS"><c>{$a}</c></b:x> / c)', '<c xmlns:b="BNS"><a:xyz xmlns:a="ANS"/></c>');
 
   m('declare namespace a = "ANS"; declare namespace b = "BNS"; declare copy-namespaces preserve, inherit;       let $a := <a:xyz/>, $b := <b:foo xmlns:b="BNS">{$a}</b:foo> return outer-xml($b)', '<b:foo xmlns:b="BNS"><a:xyz xmlns:a="ANS"/></b:foo>');
-  m('declare namespace a = "ANS"; declare namespace b = "BNS"; declare copy-namespaces preserve, inherit;       let $a := <a:xyz/>, $b := <b:foo xmlns:b="BNS">{$a}</b:foo> return outer-xml($b / a:*)', '<a:xyz xmlns:a="ANS" xmlns:b="BNS"/>');
-  m('declare namespace a = "ANS"; declare namespace b = "BNS"; declare copy-namespaces no-preserve, inherit;    let $a := <a:xyz/>, $b := <b:foo xmlns:b="BNS">{$a}</b:foo> return outer-xml($b / a:*)', '<a:xyz xmlns:a="ANS" xmlns:b="BNS"/>');
+  m('declare namespace a = "ANS"; declare namespace b = "BNS"; declare copy-namespaces preserve, inherit;       let $a := <a:xyz/>, $b := <b:foo xmlns:b="BNS">{$a}</b:foo> return outer-xml($b / a:*)', '<a:xyz xmlns:b="BNS" xmlns:a="ANS"/>');
+  m('declare namespace a = "ANS"; declare namespace b = "BNS"; declare copy-namespaces no-preserve, inherit;    let $a := <a:xyz/>, $b := <b:foo xmlns:b="BNS">{$a}</b:foo> return outer-xml($b / a:*)', '<a:xyz xmlns:b="BNS" xmlns:a="ANS"/>');
   m('declare namespace a = "ANS"; declare namespace b = "BNS"; declare copy-namespaces preserve, no-inherit;    let $a := <a:xyz/>, $b := <b:foo xmlns:b="BNS">{$a}</b:foo> return outer-xml($b / a:*)', '<a:xyz xmlns:a="ANS"/>');
   m('declare namespace a = "ANS"; declare namespace b = "BNS"; declare copy-namespaces no-preserve, no-inherit; let $a := <a:xyz/>, $b := <b:foo xmlns:b="BNS">{$a}</b:foo> return outer-xml($b / a:*)', '<a:xyz xmlns:a="ANS"/>');
 
   m('declare namespace a = "ANS"; declare namespace b = "BNS"; declare namespace c = "CNS"; declare copy-namespaces preserve, inherit;       let $a := <a:xyz/>, $b := <b:foo c:def="123">{$a}</b:foo> return outer-xml($b)', '<b:foo xmlns:b="BNS" xmlns:c="CNS" c:def="123"><a:xyz xmlns:a="ANS"/></b:foo>');
-  m('declare namespace a = "ANS"; declare namespace b = "BNS"; declare namespace c = "CNS"; declare copy-namespaces preserve, inherit;       let $a := <a:xyz/>, $b := <b:foo c:def="123">{$a}</b:foo> return outer-xml($b / a:*)', '<a:xyz xmlns:a="ANS"/>');
-  m('declare namespace a = "ANS"; declare namespace b = "BNS"; declare namespace c = "CNS"; declare copy-namespaces no-preserve, inherit;    let $a := <a:xyz/>, $b := <b:foo c:def="123">{$a}</b:foo> return outer-xml($b / a:*)', '<a:xyz xmlns:a="ANS"/>');
+  m('declare namespace a = "ANS"; declare namespace b = "BNS"; declare namespace c = "CNS"; declare copy-namespaces preserve, inherit;       let $a := <a:xyz/>, $b := <b:foo c:def="123">{$a}</b:foo> return outer-xml($b / a:*)', '<a:xyz xmlns:b="BNS" xmlns:c="CNS" xmlns:a="ANS"/>');
+  m('declare namespace a = "ANS"; declare namespace b = "BNS"; declare namespace c = "CNS"; declare copy-namespaces no-preserve, inherit;    let $a := <a:xyz/>, $b := <b:foo c:def="123">{$a}</b:foo> return outer-xml($b / a:*)', '<a:xyz xmlns:b="BNS" xmlns:c="CNS" xmlns:a="ANS"/>');
   m('declare namespace a = "ANS"; declare namespace b = "BNS"; declare namespace c = "CNS"; declare copy-namespaces preserve, no-inherit;    let $a := <a:xyz/>, $b := <b:foo c:def="123">{$a}</b:foo> return outer-xml($b / a:*)', '<a:xyz xmlns:a="ANS"/>');
   m('declare namespace a = "ANS"; declare namespace b = "BNS"; declare namespace c = "CNS"; declare copy-namespaces no-preserve, no-inherit; let $a := <a:xyz/>, $b := <b:foo c:def="123">{$a}</b:foo> return outer-xml($b / a:*)', '<a:xyz xmlns:a="ANS"/>');
 
   m('declare namespace a = "ANS"; declare namespace b = "BNS"; declare namespace c = "CNS"; declare copy-namespaces preserve, inherit;       let $a := <a:xyz/>, $b := <b:foo c:def="123" xmlns:b="BNS" xmlns:c="CNS">{$a}</b:foo> return outer-xml($b)', '<b:foo xmlns:b="BNS" xmlns:c="CNS" c:def="123"><a:xyz xmlns:a="ANS"/></b:foo>');
-  m('declare namespace a = "ANS"; declare namespace b = "BNS"; declare namespace c = "CNS"; declare copy-namespaces preserve, inherit;       let $a := <a:xyz/>, $b := <b:foo c:def="123" xmlns:b="BNS" xmlns:c="CNS">{$a}</b:foo> return outer-xml($b / a:*)', '<a:xyz xmlns:a="ANS" xmlns:b="BNS" xmlns:c="CNS"/>');
-  m('declare namespace a = "ANS"; declare namespace b = "BNS"; declare namespace c = "CNS"; declare copy-namespaces no-preserve, inherit;    let $a := <a:xyz/>, $b := <b:foo c:def="123" xmlns:b="BNS" xmlns:c="CNS">{$a}</b:foo> return outer-xml($b / a:*)', '<a:xyz xmlns:a="ANS" xmlns:b="BNS" xmlns:c="CNS"/>');
+  m('declare namespace a = "ANS"; declare namespace b = "BNS"; declare namespace c = "CNS"; declare copy-namespaces preserve, inherit;       let $a := <a:xyz/>, $b := <b:foo c:def="123" xmlns:b="BNS" xmlns:c="CNS">{$a}</b:foo> return outer-xml($b / a:*)', '<a:xyz xmlns:b="BNS" xmlns:a="ANS" xmlns:c="CNS"/>');
+  m('declare namespace a = "ANS"; declare namespace b = "BNS"; declare namespace c = "CNS"; declare copy-namespaces no-preserve, inherit;    let $a := <a:xyz/>, $b := <b:foo c:def="123" xmlns:b="BNS" xmlns:c="CNS">{$a}</b:foo> return outer-xml($b / a:*)', '<a:xyz xmlns:b="BNS" xmlns:a="ANS" xmlns:c="CNS"/>');
   m('declare namespace a = "ANS"; declare namespace b = "BNS"; declare namespace c = "CNS"; declare copy-namespaces preserve, no-inherit;    let $a := <a:xyz/>, $b := <b:foo c:def="123" xmlns:b="BNS" xmlns:c="CNS">{$a}</b:foo> return outer-xml($b / a:*)', '<a:xyz xmlns:a="ANS"/>');
   m('declare namespace a = "ANS"; declare namespace b = "BNS"; declare namespace c = "CNS"; declare copy-namespaces no-preserve, no-inherit; let $a := <a:xyz/>, $b := <b:foo c:def="123" xmlns:b="BNS" xmlns:c="CNS">{$a}</b:foo> return outer-xml($b / a:*)', '<a:xyz xmlns:a="ANS"/>');
 
   m('declare namespace a = "ANS"; declare namespace b = "BNS"; declare default element namespace "defNS"; declare copy-namespaces preserve, inherit;       let $a := <a:xyz/>, $b := <foo b:def="123">{$a}</foo> return outer-xml($b)', '<foo xmlns="defNS" xmlns:b="BNS" b:def="123"><a:xyz xmlns:a="ANS"/></foo>');
-  m('declare namespace a = "ANS"; declare namespace b = "BNS"; declare default element namespace "defNS"; declare copy-namespaces preserve, inherit;       let $a := <a:xyz/>, $b := <foo b:def="123">{$a}</foo> return outer-xml($b / a:*)', '<a:xyz xmlns:a="ANS"/>');
-  m('declare namespace a = "ANS"; declare namespace b = "BNS"; declare default element namespace "defNS"; declare copy-namespaces no-preserve, inherit;    let $a := <a:xyz/>, $b := <foo b:def="123">{$a}</foo> return outer-xml($b / a:*)', '<a:xyz xmlns:a="ANS"/>');
+  m('declare namespace a = "ANS"; declare namespace b = "BNS"; declare default element namespace "defNS"; declare copy-namespaces preserve, inherit;       let $a := <a:xyz/>, $b := <foo b:def="123">{$a}</foo> return outer-xml($b / a:*)', '<a:xyz xmlns="defNS" xmlns:b="BNS" xmlns:a="ANS"/>');
+  m('declare namespace a = "ANS"; declare namespace b = "BNS"; declare default element namespace "defNS"; declare copy-namespaces no-preserve, inherit;    let $a := <a:xyz/>, $b := <foo b:def="123">{$a}</foo> return outer-xml($b / a:*)', '<a:xyz xmlns="defNS" xmlns:b="BNS" xmlns:a="ANS"/>');
   m('declare namespace a = "ANS"; declare namespace b = "BNS"; declare default element namespace "defNS"; declare copy-namespaces preserve, no-inherit;    let $a := <a:xyz/>, $b := <foo b:def="123">{$a}</foo> return outer-xml($b / a:*)', '<a:xyz xmlns:a="ANS"/>');
   m('declare namespace a = "ANS"; declare namespace b = "BNS"; declare default element namespace "defNS"; declare copy-namespaces no-preserve, no-inherit; let $a := <a:xyz/>, $b := <foo b:def="123">{$a}</foo> return outer-xml($b / a:*)', '<a:xyz xmlns:a="ANS"/>');
 
   m('declare namespace a = "ANS"; declare namespace b = "BNS"; declare default element namespace "defNS"; declare copy-namespaces preserve, inherit;       let $a := <a:xyz/>, $b := <foo b:def="123" xmlns="defNS" xmlns:b="BNS">{$a}</foo> return outer-xml($b)', '<foo xmlns="defNS" xmlns:b="BNS" b:def="123"><a:xyz xmlns:a="ANS"/></foo>');
-  m('declare namespace a = "ANS"; declare namespace b = "BNS"; declare default element namespace "defNS"; declare copy-namespaces preserve, inherit;       let $a := <a:xyz/>, $b := <foo b:def="123" xmlns="defNS" xmlns:b="BNS">{$a}</foo> return outer-xml($b / a:*)', '<a:xyz xmlns:a="ANS" xmlns="defNS" xmlns:b="BNS"/>');
-  m('declare namespace a = "ANS"; declare namespace b = "BNS"; declare default element namespace "defNS"; declare copy-namespaces no-preserve, inherit;    let $a := <a:xyz/>, $b := <foo b:def="123" xmlns="defNS" xmlns:b="BNS">{$a}</foo> return outer-xml($b / a:*)', '<a:xyz xmlns:a="ANS" xmlns="defNS" xmlns:b="BNS"/>');
+  m('declare namespace a = "ANS"; declare namespace b = "BNS"; declare default element namespace "defNS"; declare copy-namespaces preserve, inherit;       let $a := <a:xyz/>, $b := <foo b:def="123" xmlns="defNS" xmlns:b="BNS">{$a}</foo> return outer-xml($b / a:*)', '<a:xyz xmlns="defNS" xmlns:a="ANS" xmlns:b="BNS"/>');
+  m('declare namespace a = "ANS"; declare namespace b = "BNS"; declare default element namespace "defNS"; declare copy-namespaces no-preserve, inherit;    let $a := <a:xyz/>, $b := <foo b:def="123" xmlns="defNS" xmlns:b="BNS">{$a}</foo> return outer-xml($b / a:*)', '<a:xyz xmlns="defNS" xmlns:a="ANS" xmlns:b="BNS"/>');
   m('declare namespace a = "ANS"; declare namespace b = "BNS"; declare default element namespace "defNS"; declare copy-namespaces preserve, no-inherit;    let $a := <a:xyz/>, $b := <foo b:def="123" xmlns="defNS" xmlns:b="BNS">{$a}</foo> return outer-xml($b / a:*)', '<a:xyz xmlns:a="ANS"/>');
   m('declare namespace a = "ANS"; declare namespace b = "BNS"; declare default element namespace "defNS"; declare copy-namespaces no-preserve, no-inherit; let $a := <a:xyz/>, $b := <foo b:def="123" xmlns="defNS" xmlns:b="BNS">{$a}</foo> return outer-xml($b / a:*)', '<a:xyz xmlns:a="ANS"/>');
 
@@ -1437,7 +1438,7 @@ begin
   t('<a><b><c/></b><x/><y/></a> //c/ (for $i in 1 to 3 return (name((ancestor::*)[$i])))', 'a b ');
 
   t('outer-xml(<a xml:id="foobar"/>)', '<a xml:id="foobar"/>');
-  t('outer-xml(<a>{attribute {QName("'+XMLNamespaceUrl_XML+'", "id")} {123}}</a>)', '<a xml:id="123"/>');
+  t('outer-xml(<a>{attribute {QName("'+XMLNamespaceUrl_XML+'", "id")} {"x123"}}</a>)', '<a xml:id="x123"/>');
 
   m('declare base-uri "http://example.org"; base-uri(document { element a {1} })', 'http://example.org');
   m('declare base-uri "http://example.org"; base-uri(element a {1} )', 'http://example.org');
@@ -1495,6 +1496,8 @@ begin
   t('let $y := <y xmlns="" xmlns:abc="def"><x foo="bar" xmlns:foo="..."/></y> return outer-xml(<a xmlns="ANS">{$y // *:x}</a>)', '<a xmlns="ANS"><x xmlns:foo="..." xmlns="" xmlns:abc="def" foo="bar"/></a>');
   t('let $y := <y xmlns=""><x foo="bar" xmlns:foo="..."/></y> return outer-xml(<a xmlns="ANS">{$y // *:x}</a>)', '<a xmlns="ANS"><x xmlns:foo="..." xmlns="" foo="bar"/></a>');
   m('declare default element namespace "abc"; let $y := <y><x foo="bar" xmlns:foo="..."/></y> return outer-xml(<a xmlns="ANS">{$y // *:x}</a>)', '<a xmlns="ANS"><x xmlns:foo="..." xmlns="abc" foo="bar"/></a>');
+  m('declare copy-namespaces preserve, inherit; let $b := <b/>, $a := <a xmlns="A">{$b}</a> return outer-xml(<r>{$a//*:b}</r>)', '<r><b/></r>' );
+  m('declare copy-namespaces preserve, inherit; declare namespace x = "y"; let $b := <x:b/>, $a := <x:a xmlns:x="A">{$b}</x:a> return outer-xml(<r>{$a//*:b}</r>)', '<r><x:b xmlns:x="y"/></r>' );
   t('let $y := <y><x foo="bar" xmlns:foo="..."/></y> return outer-xml(<a xmlns="ANS">{$y // *:x}</a>)', '<a xmlns="ANS"><x xmlns:foo="..." xmlns="" foo="bar"/></a>');
   t('outer-xml(for $x in <parent2 xmlns:foo="http://www.example.com/parent2" foo:attr2="attr2"><child2 attr="child"/></parent2> return <new xmlns="http://www.example.com">{$x//*:child2}</new>)', '<new xmlns="http://www.example.com"><child2 xmlns:foo="http://www.example.com/parent2" xmlns="" attr="child"/></new>'); //XQTS test
   t('outer-xml(for $x in <parent2 xmlns:foo="http://www.example.com/parent2" foo:attr2="attr2"><foo:child2 attr="child"/></parent2> return <new xmlns="http://www.example.com">{$x//*:child2}</new>)', '<new xmlns="http://www.example.com"><foo:child2 xmlns:foo="http://www.example.com/parent2" attr="child"/></new>'); //unprefixed attributes are in no ns
@@ -1608,8 +1611,8 @@ begin
   m('outer-xml(<a>&#x9;&#xA;&#xD;&#x85;&#x2028;</a>)', '<a>'#9#10'&#xD;&#x85;&#x2028;</a>');
   m('outer-xml(<a x="foobar&#x9;&#xA;&#xD;&#x85;&#x2028;"/>)', '<a x="foobar&#x9;&#xA;&#xD;&#x85;&#x2028;"/>');
 
-  t('outer-xml(<a id="  a  b "/>)', '<a id="  a  b "/>');
-  t('outer-xml(<a xml:id="  a  b "/>)', '<a xml:id="a b"/>');
+  t('outer-xml(<a id="  axxb "/>)', '<a id="  axxb "/>');
+  t('outer-xml(<a xml:id="  axxb "/>)', '<a xml:id="axxb"/>');
   t('(text {""}, text {""}, text {""}, comment {()}) /(position())', '1 2 3 4');
   m('declare namespace test = "foobar"; <a xmlns:test="foobar" test:test="123"/> / @test:test', '123');
   m('declare namespace test = "foobar"; <a xmlns:test="foobar" test:test="123"/> / namespace-uri(@test:test)', 'foobar');

@@ -151,7 +151,7 @@ begin
   result := xqtvaContinue;
   for i := 0 to high(children) do begin
     result := visitor.simpleTermVisit(@children[i], self);
-    case result of xqtvaAbort: exit; end;
+    if result = xqtvaAbort then exit;
   end;
 end;
 
@@ -178,7 +178,7 @@ begin
   tempvar := globalUnnamedVariable;
   for i := 0 to high(children) do begin
     result := visitor.simpleTermVisit(@children[i], self);
-    case result of xqtvaAbort: exit; end;
+    if result = xqtvaAbort then exit;
     visitor.declare(@tempvar);
   end;
   for i := high(children) downto 0 do
@@ -231,11 +231,11 @@ begin
     xqtvaNoRecursion: ;
     else result := term^.visitchildren(self);
   end;
-  //case result of xqtvaAbort: exit; end;
+  //if result = xqtvaAbort then exit;
 
   parent := theparent;
   result := leave(term);
-  //case result of xqtvaAbort: exit; end;
+  //if result = xqtvaAbort then exit;
 end;
 
 procedure TXQTerm_Visitor.declare(v: PXQTermVariable; theparent: TXQTerm);
@@ -254,7 +254,7 @@ function TXQTerm_Visitor.simpleTermVisitNoRecurse(term: PXQTerm; theparent: TXQT
 begin
   parent := theparent;
   result := visit(term);
-  case result of xqtvaAbort: exit;  end;
+  if result = xqtvaAbort then exit;
 
   parent := theparent;
   result := leave(term);
@@ -285,8 +285,6 @@ begin
     if v^.kind = pvkObject then
        seq.add(v^.getProperty(propname));
   xqvalueSeqSqueezed(result, seq)
-//  if not (obj is TXQValueObject) then raiseEvaluationError('pxp:OBJ', 'Expected object, got: '+obj.toString);
-//  result := (obj as TXQValueObject).getProperty(propname);
 end;
 
 function TXQTermReadObjectProperty.getContextDependencies: TXQContextDependencies;
@@ -325,12 +323,12 @@ var
   ar: TXQValueJSONArray;
   seq: TXQValueSequence;
   i: Int64;
-  pp: TXQProperty;
   pk: PIXQValue;
+  w: TXQValue;
 begin
   if unary then begin
     source := context.SeqValue;
-    if source = nil then raiseTypeError0004('No context item');
+    if source = nil then raiseXQEvaluationException('XPDY0002', 'No context item');
   end else source := children[0].evaluate(context);
   keys := nil;
   if mode = xqtjlmParenthesized then keys := xqvalueAtomize(children[high(children)].evaluate(context));
@@ -358,15 +356,15 @@ begin
       end;
       pvkObject: begin
         case mode of
-          xqtjlmInteger: xqvalueSeqConstruct(result, seq, pv^.getProperty(IntToStr(integerKey)));
+          xqtjlmInteger: xqvalueSeqConstruct(result, seq, pv^.getProperty(xqvalue(integerKey)));
           xqtjlmName: xqvalueSeqConstruct(result, seq, pv^.getProperty(propname));
           xqtjlmParenthesized:
             for pk in keys.GetEnumeratorPtrUnsafe do begin
-              xqvalueSeqConstruct(result, seq, pv^.getProperty(pk^.toString));
+              xqvalueSeqConstruct(result, seq, pv^.getProperty(pk^));
             end;
           xqtjlmWild:
-            for pp in pv^.getPropertyEnumerator do
-              xqvalueSeqConstruct(result, seq, pp.Value);
+            for w in pv^.getEnumeratorPropertyValuesUnsafe do
+              xqvalueSeqConstruct(result, seq, w);
         end;
       end
     else raiseTypeError0004('Need array/map', pv^);
@@ -795,11 +793,22 @@ begin
     tikAny: result := 'item()';
     tikAtomic: begin
       if atomicTypeInfo = nil then exit(name + '(TYPE NOT FOUND)');
-      if atomicTypeInfo.schema <> baseSchema then result := 'Q{' + atomicTypeInfo.schema.url + '}'
+      if (atomicTypeInfo.schema <> baseSchema) and (atomicTypeInfo.schema <> baseJSONiqSchema) then result := 'Q{' + atomicTypeInfo.schema.url + '}'
       else result :=  '';
       result += atomicTypeInfo.name;
     end;
-    tikFunctionTest: result := 'function';
+    tikJSONiqTest: result += atomicTypeInfo.name;
+    tikFunctionTest: begin
+      result := 'function(';
+      if length(arguments) = 0 then result += '*)'
+      else begin
+        for i := 0 to high(arguments) - 1 do begin
+          if i <> 0 then result += ', ';
+          result += arguments[i].serialize;
+        end;
+        result += ') as ' + arguments[high(arguments)].serialize;
+      end;
+    end;
     tikElementTest: result := nodeMatching.serialize();
     tikUnion: begin
       result := '';
@@ -807,6 +816,10 @@ begin
         result += '| ' + (children[i] as TXQTermSequenceType).serialize;
       delete(result, 1, 2);
     end;
+    tikArrayTest: if length(children) = 0 then result := 'array(*)'
+                  else result := 'array('+(children[0] as TXQTermSequenceType).serialize+')';
+    tikMapTest: if length(children) = 0 then result := 'map(*)'
+                  else result := 'map('+(children[0] as TXQTermSequenceType).serialize+', '+(children[1] as TXQTermSequenceType).serialize+')';
   end;
   if allowNone and allowMultiple then result += '*'
   else if allowMultiple then result += '+'
@@ -870,88 +883,167 @@ begin
 end;
 
 function TXQTermSequenceType.instanceOf(const ta: IXQValue; const context: TXQEvaluationContext): boolean;
-
-
-  function instanceOfSingleType(const sub: IXQValue): boolean;
-    function checkArrayMembers: boolean;
-    var
-      pv: PIXQValue;
-    begin
-      for pv in (sub as TXQValueJSONArray).GetEnumeratorMembersPtrUnsafe do
-        if not TXQTermSequenceType(children[0]).instanceOf(pv^) then
-          exit(false);
-      result := true;
-    end;
-    function checkMap: boolean;
-    var
-      pp: TXQProperty;
-      notEmpty: Boolean;
-    begin
-      notEmpty := false;
-      for pp in sub.getPropertyEnumerator do begin
-        notEmpty := true;
-        if not TXQTermSequenceType(children[1]).instanceOf(pp.Value) then
-          exit(false);
-      end;
-      //todo: check keys
-      //todo: check function calls convertType/checkType ?
-      if notEmpty then result := TXQTermSequenceType(children[0]).instanceOf(xqvalue('KEY'))
-      else result := true;
-    end;
-
-  var
-    t: TXSType;
-    fun: TXQValueFunction;
-    i: Integer;
+  function checkSequenceCount: boolean;
   begin
-    case kind of
-      //tikAny, tikNone: ; //handled before
-      tikAtomic: begin
-        t := sub.typeAnnotation;;
-        result := t.derivedFrom(atomicTypeInfo);
-        if result and (length(children) > 0) then begin
-          if (atomicTypeInfo = baseJSONiqSchema.array_) then result := checkArrayMembers
-          else if (atomicTypeInfo = baseJSONiqSchema.object_) then result := checkMap
-          else raiseInternalError(2019010327);
+    case ta.getSequenceCount of
+      0: result := allowNone;
+      1: result := true;
+      else result := allowMultiple;
+    end;
+  end;
+
+  function checkArrayMembers: boolean;
+  var
+    v, w: PIXQValue;
+    memberTypeNeedsChecking: Boolean;
+  begin
+    memberTypeNeedsChecking := length(children) > 0;
+    for v in ta.GetEnumeratorPtrUnsafe do begin
+      if v.kind <> pvkArray then exit(false);
+      if memberTypeNeedsChecking then
+        for w in v.GetEnumeratorMembersPtrUnsafe do
+          if not TXQTermSequenceType(children[0]).instanceOf(w^, context) then
+            exit(false);
+    end;
+    result := true;
+  end;
+  function checkMap: boolean;
+  var
+    notEmpty, propertyTypeNeedsChecking: Boolean;
+    v: PIXQValue;
+    w: TXQValue;
+    p: TXQStandardProperty;
+  begin
+    propertyTypeNeedsChecking := length(children) > 0;
+    for v in ta.GetEnumeratorPtrUnsafe do begin
+      if v.kind <> pvkObject then exit(false);
+      if propertyTypeNeedsChecking then begin
+        case v.getPropertyKeyKind of
+          xqmpkkStringKeys: begin
+            notEmpty := false;
+            for w in v.getEnumeratorPropertyValuesUnsafe do begin
+              notEmpty := true;
+              if not TXQTermSequenceType(children[1]).instanceOf(w, context) then
+                exit(false);
+            end;
+            if notEmpty and not TXQTermSequenceType(children[0]).instanceOf(xqvalue('KEY'), context) then
+              exit(false);
+          end;
+          xqmpkkStandardKeys: begin
+            for p in v.getEnumeratorPropertiesUnsafe do
+              if not TXQTermSequenceType(children[0]).instanceOf(p.key, context) or not TXQTermSequenceType(children[1]).instanceOf(p.value, context) then
+                exit(false);
+            result := true;
+          end;
         end;
       end;
-      tikFunctionTest: begin
-        result := false; //hide warning
-        case sub.kind of
-          pvkFunction: begin
-            if length(arguments) = 0 then exit(true);
-            fun := sub as TXQValueFunction;
-            if (length(arguments) <> length(fun.parameters) + 1) then exit(false);
-            for i := 0 to high(fun.parameters) do
-              if (fun.parameters[i].seqtype <> nil) and not arguments[i].subtypeOf(fun.parameters[i].seqtype) then exit(false);
-            if fun.resulttype <> nil then result := fun.resulttype.subtypeOf(arguments[high(arguments)])
-            else result := arguments[high(arguments)].isItemStar();
+    end;
+    result := true;
+  end;
+  function checkJSONiqStructuredItem: boolean;
+  var
+    v: PIXQValue;
+  begin
+    for v in ta.GetEnumeratorPtrUnsafe do
+      if not v.typeAnnotation.derivedFrom(atomicTypeInfo) then
+        exit(false);
+    result := true;
+  end;
+
+  function checkAtomicSequence: boolean;
+  var atomicCount: integer;
+    function checkAtomicRecursion(v: TXQValue): boolean;
+    var
+      w: PIXQValue;
+    begin
+      case v.kind of
+        pvkUndefined: result := allowNone;
+        pvkSequence: begin
+          result := true;
+          for w in v.GetEnumeratorPtrUnsafe do begin
+            result := checkAtomicRecursion(w.toValue);
+            if not result then exit;
           end;
-          pvkArray, pvkObject: begin
-            //map:   function(A) as item()*,  A: any atomic
-            //array: function(xs:integer) as item()*
-            case length(arguments) of
-              0: result := true;
-              2: begin
-                if not (arguments[high(arguments)].isItemStar()) then exit(false);
-                with arguments[0] do begin
-                  if (allowNone) or (allowMultiple) then exit(false);
-                  case kind of
-                    tikNone: exit(false);
-                    tikAtomic:
-                      case sub.kind of
-                        pvkArray: result := subtypeItemTypeAtomic(atomicTypeInfo, baseSchema.integer);
-                        pvkObject: result := true;
-                      end;
-                    tikAny: result := true;
+        end
+        else begin
+          inc(atomicCount);
+          result := v.typeAnnotation.derivedFrom(atomicTypeInfo);
+        end;
+      end;
+    end;
+  begin
+    atomicCount := 0;
+    result := checkAtomicRecursion(ta.toValue);
+    if result then begin
+      case atomicCount of
+        0: result := allowNone;
+        1: result := true;
+        else result := allowMultiple;
+      end;
+    end;
+  end;
+
+  function checkFunctionTestSequence: boolean;
+  var
+    sub, pw: PIXQValue;
+    fun: TXQValueFunction;
+    i: Integer;
+    returnType: TXQTermSequenceType;
+    w: TXQValue;
+  begin
+    if length(arguments) > 0 then returnType := arguments[high(arguments)];
+    result := true;
+    for sub in ta.GetEnumeratorPtrUnsafe do begin
+      case sub.kind of
+        pvkFunction: begin
+          if length(arguments) = 0 then continue;
+          fun := sub^ as TXQValueFunction;
+          if (length(arguments) <> length(fun.parameters) + 1) then exit(false);
+          for i := 0 to high(fun.parameters) do
+            if (fun.parameters[i].seqtype <> nil) and not arguments[i].subtypeOf(fun.parameters[i].seqtype) then exit(false);
+          if fun.resulttype <> nil then result := fun.resulttype.subtypeOf(returnType)
+          else result := returnType.isItemStar();
+        end;
+        pvkArray, pvkObject: begin
+          result := false;
+          //map:   function(A) as item()*,  A: any atomic
+          //array: function(xs:integer) as item()*
+          case length(arguments) of
+            0: result := true;
+            2: begin
+              if not (returnType.isItemStar()) then begin
+                case sub.kind of
+                  pvkObject: begin
+                    if not returnType.allowNone and (returnType.kind <> tikNone) then exit();
+                    for w in sub.getEnumeratorPropertyValuesUnsafe do
+                      if not returnType.instanceOf(w, context) then
+                        exit();
                   end;
+                  pvkArray:
+                    for pw in sub.GetEnumeratorMembersPtrUnsafe do
+                      if not returnType.instanceOf(pw^, context) then
+                        exit();
+                  else;
+                end;
+              end;
+              with arguments[0] do begin
+                if (allowNone) or (allowMultiple) then exit();
+                case kind of
+                  tikNone: exit();
+                  tikAtomic:
+                    case sub.kind of
+                      pvkArray: result := subtypeItemTypeAtomic(atomicTypeInfo, baseSchema.integer);
+                      pvkObject: result := true; //todo check actual key kind
+                      else;
+                    end;
+                  tikAny: result := true;
                 end;
               end;
             end;
-          end
+          end;
         end;
+        else exit(false);
       end;
-      else result := false; //hide warning
     end;
   end;
 
@@ -978,48 +1070,38 @@ function TXQTermSequenceType.instanceOf(const ta: IXQValue; const context: TXQEv
   end;
 
 var
-  count: Integer;
   i: Integer;
-  v: PIXQValue;
 begin
-  //compare count with sequence count
   case kind of
-    tikNone: exit(ta.isUndefined);
+    tikNone: result := ta.isUndefined;
+    tikAny: result := checkSequenceCount;
+    tikAtomic: result := checkAtomicSequence;
+    tikArrayTest: result := checkSequenceCount and checkArrayMembers;
+    tikMapTest: result := checkSequenceCount and checkMap;
+    tikFunctionTest: exit(checkSequenceCount and checkFunctionTestSequence);
+    tikElementTest: exit(checkSequenceCount and elementTest);
     tikUnion: begin
       for i := 0 to high(children) do
         if TXQTermSequenceType(children[i]).instanceOf(ta, context) then exit(true);
       exit(false);
     end;
-  end;
-  count := ta.getSequenceCount;
-  if ((count = 0) and not allowNone) or
-     ((count > 1) and not allowMultiple) then
-    exit(false);
-  if (count = 0) then
-    exit(true);
-  //compare item type
-  if kind = tikAny then
-    exit(true);
-  if kind = tikElementTest then
-    exit(elementTest);
-  result := true;
-  for v in ta.GetEnumeratorPtrUnsafe do begin
-    result := result and instanceOfSingleType(v^);
-    if not result then exit;
-  end;
+    tikJSONiqTest: result := checkSequenceCount and checkJSONiqStructuredItem;
+  end
 end;
 
-function TXQTermSequenceType.instanceOf(const ta: IXQValue): boolean;
+(*function TXQTermSequenceType.instanceOf(const ta: IXQValue): boolean;
 var temp: TXQEvaluationContext;
 begin
-  temp.staticContext := nil;
+  temp := default(TXQEvaluationContext);
   result := instanceOf(ta, temp);
-end;
+end;*)
 
 {$ImplicitExceptions off}
 function TXQTermSequenceType.instanceOf(const node: TTreeNode): boolean;
+var temp: TXQEvaluationContext;
 begin
-  result := instanceof(xqvalue(node));
+  temp := default(TXQEvaluationContext);
+  result := instanceof(xqvalue(node), temp); //todo: this might crash when this type depends on something in the context (e.g. namespaces)
 end;
 {$ImplicitExceptions on}
 
@@ -1082,13 +1164,13 @@ begin
           //subtype-assertions(AnnotationsA, AnnotationsB) is not defined (??)
           exit(true);
         end;
-        tikAtomic: if (atomicTypeInfo = baseJSONiqSchema.object_) or (atomicTypeInfo = baseJSONiqSchema.array_) then begin
+        tikArrayTest, tikMapTest, tikJSONiqTest: begin
           case length(tb.arguments) of
             0: exit(true);
             2: ;
             else exit(false);
           end;
-          if atomicTypeInfo = baseJSONiqSchema.object_ then begin
+          if (kind = tikMapTest) or ((kind = tikJSONiqTest) and (atomicTypeInfo = baseJSONiqSchema.object_)) then begin
             tempExpectedKeyType := baseSchema.anyAtomicType;
             tempExpectedValueChild := 1;
           end else begin
@@ -1102,7 +1184,34 @@ begin
           end;
           exit(false);
         end;
+        else;
       end;
+    tikArrayTest: begin
+      if length(tb.children) = 0 then begin
+        if kind = tikArrayTest then exit(true);
+        if (kind = tikJSONiqTest) and (atomicTypeInfo = baseJSONiqSchema.array_) then exit(true);
+      end;
+      if (kind <> tikArrayTest) or (length(children) = 0) then exit(false);
+      exit( TXQTermSequenceType(children[0]).subtypeOf( TXQTermSequenceType(tb.children[0]) ) );
+    end;
+    tikMapTest: begin
+      if length(tb.children) = 0 then begin
+        if kind = tikMapTest then exit(true);
+        if (kind = tikJSONiqTest) and (atomicTypeInfo = baseJSONiqSchema.object_) then exit(true);
+      end;
+      if (kind <> tikMapTest) or (length(children) = 0) then exit(false);
+      exit( //(TXQTermSequenceType(tb.children[0]).subtypeItemTypeOf( TXQTermSequenceType(children[0]) ))
+        (TXQTermSequenceType(children[0]).subtypeItemTypeOf( TXQTermSequenceType(tb.children[0]) )) //this is how it is described in the standard and it passes the tests, but should it not be the opposite order?
+        and (TXQTermSequenceType(children[1]).subtypeOf( TXQTermSequenceType(tb.children[1]) ))
+      );
+    end;
+    tikJSONiqTest: case kind of
+      tikArrayTest: exit(tb.atomicTypeInfo = baseJSONiqSchema.array_);
+      tikMapTest: exit(tb.atomicTypeInfo = baseJSONiqSchema.object_);
+      tikJSONiqTest: exit(atomicTypeInfo.derivedFrom(tb.atomicTypeInfo));
+      else;
+    end;
+    tikAtomic: ;
   end;
   exit(false);
 end;
@@ -1117,6 +1226,8 @@ var
 begin
   //function coercion f(v, w, ..)=>s  passed to f(a, b, ..)=>r becomes f(a intersect v, b intersect w, ..)=>r intersect s
   //if v.kind <> pvkFunction then raise EXQEvaluationException.Create('XPTY0004', 'Expected function, but got : '+result.toXQuery());
+
+  //note: function coercion is only used with strict type checking enabled
   if length(arguments) = 0 then exit(v);
   case v.kind of
     pvkFunction: begin
@@ -1124,8 +1235,7 @@ begin
       if (length(arguments) <> length(fun.parameters) + 1) then raise EXQEvaluationException.Create('XPTY0004', 'Invalid argument count');
       needCoercion := false;
       for i := 0 to high(fun.parameters) do
-        if (not arguments[i].isItemStar)
-           and ((fun.parameters[i].seqtype = nil) or not fun.parameters[i].seqtype.subtypeOf(arguments[i])) then begin
+        if (fun.parameters[i].seqtype = nil) or not arguments[i].subtypeOf(fun.parameters[i].seqtype) then begin
           needCoercion:=true;
           break;
         end;
@@ -1355,17 +1465,17 @@ function TXQTermSomeEvery.visitchildren(visitor: TXQTerm_Visitor): TXQTerm_Visit
       exit(visitor.simpleTermVisit(@children[pos], self));
     if objInheritsFrom(children[pos + 1], TXQTermSequenceType) then begin
       result := visitor.simpleTermVisit(@children[pos+1], self);
-      case result of xqtvaAbort: exit; end;
+      if result = xqtvaAbort then exit;
       typeDelta:=1;
     end else typeDelta:=0;
 
     result := visitor.simpleTermVisit(@children[pos+1+typeDelta], self);
-    case result of xqtvaAbort: exit; end;
+    if result = xqtvaAbort then exit;
 
     visitor.declare(@children[pos], self);
 
     result := visitSomeEvery(pos+2+typeDelta);
-    case result of xqtvaAbort: exit; end;
+    if result = xqtvaAbort then exit;
 
     visitor.undeclare(@children[pos], self);
   end;
@@ -1444,10 +1554,10 @@ end;
 function TXQTermFlowerLet.visitchildren(visitor: TXQTerm_Visitor): TXQTerm_VisitAction;
 begin
   result := visitor.simpleTermVisit(@expr, self);
-  case result of xqtvaAbort: exit; end;
+  if result = xqtvaAbort then exit;
   if sequenceTyp <> nil then begin
     result := visitor.simpleTermVisit(@sequenceTyp, self);
-    case result of xqtvaAbort: exit; end;
+    if result = xqtvaAbort then exit;
   end;
   //todo: visit loopvar, too?
   visitor.declare(@loopvar);
@@ -1563,10 +1673,10 @@ end;
 function TXQTermFlowerWindow.visitchildren(visitor: TXQTerm_Visitor): TXQTerm_VisitAction;
 begin
   result := visitor.simpleTermVisit(@expr, self);
-  case result of xqtvaAbort: exit; end;
+  if result = xqtvaAbort then exit;
   if sequenceTyp <> nil then begin
     result := visitor.simpleTermVisit(@sequenceTyp, self);
-    case result of xqtvaAbort: exit; end;
+    if result = xqtvaAbort then exit;
   end;
 
   startCondition.visitchildren(visitor, self);
@@ -1661,15 +1771,15 @@ var
   j: Integer;
 begin
   result := visitor.simpleTermVisit(@expr, self);
-  case result of xqtvaAbort: exit; end;
+  if result = xqtvaAbort then exit;
 
   if sequenceTyp <> nil then begin
     result := visitor.simpleTermVisit(@sequenceTyp, self);
-    case result of xqtvaAbort: exit; end;
+    if result = xqtvaAbort then exit;
   end;
 
   result := visitor.simpleTermVisit(@pattern, self);
-  case result of xqtvaAbort: exit; end;
+  if result = xqtvaAbort then exit;
 
   for j := 0 to high(pattern.vars) do
     visitor.declare(@pattern.vars[j]);
@@ -1872,7 +1982,7 @@ var meta: PFlowerSortingData;
 
   function isGreaterThan(w, v: IXQValue; emptyLeast: boolean; const collation: TXQCollation): boolean;
   var
-    temp: integer;
+    temp: TXQCompareResult;
   begin
     result := false;
     if emptyLeast then begin
@@ -1888,9 +1998,9 @@ var meta: PFlowerSortingData;
     end;
 
     if (collation <> nil) and (v is TXQValueString) and (w is TXQValueString) then
-      exit(collation.compare(v.toString, w.toString) < 0);
+      exit(ord(collation.compare(v.toString, w.toString)) < 0);
     temp := meta^.context^.staticContext.compareAtomic(v,w,nil) ;
-    result := (temp <> -2) and (temp < 0);
+    result := temp = xqcrLessThan;
   end;
 
 var
@@ -1941,7 +2051,7 @@ begin
       end;
       1: if b.vars[k].getSequenceCount = 0 then exit(1);
     end;
-    result :=  context^.staticContext.compareDeepAtomic(a.vars[k], b.vars[k], collation);
+    result :=  ord(context^.staticContext.compareDeepAtomic(a.vars[k], b.vars[k], collation));
     if result <> 0 then exit;
   end;
 end;
@@ -2613,7 +2723,7 @@ begin
     visitor.simpleTermVisit(@children[i], self);
 
   result := visitor.simpleTermVisit(@children[high(children)],self);
-  case result of xqtvaAbort: exit; end;
+  if result = xqtvaAbort then exit;
 
   visitor.parent := self;
   for i := high(children) - 1 downto 0 do
@@ -2896,15 +3006,20 @@ begin
 end;
 
 function TXQTermDynamicFunctionCall.evaluate(var context: TXQEvaluationContext): IXQValue;
+  procedure raiseOutofBounds(numindex: int64; a: TXQValueJSONArray);
+  begin
+    raiseEvaluationError('FOAY0001', 'Array index out of bounds: '+inttostr(numindex)+LineEnding+'Array size: ' + inttostr(a.Size));
+  end;
 var
   func: IXQValue;
   index: IXQValue;
   ara: TXQValueJSONArray;
   i, stackSize: Integer;
-  sl: TStringList;
   resultSeq: TXQVList;
   v: PIXQValue;
   funcref: TXQValueFunction;
+  numindex: Int64;
+
 begin
   //if length(children) < 2 then raiseEvaluationError('XPST0003', 'Only one argument given, need function AND arguments');
   func := children[0].evaluate(context);
@@ -2930,13 +3045,8 @@ begin
     resultSeq := TXQVList.create();
     for v in func.GetEnumeratorPtrUnsafe do begin
       case v^.kind of
-        pvkObject: begin
-          sl := TStringList.Create;
-          sl.CaseSensitive := true;
-          (v^ as TXQValueObject).enumerateKeys(sl);
-          resultSeq.add(xqvalue(sl));
-          sl.free;
-        end;
+        pvkObject:
+          resultSeq.add(v.enumeratePropertyKeys());
         pvkArray: begin
           ara := v^ as TXQValueJSONArray;;
           for i := 0 to ara.seq.Count-1 do
@@ -2955,11 +3065,20 @@ begin
   for v in func.GetEnumeratorPtrUnsafe do
     case v^.kind of
       pvkArray: begin
-        if (index.toInt64 < 1) or (index.toInt64 > (v^ as TXQValueJSONArray).seq.Count) then continue;
-        resultSeq.add((v^ as TXQValueJSONArray).seq[index.toInt64-1]);
+        if (index.kind <> pvkInt64) and (context.staticContext.strictTypeChecking) then begin
+          if not (index.instanceOf(baseSchema.integer) or (index.kind = pvkNode) or (index.instanceOf(baseSchema.untypedAtomic))) then
+            raiseTypeError0004('Expected integer index', index)
+        end;
+        numindex := index.toInt64;
+        if (numindex < 1) or (numindex > (v^ as TXQValueJSONArray).seq.Count) then begin
+          if not context.staticContext.AllowJSONiqOperations then
+            raiseOutofBounds(numindex, v^ as TXQValueJSONArray);
+          continue;
+        end;
+        resultSeq.add((v^ as TXQValueJSONArray).seq[numindex-1]);
       end;
       pvkObject: begin
-        resultSeq.add(v^.getProperty(index.ToString));
+        resultSeq.add(v^.getProperty(index));
       end;
       else if not AllowJSONDefaultInternal then //not an error since JSONiq 1.0.1
         raiseEvaluationError('XPTY0004', 'Invalid call, expected function, object or array, got: '+func.toXQuery());
@@ -2973,11 +3092,11 @@ var
   i: Integer;
 begin
   result := visitor.simpleTermVisit(@children[0], self);
-  case result of xqtvaAbort: exit; end;
+  if result = xqtvaAbort then exit;
   tempvar := globalUnnamedVariable;
   for i := 1 to high(children) do begin
     result := visitor.simpleTermVisit(@children[i], self);
-    case result of xqtvaAbort: exit; end;
+    if result = xqtvaAbort then exit;
     visitor.declare(@tempvar);
   end;
   for i := high(children) downto 1 do
@@ -3038,11 +3157,13 @@ begin
         case evilkids[i].kind of
           pvkNode: evilkids[i] := xqvalue(evilkids[i].toString);
           pvkString: if evilkids[i].instanceOf(baseSchema.untypedAtomic) then evilkids[i] := xqvalue(evilkids[i].toString);
+          else;
         end;
     end else if xqofCastUntypedToDouble in op.flags then
       for i := 0 to 1 do
         case evilkids[i].kind of
           pvkString, pvkNode: evilkids[i] := xqvalue(evilkids[i].toFloatChecked(context.staticContext) );
+          else;
         end;
     op.checkOrConvertTypes(@evilkids[0], 2, context, self);
   end;
@@ -3159,7 +3280,7 @@ begin
     if path[i].requiredType <> nil then visitor.simpleTermVisit(@path[i].requiredType, self);
     for j := 0 to high(path[i].filters) do begin
       result := visitor.simpleTermVisit(@path[i].filters[j], self);
-      case result of xqtvaAbort: exit; end;
+      if result = xqtvaAbort then exit;
     end;
   end;
 end;
@@ -3349,8 +3470,14 @@ begin
   if namespaceCheck <> xqnmNone then begin
     queryCommand.namespaceURLOrPrefix:=namespaceURLOrPrefix;
     case namespaceCheck of
-      xqnmPrefix: Include(queryCommand.matching, qmCheckNamespacePrefix);
+      xqnmPrefix: if (namespaceURLOrPrefix <> '') or (tneaAttribute <> queryCommand.typ) then
+          Include(queryCommand.matching, qmCheckNamespacePrefix)
+        else
+          Include(queryCommand.matching, qmCheckNamespaceURL);
+
       xqnmURL: Include(queryCommand.matching, qmCheckNamespaceURL);
+
+      xqnmNone:;
     end;
   end
 end;
@@ -3607,14 +3734,14 @@ begin
     if variable <> nil then visitor.declare(@variable, self);
     if typ <> nil then begin
       result := visitor.simpleTermVisit(@typ, self);
-      case result of xqtvaAbort: exit; end;
+      if result = xqtvaAbort then exit;
     end;
     result := visitor.simpleTermVisit(@expr, self);
-    case result of xqtvaAbort: exit; end;
+    if result = xqtvaAbort then exit;
     if variable <> nil then visitor.undeclare(@variable, self);
   end else begin
     result := visitor.simpleTermVisit(@pattern, self);
-    case result of xqtvaAbort: exit; end;
+    if result = xqtvaAbort then exit;
 
     visitor.parent := self;
     with pattern do
@@ -3622,7 +3749,7 @@ begin
         visitor.declare(@vars[j]);
 
     result := visitor.simpleTermVisit(@expr, self);
-    case result of xqtvaAbort: exit; end;
+    if result = xqtvaAbort then exit;
 
     visitor.parent := self;
     with pattern do
@@ -3739,7 +3866,7 @@ end;
 function TXQTermTypeSwitch.visitchildren(visitor: TXQTerm_Visitor): TXQTerm_VisitAction;
 begin
   result := visitor.simpleTermVisit(@children[0], self);
-  case result of xqtvaAbort: exit; end;
+  if result = xqtvaAbort then exit;
   Result:=inherited visitchildren(visitor);
 end;
 
@@ -3793,6 +3920,7 @@ begin
   with state do begin
     baseOffset := 0;
     olddocumentnamespacecount:= -1;
+    namespaceOverrides := nil;
     if context.namespaces <> nil then olddocumentnamespacecount := context.namespaces.Count;
     if (typ = tetDocument) then begin
       document := TTreeDocument.create(nil);
@@ -3812,6 +3940,8 @@ begin
       if context.namespaces <> nil then
         if olddocumentnamespacecount = -1 then FreeAndNil(context.namespaces)
         else context.namespaces.deleteFrom(olddocumentnamespacecount);
+      if state.namespaceOverrides <> nil then
+        state.namespaceOverrides.Free;
     end;
   end;
 end;
@@ -3852,6 +3982,39 @@ var
     if (context.namespaces = nil) then context.namespaces := TNamespaceList.Create;
     result := context.namespaces;
   end;
+  (*
+  Different kinds of namespaces:
+                              Nested, direct constructor              Copied node,inherit=true         Copied node,inherit=false
+  Explicit
+  xmlns:ns="foo"                     inherit                                 inherit                         no inherit
+  inherited                                                                                                  => REMOVE
+
+  Implicit
+  <ns:element/>                     no inherit                               inherit ?                       no inherit
+  not inherited                                                              => ADD
+
+  Computed
+  namespace xy{..}                  no inherit                               inherit ?                       no inherit
+  inherited                          => REMOVE                                                               => REMOVE
+  *)
+  //Explicitly declared namespace like xmlns:ns="foo"
+  procedure addExplicitNamespace(n: TNamespace);
+  begin
+    needNamespaceList.addIfNewPrefixUrl(n);
+    if context.staticContext.copyNamespaceInherit then
+      exit; //explicit namespaces are automatically inherited, so they need to be removed if (inherit) is off
+    if state.namespaceOverrides = nil then state.namespaceOverrides := TNamespaceList.Create;
+    state.namespaceOverrides.addIfNewPrefixUrl(n);
+  end;
+  //Implicitly declared namespace like ns in <ns:element/>, not to be confused with the unrelated implicitNamespaces property
+  procedure addImplicitNamespace(n: TNamespace);
+  begin
+    needNamespaceList.addIfNewPrefixUrl(n);
+    if not context.staticContext.copyNamespaceInherit then
+      exit; //implicit namespaces are not automatically inherited, so they need to be added if (inherit) is on
+    if state.namespaceOverrides = nil then state.namespaceOverrides := TNamespaceList.Create;
+    state.namespaceOverrides.addIfNewPrefixUrl(n);
+  end;
 
   function chooseRandomPrefix(): string;
   begin
@@ -3865,7 +4028,7 @@ var
     doc: TTreeNode;
     n: TTreeNode;
     attrib: TTreeNode;
-    namespaceIndex: Integer;
+    namespaceIndex: SizeInt;
   begin
     kid.parent := tree;
     previousValueWasAtomic := false;
@@ -3882,13 +4045,13 @@ var
               //if the namespace prefix is not already correctly bound, we need to add it. But if we have already a namespace for that prefix, we need use another prefix
               //Also this does not actually create namespace nodes. Real namespace nodes might be inherited by the children, but these implicit namespaces nodes must not.
               if namespaceIndex >= 0 then kid.namespace := state.document.addNamespace(kid.namespace.getURL, chooseRandomPrefix());
-              context.namespaces.add(kid.namespace)
+              addImplicitNamespace(kid.namespace)
             end;
           end else begin
             if (tree.namespace <> nil) and (tree.namespace.getPrefix = kid.value) and (tree.namespace.getURL <> TTreeAttribute(kid).realvalue) then begin
               tree.namespace := state.document.addNamespace(tree.namespace.getURL, chooseRandomPrefix());
               tree.addAttribute(tree.namespace.getPrefix, tree.namespace.getURL).namespace := XMLNamespace_XMLNS;
-              needNamespaceList.add(tree.namespace);
+              addImplicitNamespace(tree.namespace);
             end;
           end;
         end;
@@ -3913,7 +4076,7 @@ var
         if TTreeAttribute(kid).isNamespaceNode then begin
           if (kid.value = '') and ((tree.namespace = nil) or (tree.namespace.getPrefix = '')) and (TTreeAttribute(kid).realvalue <> namespaceGetURL(tree.namespace)) then
             raiseEvaluationError('XQDY0102', 'Namespace override');
-          needNamespaceList.addIfNewPrefixUrl(TNamespace.make(kid.getStringValue(), kid.value));
+          addExplicitNamespace(TNamespace.make(kid.getStringValue(), kid.value));
         end;
       end;
       tetDocument: begin
@@ -3934,12 +4097,28 @@ var
     end;
   end;
 
+  var oldDeclaredNodeNamespaceCount, oldstatenamespacecount: SizeInt;
+  procedure addDirectlyConstructedNodeAsKid;
+  var
+    i: SizeInt;
+  begin
+    if (kid.typ = tetOpen) and assigned(context.namespaces) and not context.staticContext.copyNamespaceInherit  and (context.namespaces.count > oldDeclaredNodeNamespaceCount) then begin
+      //remove namespaces created by namespace constructors in the content sequence
+      for i := oldDeclaredNodeNamespaceCount to context.namespaces.Count - 1 do
+        if not kid.isNamespaceUsed(context.namespaces.items[i]) then
+          kid.addNamespaceDeclaration(context.namespaces.items[i].getPrefix, '', false);
+      //todo: does copy-namespace preserve matter here? nodes constructed in the content sequence are conceptionally "copied", but our parser converts them to non-copied direct constructors
+    end;
+    addNodeAsKid;
+  end;
+
+
   procedure addValue(const v: IXQValue);
     procedure addClonedNodeAsKid(n: TTreeNode);
     var
       temp: TTreeNode;
       attrib, tempattrib: TTreeAttribute;
-      i: Integer;
+      i: SizeInt;
       tempNamespaces: TNamespaceList;
       tempNamespace: TNamespace;
     begin
@@ -3974,22 +4153,22 @@ var
             for i:=0 to tempNamespaces.Count - 1 do
               if context.staticContext.copyNamespacePreserve or (kid.isNamespaceUsed(tempNamespaces.items[i])) then
                 kid.addNamespaceDeclaration(tempNamespaces.items[i], false);
-            {if not tempNamespaces.hasNamespacePrefix('') then begin
-              v.toNode.getOwnNamespaces(tempNamespaces);
-              if not tempNamespaces.hasNamespacePrefix('') then
-                kid.addNamespaceDeclaration(TNamespace.make('', ''), false);
-            end;}
             tempNamespaces.free;
           end;
-          if (not context.staticContext.copyNamespaceInherit) and (context.namespaces <> nil) then begin
+
+          if (not context.staticContext.copyNamespaceInherit) and (state.namespaceOverrides <> nil) then begin
             //remove namespaces of new parent
-            for i := 0 to context.namespaces.Count - 1 do
-              if not kid.isNamespaceUsed(context.namespaces.items[i]) then begin
-                if context.namespaces.items[i].getPrefix = '' then kid.addAttribute('xmlns', '')
-                else kid.addAttribute(context.namespaces.items[i].getPrefix, '').namespace := XMLNamespace_XMLNS;
-              end;
+            for i := 0 to state.namespaceOverrides.Count - 1 do
+              if not kid.isNamespaceUsed(state.namespaceOverrides.items[i]) then
+                kid.addNamespaceDeclaration(state.namespaceOverrides.items[i].getPrefix, '', false);
+          end;
+          if (context.staticContext.copyNamespaceInherit) and (state.namespaceOverrides <> nil) then begin
+            //copied nodes inherit all namespaces even those created implicitly by prefixes used in names of their ancestors.
+            for i := oldstatenamespacecount to state.namespaceOverrides.Count - 1 do
+                kid.addNamespaceDeclaration(state.namespaceOverrides.items[i], false);
           end;
         end;
+        else;
       end;
       addNodeAsKid;
     end;
@@ -4038,13 +4217,16 @@ var
     var x: PIXQValue;
     begin
       for x in enum do begin
-        if not first then result += ' ';
         case x^.kind of
           pvkFunction, pvkObject: raiseEvaluationError('FOTY0013', 'Cannot serialize function');
           pvkArray: enumToString(x^.GetEnumeratorMembersPtrUnsafe);
-          else result += x^.toString;
+          pvkSequence: enumToString(x^.GetEnumeratorPtrUnsafe);
+          else begin
+            if not first then result += ' ';
+            result += x^.toString;
+            first := false;
+          end;
         end;
-        first := false;
       end;
     end;
 
@@ -4067,8 +4249,7 @@ var
       procedure registerNamespace();
       begin
         state.document.addNamespace(tree.namespace);
-        if context.namespaces = nil then needNamespaceList;
-        context.namespaces.Add(tree.namespace);
+        addImplicitNamespace(tree.namespace);
       end;
     var
       i: Integer;
@@ -4083,85 +4264,81 @@ var
       end;
       tree.namespace := context.staticContext.findNamespace(prefix, defkind);
       if tree.namespace <> nil then registerNamespace();
-      // tree.namespace := context.findNamespace('', defkind)
     end;
 
-    procedure setTreeNodeNameFromQName(const url, aprefix, local: string; defkind: TXQDefaultNamespaceKind);
+    procedure setTreeNamespaceFromQName(const url, aprefix: string; defkind: TXQDefaultNamespaceKind);
 
     var
       prefix: String;
     begin
-      tree.value := local;
       prefix := aprefix;
       if (prefix = '') and (url = '') then
         tree.namespace := nil //something weird happens, if there is a non-nil Q{} Qname. Children of this node that have an empty-prefix namespace inherit this non-nil non existing namespace, so copying and serializing them, duplicates there namespace declaration attribute
       else begin
         setNamespaceFromPrefix(prefix);
-        {//find namespace from earlier tree construction
-        if (context.namespaces <> nil) and ((prefix <> '') or (defkind = xqdnkElementType)) then begin
-          i := context.namespaces.lastIndexOfNamespacePrefix(prefix);
-          if (i >= 0) then begin
-            tree.fnamespace := context.namespaces.items[i];
-            if tree.fnamespace.getURL = url then begin
-              if i < state.olddocumentnamespacecount then registerNamespace(); //duplicate namespace if it is from another document
-              exit;
-            end;
-          end;
-        end;
         //new namespace
-        tree.fnamespace := context.staticContext.findNamespace(prefix, defkind);}
         if (tree.namespace = nil) or (tree.namespace.getURL <> url) then begin//((defkind = xqdnkElementType) or (url <> '')) then begin
           if (prefix = '') and (url = XMLNamespaceUrl_XML) then prefix := 'xml';
           if (prefix = '') and (defkind <> xqdnkElementType) then prefix := chooseRandomPrefix;
           tree.namespace := state.document.addNamespace(url, prefix);
-          needNamespaceList.Add(tree.namespace);
+          addImplicitNamespace(tree.namespace);
         end;
       end;
     end;
 
     procedure setTreeNodeNameFromValue(v: IXQValue; defkind: TXQDefaultNamespaceKind);
+      procedure invalidNameXQDY0074(const reason: string);
+      begin
+         raiseEvaluationError('XQDY0074', reason+v.toString);
+      end;
+
     var
       vname: TXQValueQName;
-      sep: SizeInt;
-      temp: String;
+      namespaceUrlPrefix: String;
+      eqnameKind: TXQEQNameParseResult;
     begin
       if (v.kind = pvkSequence) and (v.getSequenceCount = 1) then v := v.get(1);
       if (v.instanceOf(baseSchema.QName))  then begin
         vname := (v as TXQValueQName);
-        setTreeNodeNameFromQName(vname.url, vname.prefix, vname.local, defkind);
+        setTreeNamespaceFromQName(vname.url, vname.prefix, defkind);
+        tree.value := vname.local;
       end else if v.instanceOf(baseSchema.string_) or v.instanceOf(baseSchema.untypedAtomic) or v.instanceOf(baseSchema.node) then begin
-        tree.value := v.toString;
-        sep := pos(':', tree.value);
-        if sep = 0 then begin
-          if defkind = xqdnkElementType then setNamespaceFromPrefix('')
-          else tree.namespace := nil;
-        end else begin
-          temp := copy(tree.value, 1, sep - 1);
-          tree.value := copy(tree.value, sep + 1);
-          setNamespaceFromPrefix(temp);
-          if tree.namespace = nil then raiseEvaluationError('XQDY0074', 'Failed to find namespace for '+v.toString);
+        eqnameKind := parseEQName(v.toString, namespaceUrlPrefix, tree.value);
+        case eqnameKind of
+          xqeqnPrefixAbsent:
+            if defkind = xqdnkElementType then setNamespaceFromPrefix('')
+            else tree.namespace := nil;
+          xqeqnPrefix: begin
+            setNamespaceFromPrefix(namespaceUrlPrefix);
+            if tree.namespace = nil then invalidNameXQDY0074('Failed to find namespace for ');
+          end;
+          xqeqnNamespaceUrl: begin
+            setTreeNamespaceFromQName(namespaceUrlPrefix, 'Q', defkind);
+            if context.staticContext.model = xqpmXQuery1 then invalidNameXQDY0074('Q{} notation requires 3.0+: ');
+          end;
+          xqeqnInvalid: invalidNameXQDY0074('Invalid EQName: ');
         end;
       end else raiseEvaluationError('XPTY0004', 'Expected string value');
       if tree.namespace <> nil then
         with tree.namespace.getSelf do
           if ((prefix = 'xml') <> (url = XMLNamespaceUrl_XML)) or (prefix = 'xmlns') or (url = XMLNamespaceUrl_XMLNS) then
             raiseEvaluationError(IfThen(tree.typ <> tetAttribute, 'XQDY0096', 'XQDY0044'), 'Invalid namespace: '+tree.namespace.serialize);
-      if not baseSchema.isValidNCName(tree.value) then
-        raiseEvaluationError('XQDY0074', 'Invalid name: '+tree.value);
     end;
   var
     tqname: TXQTermEQNameToken;
   begin
     if t.ClassType = TXQTermEQNameToken then begin
       tqname := TXQTermEQNameToken(t);
-      setTreeNodeNameFromQName(tqname.namespaceurl, tqname.namespaceprefix, tqname.localpart, defkind);
+      setTreeNamespaceFromQName(tqname.namespaceurl, tqname.namespaceprefix, defkind);
+      tree.value := tqname.localpart;
     end else setTreeNodeNameFromValue(t.evaluate(context), defkind);
     setTreeHash;
     if (tree.typ = tetAttribute) and (tree.value = 'xmlns') and (tree.namespace = nil) then
       raiseEvaluationError('XQDY0044', 'Attribute must not be called xmlns');
   end;
 
-var i, oldnodenamespacecount: integer;
+
+var i, oldNodeNameSpaceCount: SizeInt;
   nameValueEvaluated: IXQValue;
 begin
   with state do begin
@@ -4193,8 +4370,10 @@ begin
     inc(baseOffset);
 
     oldnodenamespacecount:= 0;
+    oldDeclaredNodeNamespaceCount := 0;
     if context.namespaces <> nil then oldnodenamespacecount := context.namespaces.Count;
-
+    oldstatenamespacecount := 0;
+    if state.namespaceOverrides <> nil then oldstatenamespacecount := state.namespaceOverrides.count;
 
     case typ of
       tetAttribute, tetNamespace: begin
@@ -4204,21 +4383,25 @@ begin
           if nameValueEvaluated.instanceOf(baseSchema.string_) or nameValueEvaluated.instanceOf(baseSchema.untypedAtomic) or nameValueEvaluated.instanceOf(baseSchema.node)
                 or nameValueEvaluated.isUndefined then begin
              tree.value := nameValueEvaluated.toString;
-             if (tree.value <> '') and not baseSchema.isValidNCName(tree.value) then raise EXQEvaluationException.create('XQDY0074', 'Invalid namespace prefix');
+             if (tree.value <> '') and not isValidNCName(tree.value) then raise EXQEvaluationException.create('XQDY0074', 'Invalid namespace prefix');
              setTreeHash;
              tree.namespace := XMLNamespace_XMLNS;
           end else raiseTypeError0004('Invalid namespace prefix', nameValueEvaluated);
         end;
         for i:= 0 to high(children) do
           TTreeAttribute(tree).realvalue := TTreeAttribute(tree).realvalue + valueToString(children[i].evaluate(context));
-        if (typ = tetNamespace) or ( (tree.namespace <> nil) and (tree.value = 'id') and (tree.namespace.getURL = XMLNamespaceUrl_XML) ) then begin
+        if (typ = tetNamespace)
+            or ( (tree.namespace <> nil) and (tree.value = 'id') and (tree.namespace.getURL = XMLNamespaceUrl_XML) ) then begin
           TTreeAttribute(tree).realvalue := strTrimAndNormalize(TTreeAttribute(tree).realvalue);
-          if typ = tetNamespace then
+          if typ = tetNamespace then begin
             if ((tree.value = 'xml') <> (TTreeAttribute(tree).realvalue = XMLNamespaceUrl_XML)) or
                (tree.value = 'xmlns') or
                (TTreeAttribute(tree).realvalue = XMLNamespaceUrl_XMLNS) or
                (TTreeAttribute(tree).realvalue = '') then
                  raise EXQEvaluationException.create('XQDY0101', 'Invalid namespace binding');
+          end else
+            if not isValidNCName(TTreeAttribute(tree).realvalue) then
+              raise EXQEvaluationException.create('XQDY0091', 'Invalid xml:id');
         end;
       end;
       tetOpen, tetDocument: begin
@@ -4226,7 +4409,7 @@ begin
           needNamespaceList;
           for i:= 0 to implicitNamespaces.Count - 1 do begin
             tree.addNamespaceDeclaration(implicitNamespaces.namespaces[i], true);
-            context.namespaces.add(implicitNamespaces.namespaces[i]);
+            addExplicitNamespace(implicitNamespaces.namespaces[i]);
           end;
         end;
 
@@ -4235,7 +4418,7 @@ begin
         if nameValue <> nil then begin
           setTreeNodeNameFromTerm(nameValue, xqdnkElementType);
           if tree.namespace <> nil then
-            needNamespaceList.addIfNewPrefixUrl(tree.namespace);
+            addImplicitNamespace(tree.namespace);
         end;
 
         if (root = tree) and (olddocumentnamespacecount > 0)  then
@@ -4244,11 +4427,13 @@ begin
           for i := 0 to olddocumentnamespacecount - 1 do
             tree.addNamespaceDeclaration(context.namespaces.items[i], false);
 
+        if context.namespaces <> nil then oldDeclaredNodeNamespaceCount := context.namespaces.Count;
+
         for i:=0 to high(children) do begin
           if objInheritsFrom(children[i], TXQTermConstructor) then begin
             kid := TXQTermConstructor(children[i]).evaluate(context, state);
             if kid = nil then continue;
-            addNodeAsKid;
+            addDirectlyConstructedNodeAsKid;
           end else begin
             previousValueWasAtomic:=false; //because constant text contents is stored as string not as text node
             addValue(children[i].evaluate(context));
@@ -4269,7 +4454,7 @@ begin
         if nameValueEvaluated.instanceOf(baseSchema.NCName) then tree.value := nameValueEvaluated.toString
         else if nameValueEvaluated.instanceOf(baseSchema.string_) or nameValueEvaluated.instanceOf(baseSchema.untypedAtomic) or nameValueEvaluated.instanceOf(baseSchema.node) then begin
           tree.value := strTrim(nameValueEvaluated.toString, WHITE_SPACE);
-          if not baseSchema.isValidNCName(tree.value) then raiseEvaluationError('XQDY0041', 'Invalid NCName');
+          if not isValidNCName(tree.value) then raiseEvaluationError('XQDY0041', 'Invalid NCName');
         end else raiseTypeError0004('Need NCName', nameValueEvaluated);
         if striEqual(tree.value, 'XML') then raiseEvaluationError('XQDY0064', '"XML" cannot be used as PI name');
         setTreeHash;
@@ -4290,6 +4475,8 @@ begin
   end;
   if context.namespaces <> nil then
     context.namespaces.deleteFrom(oldnodenamespacecount);
+  if state.namespaceOverrides <> nil then
+    state.namespaceOverrides.deleteFrom(oldstatenamespacecount);
   result := tree;
 end;
 
@@ -4330,55 +4517,90 @@ function TXQTermConstructor.visitchildren(visitor: TXQTerm_Visitor): TXQTerm_Vis
 begin
   if nameValue <> nil then begin
     result := visitor.simpleTermVisit(@nameValue, self);
-    case result of xqtvaAbort: exit; end;
+    if result = xqtvaAbort then exit;
   end;
   result := inherited visitchildren(visitor);
 end;
 
-{ TXQTermJSONObjectConstructor }
 
-function TXQTermJSONObjectConstructor.evaluate(var context: TXQEvaluationContext): IXQValue;
-  function transformValue(v: IXQValue): IXQValue;
-  begin
-    if v.getSequenceCount = 0 then
-      exit(TXQValueJSONNull.create());
-    if v.kind = pvkSequence then
-      if v.getSequenceCount > 1 then begin
-        result := TXQValueJSONArray.create(v.getSequenceCount);
-        (result as TXQValueJSONArray).seq.add(v);
-        exit;
-      end else v := v.get(1);
-    if v is TXQValueNode then
-      exit(xqvalue(context.staticContext.needTemporaryNodes.addClone(v.toNode)));
-    result := v;
-  end;
 
+
+procedure TXQTermMapConstructor.duplicateError(const map: IXQValue; errStandardCode: boolean);
+begin
+  raise EXQEvaluationException.create(IfThen(not errStandardCode, 'jerr:JNDY0003', 'XQDY0137'), 'Encountered duplicate keys when constructing map object', nil, map, self);
+end;
+
+function TXQTermMapConstructor.evaluate(var context: TXQEvaluationContext): IXQValue;
 var
-  obj: TXQValueObject;
-  i: Integer;
+  obj: TXQValueStandardMap;
+  i: integer;
   v: IXQValue;
 begin
-  obj := TXQValueObject.create();
+  obj := TXQValueStandardMap.create();
+  result := obj;
   if length(children) and 1 = 1 then raiseEvaluationError('pxp:OBJ', 'Need an even number of names+values in an object constructor');
   for i := 0 to length(children) div 2 - 1 do begin
     v := children[i*2+1].evaluate(context);
-    if (length(optionals) > i) and (optionals[i]) and (v.getSequenceCount = 0) then continue;
-    if objectsRestrictedToJSONTypes then v := transformValue(v);
-    obj.setMutable(children[i*2].evaluate(context).toString, v);
+    obj.setMutable(children[i*2].evaluate(context), v);
   end;
-  result := obj;
+  if obj.Size <> length(children) div 2 then
+    duplicateError(result);
 end;
 
-function TXQTermJSONObjectConstructor.getContextDependencies: TXQContextDependencies;
+function TXQTermMapConstructor.getContextDependencies: TXQContextDependencies;
 begin
   result := getChildrenContextDependencies;
 end;
 
-function TXQTermJSONObjectConstructor.clone: TXQTerm;
+function TXQTermJSONiqObjectConstructor.evaluate(var context: TXQEvaluationContext): IXQValue;
+function transformValue(v: IXQValue): IXQValue;
+begin
+  if v.getSequenceCount = 0 then
+    exit(TXQValueJSONNull.create());
+  if v.kind = pvkSequence then
+    if v.getSequenceCount > 1 then begin
+      result := TXQValueJSONArray.create(v.getSequenceCount);
+      (result as TXQValueJSONArray).seq.add(v);
+      exit;
+    end else v := v.get(1);
+  if v is TXQValueNode then
+    exit(xqvalue(context.staticContext.needTemporaryNodes.addClone(v.toNode)));
+  result := v;
+end;
+
+var
+  obj: TXQValueStringMap;
+  i: integer;
+  skippedOptionals: Integer = 0;
+  v: IXQValue;
+begin
+  obj := TXQValueStringMap.create();
+  result := obj;
+  if length(children) and 1 = 1 then raiseEvaluationError('pxp:OBJ', 'Need an even number of names+values in an object constructor');
+  for i := 0 to length(children) div 2 - 1 do begin
+    v := children[i*2+1].evaluate(context);
+    if (length(optionals) > i) and (optionals[i]) and (v.getSequenceCount = 0) then begin
+      inc(skippedOptionals);
+      continue;
+    end;
+    if objectsRestrictedToJSONTypes then v := transformValue(v);
+    obj.setMutable(children[i*2].evaluate(context).toString, v);
+  end;
+  if not (allowDuplicates) and (obj.Size + skippedOptionals <> length(children) div 2) then
+    duplicateError(result, false);
+end;
+
+function TXQTermJSONiqObjectConstructor.clone: TXQTerm;
 begin
   Result:=inherited clone;
-  TXQTermJSONObjectConstructor(result).objectsRestrictedToJSONTypes := objectsRestrictedToJSONTypes;
+  TXQTermJSONiqObjectConstructor(result).objectsRestrictedToJSONTypes := objectsRestrictedToJSONTypes;
+  TXQTermJSONiqObjectConstructor(result).optionals := optionals;
+  TXQTermJSONiqObjectConstructor(result).allowDuplicates := allowDuplicates;
 end;
+
+
+
+
 
 
 type
@@ -4596,6 +4818,7 @@ begin
   case kind of
     xqtdfStaticPartialApplication: result += children[high(children)].getContextDependencies;
     xqtdfDynamicPartialApplication: result += children[0].getContextDependencies;
+    xqtdfUserDefined, xqtdfNamedReference: ;
   end;
 end;
 
@@ -4627,13 +4850,13 @@ begin
         visitor.declare(@varDef.variable);
         if length(varDef.children) > 0 then begin
           result := visitor.simpleTermVisit(@children[i], self);
-          case result of xqtvaAbort: exit; end;
+          if result = xqtvaAbort then exit;
           visitor.parent := self;
         end;
       end;
       for i := parameterCount to high(children) do begin
         result := visitor.simpleTermVisit(@children[i], self);
-        case result of xqtvaAbort: exit; end;
+        if result = xqtvaAbort then exit;
       end;
       visitor.parent := self;
       for i := parameterCount - 1 downto 0 do
@@ -4930,13 +5153,13 @@ var
   i: Integer;
 begin
   result := visitor.simpleTermVisit(@body, self);
-  case result of xqtvaAbort: exit; end;
+  if result = xqtvaAbort then exit;
   for i := 0 to high(infoVars) do
     visitor.declare(PXQTermVariable(@infoVars[i]));
 
   for i := 0 to high(catches) do begin
     result := visitor.simpleTermVisit(@catches[i].expr, self);
-    case result of xqtvaAbort: break; end;
+    if result = xqtvaAbort then break;
   end;
   for i := high(infoVars) downto 0 do
     visitor.undeclare(PXQTermVariable(@infoVars[i]));

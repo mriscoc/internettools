@@ -33,14 +33,15 @@ type
   Not all options are supported by all backends. Compatibility matrix:
 
       @table(
-        @rowHead( @cell(option)           @cell(wininet (w32)) @cell(synapse) @cell(OkHttp for Android) @cell((Android) Apache HttpComponents) )
-        @row(     @cell(useragent)        @cell(yes)           @cell(yes)     @cell(yes)            @cell(yes) )
-        @row(     @cell(tryDefaultConfig) @cell(yes)           @cell(no)      @cell(no)             @cell(no) )
-        @row(     @cell(http proxy)       @cell(yes)           @cell(yes)     @cell(no)             @cell(yes) )
-        @row(     @cell(https proxy)      @cell(yes)      @cell(should use http proxy) @cell(no)    @cell(should use http proxy) )
-        @row(     @cell(socks proxy)      @cell(yes)           @cell(yes)     @cell(no)             @cell(no) )
-        @row(     @cell(proxy user/pass)  @cell(same auth for all proxies)@cell(separate for http and socks)@cell(no)@cell(no) )
-        @row(     @cell(checkSSLCertificates) @cell(yes)       @cell(no, always @false)     @cell(no, depends on Android)   @cell(no, depends on Android) )
+        @rowHead( @cell(option)               @cell(wininet (w32)) @cell(synapse) @cell(OkHttp for Android) @cell((Android) Apache HttpComponents) )
+        @row(     @cell(useragent)            @cell(yes)           @cell(yes)     @cell(yes)            @cell(yes) )
+        @row(     @cell(tryDefaultConfig)     @cell(yes)           @cell(no)      @cell(no)             @cell(no) )
+        @row(     @cell(http proxy)           @cell(yes)           @cell(yes)     @cell(no)             @cell(yes) )
+        @row(     @cell(https proxy)          @cell(yes)           @cell(should use http proxy) @cell(no)    @cell(should use http proxy) )
+        @row(     @cell(socks proxy)          @cell(yes)           @cell(yes)     @cell(no)             @cell(no) )
+        @row(     @cell(proxy user/pass)      @cell(same auth for all proxies)@cell(separate for http and socks)@cell(no)@cell(no) )
+        @row(     @cell(checkSSLCertificates) @cell(yes)           @cell(yes)     @cell(no, depends on Android)   @cell(no, depends on Android) )
+        @row(     @cell(cafile/capath)        @cell(no, uses system CA) @cell(yes)     @cell(no)   @cell(no) )
       )
 
   You can always set more options on the internalHandle returned by TInternetAccess.
@@ -57,10 +58,12 @@ type
     connectionCheckPage: string; //**< url we should open to check if an internet connection exists (e.g. http://google.de)
 
     checkSSLCertificates: boolean; //**< If ssl certificates should be checked in HTTPS connections
+    CAFile, CAPath: string;  //**< CA certificates when using OpenSSL
 
     logToPath: string;
 
     procedure setProxy(proxy: string);
+    procedure searchCertificates;
   end;
   { TDecodedUrl }
 
@@ -101,12 +104,18 @@ type
     function getFormDataIndex(const name: string): integer;
     procedure add(const sdata: string; const headers: string = '');
     procedure addFormData(const name, sdata: string; headers: string = '');
+    //procedure TMIMEMultipartData.addFormData(const name, sdata: string; headers: TStringArray);
     procedure addFormDataFile(const name, filename: string; headers: string = '');
     procedure addFormData(const name, sdata, filename, contenttype, headers: string);
     function compose(out boundary: string; boundaryHint: string = '---------------------------1212jhjg2ypsdofx0235p2z5as09'): string;
     procedure parse(sdata, boundary: string);
     procedure clear;
 
+    const HeaderSeparator = #13#10;
+    class function buildHeaders(const name, filename, contenttype, headers: string): TStringArray; static;
+    class function insertMissingNameToHeaders(const name: string; headers: TStringArray): TStringArray; static;
+    class function nameFromHeader(const header: string): string; static;
+    class function indexOfHeader(const sl: TStringArray; name: string): sizeint; static;
     class function HeaderForBoundary(const boundary: string): string; static;
     class function randomLetter: Char; static;
   end;
@@ -523,22 +532,17 @@ begin
   add(sdata, headers);
 end;
 
+{procedure TMIMEMultipartData.addFormData(const name, sdata: string; headers: TStringArray);
+begin
+  add(sdata, strJoin(insertMissingNameToHeaders(name, headers), HeaderSeparator));
+end;}
+
 procedure TMIMEMultipartData.addFormDataFile(const name, filename: string; headers: string);
 begin
   headers := 'Content-Disposition: form-data; name="'+name+'"; filename="'+filename+'"' + #13#10 + headers; //todo: name may encoded with [RFC2045]/rfc2047; filename may be approximated or encoded with 2045
   add(strLoadFromFileUTF8(filename), headers);
 end;
 
-function indexOfHeader(const sl: TStringArray; name: string): integer;
-var
-  i: Integer;
-begin
-  name := trim(name) + ':';
-  for i:=0 to high(sl) do
-    if striBeginsWith(sl[i], name) then
-      exit(i);
-  exit(-1);
-end;
 
 procedure TMIMEMultipartData.addFormData(const name, sdata, filename, contenttype, headers: string);
 var
@@ -655,6 +659,47 @@ begin
   setlength(data, 0);
 end;
 
+class function TMIMEMultipartData.buildHeaders(const name, filename, contenttype, headers: string): TStringArray;
+var
+  splittedHeaders: TStringArray;
+  disposition: String;
+begin
+  splittedHeaders := strSplit(headers, HeaderSeparator, false);
+
+  if (contenttype <> '') and (indexOfHeader(splittedHeaders, 'Content-Type') < 0) then
+    arrayInsert(splittedHeaders, 0, 'Content-Type: ' + contenttype);
+  if indexOfHeader(splittedHeaders, 'Content-Disposition') < 0 then begin
+    disposition := 'Content-Disposition: form-data; name="'+name+'"';
+    if filename <> '' then disposition += '; filename="'+filename+'"'; //todo: name may encoded with [RFC2045]/rfc2047; filename may be approximated or encoded with 2045
+    arrayInsert(splittedHeaders, 0, disposition);
+  end;
+
+  result := splittedHeaders;
+end;
+
+class function TMIMEMultipartData.insertMissingNameToHeaders(const name: string; headers: TStringArray): TStringArray;
+begin
+  result := headers;
+  if indexOfHeader(result, 'Content-Disposition') < 0 then
+    arrayInsert(result, 0, 'Content-Disposition: form-data; name="'+name+'"');
+end;
+
+class function TMIMEMultipartData.nameFromHeader(const header: string): string;
+begin
+  result := strBefore(header, ':');
+end;
+
+class function TMIMEMultipartData.indexOfHeader(const sl: TStringArray; name: string): sizeint;
+var
+  i: sizeint;
+begin
+  name := trim(name) + ':';
+  for i:=0 to high(sl) do
+    if striBeginsWith(sl[i], name) then
+      exit(i);
+  exit(-1);
+end;
+
 class function TMIMEMultipartData.HeaderForBoundary(const boundary: string): string;
 begin
   result := 'Content-Type: ' + ContentTypeMultipart + '; boundary=' + boundary;
@@ -754,6 +799,68 @@ begin
     proxyPassword:=strUnescapeHex(password, '%');
   end;
   useProxy:=true;
+end;
+
+procedure TInternetConfig.searchCertificates;
+//see https://serverfault.com/questions/62496/ssl-certificate-location-on-unix-linux
+const SystemCAFiles: array[1..2{$ifndef windows}+7{$endif}] of string = (
+{$ifndef windows}
+'/etc/ssl/certs/ca-certificates.crt',                // Debian/Ubuntu/Gentoo etc.
+'/etc/pki/tls/certs/ca-bundle.crt',                  // Fedora/RHEL 6
+'/etc/ssl/ca-bundle.pem',                            // OpenSUSE
+'/etc/pki/tls/cacert.pem',                           // OpenELEC
+'/etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem', // CentOS/RHEL 7
+'/etc/ssl/cert.pem',                                 // Alpine Linux
+'/usr/local/ssl/cert.pem',                           // OpenSSL default
+{$endif}
+'cacert.pem',
+'ca-bundle.crt'
+);
+{$ifndef windows}
+ const SystemCAPaths: array[1..7] of string = (
+'/etc/ssl/certs',               // SLES10/SLES11, https://golang.org/issue/12139
+'/system/etc/security/cacerts', // Android
+'/usr/local/share/certs',       // FreeBSD
+'/etc/pki/tls/certs',           // Fedora/RHEL
+'/etc/openssl/certs',           // NetBSD
+'/var/ssl/certs',              // AIX
+'/usr/local/ssl/certs'         // OpenSSL default
+);
+
+
+ {$endif}
+ var
+   i: Integer;
+   temp: AnsiString;
+{$ifdef windows}
+   programPath: String;
+{$endif}
+begin
+  {$ifdef windows}
+  programPath:=IncludeTrailingBackslash(ExtractFilePath(ParamStr(0)));
+  for i := low(SystemCAFiles) to high(SystemCAFiles) do begin
+    if CAFile <> '' then break;
+    if FileExists(programPath + SystemCAFiles[i]) then CAFile := programPath + SystemCAFiles[i];
+  end;
+  {$endif}
+  for i := low(SystemCAFiles) to high(SystemCAFiles) do begin
+    if CAFile <> '' then break;
+    if FileExists(SystemCAFiles[i]) then CAFile := SystemCAFiles[i];
+  end;
+  if (CAFile = '') then begin
+    temp := GetEnvironmentVariable('SSL_CERT_FILE');
+    if (temp <> '') and (FileExists(temp)) then CAFile := temp;
+  end;
+  {$ifndef windows}
+  for i := low(SystemCAPaths) to high(SystemCAPaths) do begin
+    if CAPath <> '' then break;
+    if DirectoryExists(SystemCAPaths[i]) then CAPath := SystemCAPaths[i];
+  end;
+  {$endif}
+  if (CAPath = '') then begin
+    temp := GetEnvironmentVariable('SSL_CERT_DIR');
+    if (temp <> '') and (DirectoryExists(temp)) then CAPath := temp;
+  end;
 end;
 
 
@@ -1045,6 +1152,7 @@ begin
         end;
         setCookie(domain, strUnescapeHex(path, '%'), name, value, flags);
       end;
+      else;
     end;
 end;
 
@@ -1433,7 +1541,7 @@ function defaultInternet: TInternetAccess;
 begin
   if theDefaultInternet <> nil then exit(theDefaultInternet);
   if defaultInternetAccessClass = nil then
-    raise Exception.Create('You need to set defaultInternetAccessClass to choose between synapse, wininet or android. Or you can add one of the units synapseinternetaccess, androidinternetaccecss or w32internetaccess to your uses clauses (if that unit actually will be compiled depends on the active defines).');
+    raise Exception.Create('You need to set defaultInternetAccessClass to choose between synapse, wininet or android. Or you can add one of the units synapseinternetaccess, okhttpinternetaccecss or w32internetaccess to your uses clauses (if that unit actually will be compiled depends on the active defines).');
   theDefaultInternet := defaultInternetAccessClass.create;
   result := theDefaultInternet;
 end;
@@ -1443,7 +1551,8 @@ procedure freeThreadVars;
 begin
   FreeAndNil(theDefaultInternet);
 end;
-
+initialization
+  defaultInternetConfiguration.checkSSLCertificates := true;
 
 finalization
   freeThreadVars;

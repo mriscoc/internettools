@@ -14,6 +14,21 @@ implementation
 
 uses xquery, simplehtmltreeparser, xquery_module_math, math, commontestutils;
 
+procedure hashmaptests;
+var m: TXQHashmapXQValue;
+begin
+  m.init;
+  m.include(xqvalue('abc'), TXQValueString.create('def') );
+  test(m[xqvalue('abc')].toString, 'def');
+  m.include(xqvalue('0'), TXQValueString.create('str0') );
+  test(m[xqvalue('0')].toString, 'str0');
+  m.include(xqvalue(0), TXQValueString.create('int0') );
+  test(m[xqvalue(0)].toString, 'int0');
+  test(m[xqvalue('0')].toString, 'str0');
+  test(m[xqvalue('abc')].toString, 'def');
+  m.done;
+end;
+
 procedure unittests(testerrors: boolean);
 var
   count: integer;
@@ -64,6 +79,10 @@ var
    end;
  }
 begin
+
+  hashmaptests;
+
+
   count:=0;
   ps := TXQueryEngine.Create;
   ps.StaticContext.baseURI := 'pseudo://test';
@@ -140,7 +159,7 @@ begin
   t('(map {}, array {}) ! (position(), . instance of map(*), . instance of map(string,string), '+
               '. instance of array(*), . instance of array(string), ' +
               '"F", . instance of function(*), . instance of function(integer) as item()*, . instance of function(integer) as item(), . instance of function(string) as item()*, . instance of function(string) as item() )',
-  '1 true true false false F true true false true false 2 false false true true F true true false false false');
+  '1 true true false false F true true false true false 2 false false true true F true true true false false');
 
 
 
@@ -155,8 +174,22 @@ begin
   t('(10, 20) ! array { "a" || ., "b" || ., "c" || . } ? 2 => insert-before(2, "x")', 'b10 x b20');
 
   t('([1,2] = [3,4], [1, 2, 3] = [4,5,3,6], ([], [1,2]) = ([], [2,3]))', 'false true true');
+  t('(([(),1 to 2]) = 2, ([(),1,3,(4,5,6)])  = 2, 2 = ([(),1 to 2]), [(1,[2,(3,[4],5),6],7)] = 4, 4 = [(1,[2,(3,[4],5),6],7)])', 'true false true true true');
+
   t('data([1,2,[],[[3]]])', '1 2 3');
-  //t('[1] + 2', '3');
+  t('[1] + 2', '3');
+  t('[1] * 2', '2');
+  t('[1] div 2', '0.5');
+  t('[1] idiv 2', '0');
+  t('[1] mod 2', '1');
+  t('[1] + [2]', '3');
+  t('[1] * [2]', '2');
+  t('[1] div [2]', '0.5');
+  t('[1] idiv [2]', '0');
+  t('[1] mod [2]', '1');
+  t('-[1]', '-1');
+  t('+[1]', '1');
+
   t('(deep-equal([1,2], [1,2]), deep-equal([], [()]), deep-equal([], [[]]))', 'true false false');
 
   t('``[foobar`{1+2+3}``{"a","b","c"}`xyz`{}`]``', 'foobar6a b cxyz');
@@ -170,7 +203,7 @@ begin
   t('hexBinary("aa") lt hexBinary("ff") ', 'true');
   t('hexBinary("aa") < hexBinary("ff") ', 'true');
 
-
+  t('codepoints-to-string(([65, [[[[66]]]], [], [], [], [67,68,69], [[[[65, 66], 67], 68], 69], 70], [], [], [[]]))', 'ABCDEABCDEF');
 
 
   t('serialize([1,2,3e0], map {"method": "json" })', '[1,2,3]');
@@ -181,6 +214,12 @@ begin
   t('serialize(["äxyz"""], map {"method": "json", "use-character-maps": map { "y": "foo" } })', '["äxfooz\""]');
   t('serialize(["äxyz"""], map {"method": "json", "encoding": "us-ascii" })', '["\u00E4xyz\""]');
 
+  t('let $map := map:merge((1 to 30)!map{string():.}) return ($map2 := $map, $map2("x") := 123, $map2?foo)!count(.)', '1 1');
+
+  t('let $map := map {1: 234, "1": "foo"} return ($map ? 1, ":", $map ? ("1"), ":", $map ? (1.0))', '234 : foo : 234' );
+
+  t('(123, 10, 9, 1, 0.9, 0.1, 0.09, 0.01, 0) ! format-number(., "0.##e0")', '1.23e2 1e1 9e0 1e0 9e-1 1e-1 9e-2 1e-2 0e0');
+  t('(123, 10, 9, 1, 0.9, 0.1, 0.09, 0.01, 0) ! format-number(., "00.##e000")', '12.3e001 10e000 90e-001 10e-001 90e-002 10e-002 90e-003 10e-003 00e000');
 
   writeln('XPath 3.1: ', count, ' completed');
   ps.free;

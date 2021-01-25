@@ -58,7 +58,7 @@ uses
    Classes, SysUtils,
    simplehtmltreeparser, math, bigdecimalmath, bbutils,
    {$ifdef ALLOW_EXTERNAL_DOC_DOWNLOAD}internetaccess{$endif},
-   xquery.internals.common, xquery.namespaces,
+   xquery.internals.common, xquery.internals.collations, xquery.namespaces,
    xquery__functions, xquery__parse //if this is in interface uses rather than implementation uses, fpc compiles xquery.pas first and other units can inline the functions here
    ;
 
@@ -76,8 +76,8 @@ type
   IXQValue=interface;
   PIXQValue = ^IXQValue;
   TXQVArray = array of IXQValue;
+  TXQValueMapLike = class;
   TXQValueFunction = class;
-  TXQCollation=class;
   TXQVariableChangeLog=class;
   TXQEvaluationStack=class;
   TXQTerm=class;
@@ -89,7 +89,9 @@ type
   TXQuery = class;
   IXQuery = interface;
   TXQNativeModule = class;
-  TXQValuePropertyEnumerator = class;
+  TXQValueStandardPropertyEnumerator = class;
+  TXQValueStringPropertyEnumerator = class;
+  TXQValuePropertyValueEnumerator = class;
   TXQTermDefineVariable = class;
   TXQMapStringObject = class;
 
@@ -126,8 +128,22 @@ type
     function GetEnumerator: TXQValueEnumerator;
   end;
 
+  //** @abstract(Iterator over an IXQValue.) Usually not used directly, but in a @code(for var in value) construction
+  TXQValueEnumeratorArrayTransparentUnsafe = record
+  private
+    ptrs: array of TXQValueEnumeratorPtrUnsafe;
+    currentEnumerator: integer;
+    fcurrent: TXQValue;
+    //class procedure clear(out enum: TXQValueEnumerator); static;
+  public
+    function MoveNext: Boolean;
+    property Current: TXQValue read FCurrent;
+    function GetEnumerator: TXQValueEnumeratorArrayTransparentUnsafe;
+  end;
+
   //**Type of xqvalue (see TXQValue)
-  TXQValueKind = (pvkUndefined, pvkBoolean, pvkInt64, pvkFloat, pvkBigDecimal, pvkString, pvkQName, pvkDateTime, pvkSequence, pvkNode, pvkObject, pvkArray, pvkNull, pvkFunction);
+  TXQValueKind = (pvkUndefined, pvkBoolean, pvkInt64, pvkFloat, pvkBigDecimal, pvkString, pvkBinary, pvkQName, pvkDateTime, pvkSequence, pvkNode, pvkObject, pvkArray, pvkNull, pvkFunction);
+  TXQMapPropertyKeyKind = (xqmpkkStringKeys, xqmpkkStandardKeys );
 
   TXQTermFlowerOrderEmpty = (xqeoStatic, xqeoEmptyLeast, xqeoEmptyGreatest);
   TXQDefaultNamespaceKind = (xqdnkUnknown, xqdnkAny, xqdnkElementType,  xqdnkType, xqdnkFunction);
@@ -161,8 +177,8 @@ type
     property documentCache[url: string]: TTreeDocument read GetdocumentCache write SetdocumentCache;
   end;
 
-  //============================XQUERY CONTEXTS==========================
 
+  //============================XQUERY CONTEXTS==========================
 
   //** Static context containing values read during parsing and not changed during evaluation. Mostly corresponds to the "static context" in the XQuery spec
   TXQStaticContext = class
@@ -193,12 +209,15 @@ type
 
     copyNamespacePreserve, copyNamespaceInherit: boolean;
 
+    serializationOptions: IXQValue;
+
     //extensions
     defaultTypeNamespace: TNamespace; //**< Extension: default type namespace. Behaves like the default element type namespace, but does not change the namespace of constructed elements. (default is http://www.w3.org/2001/XMLSchema)
     stringEncoding: TSystemCodePage;    //**< Encoding of strings. Currently only affects the decoding of entities in direct element constructors
     strictTypeChecking: boolean;  //**< Activates strict type checking. If enabled, things like "2" + 3 raise an exception, otherwise it is evaluated to 5. Does not affect *correct* queries (and it makes it slower, so there is no reason to enable this option unless you need compatibility to other interpreters)
     useLocalNamespaces: boolean;  //**< When a statically unknown namespace is encountered in a matching expression it is resolved using the in-scope-namespaces of the possible matching elements
     jsonPXPExtensions: boolean; //**< Allows further json extensions, going beyond jsoniq (especially child and descendant axis test matching object properties) (for dot operator, see TXQParsingOptions) (default is true)
+    AllowJSONiqOperations: boolean; //**< Allows implicit casting of objects/arrays to boolean/string.
 
     model: TXQParsingModel;
 
@@ -233,26 +252,26 @@ type
     function findVariableDeclaration(const namespace, varname: string): TXQTermDefineVariable;
     function isLibraryModule: boolean;
   protected
-    function compareCommon(a, b: TXQValue; overrideCollation: TXQCollation; castUnknownToString: boolean): integer;
+    function compareCommon(a, b: TXQValue; overrideCollation: TXQCollation; castUnknownToString: boolean): TXQCompareResult;
   public
     //**Compares two values atomically (eq,ne,..) and returns 0 if equal, -1 for a < b, and +1 for a > b; -2 for unknown
-    function compareAtomic(a, b: TXQValue; overrideCollation: TXQCollation): integer;
+    function compareAtomic(a, b: TXQValue; overrideCollation: TXQCollation): TXQCompareResult;
     //**Compares two values atomically (eq,ne,..) and returns 0 if equal, -1 for a < b, and +1 for a > b; -2 for unknown
-    function compareAtomic(const a, b: IXQValue; overrideCollation: TXQCollation = nil): integer; inline;
-    procedure compareAtomic(const a, b: IXQValue; out result: IXQValue; accept1: integer; accept2: integer = 9999);
+    function compareAtomic(const a, b: IXQValue; overrideCollation: TXQCollation = nil): TXQCompareResult; inline;
+    procedure compareAtomic(const a, b: IXQValue; out result: IXQValue; accept1: TXQCompareResult; accept2: TXQCompareResult = xqcrReservedInvalid);
     function equalAtomic(a, b: TXQValue; overrideCollation: TXQCollation): boolean;
     function equalAtomic(const a, b: IXQValue; overrideCollation: TXQCollation): boolean;
-    function compareGeneral(const a, b: TXQValueEnumeratorPtrUnsafe; overrideCollation: TXQCollation; accept1: integer; accept2: integer = 9999): boolean;
+    function compareGeneral(const a, b: TXQValueEnumeratorPtrUnsafe; overrideCollation: TXQCollation; accept1: TXQCompareResult; accept2: TXQCompareResult = xqcrReservedInvalid): boolean;
     //**Compares two values (=,!=,...) and returns true if the compare value is \in [accept1,accept2]@br
     //**(Remember that these xpath comparison operators search for a matching pair in the product of the sequences)
-    function compareGeneral(a, b: TXQValue; overrideCollation: TXQCollation; accept1: integer; accept2: integer = 9999): boolean;
+    function compareGeneral(a, b: TXQValue; overrideCollation: TXQCollation; accept1: TXQCompareResult; accept2: TXQCompareResult = xqcrReservedInvalid): boolean;
     //**Compares two values (=,!=,...) and returns true if the compare value is \in [accept1,accept2]@br
     //**(Remember that these xpath comparison operators search for a matching pair in the product of the sequences)
-    function compareGeneral(a, b: IXQValue; overrideCollation: TXQCollation; accept1: integer; accept2: integer = 9999): boolean;
-    procedure compareGeneral(a, b: IXQValue; out result: IXQValue; accept1: integer; accept2: integer = 9999);
+    function compareGeneral(a, b: IXQValue; overrideCollation: TXQCollation; accept1: TXQCompareResult; accept2: TXQCompareResult = xqcrReservedInvalid): boolean;
+    procedure compareGeneral(a, b: IXQValue; out result: IXQValue; accept1: TXQCompareResult; accept2: TXQCompareResult = xqcrReservedInvalid);
     //**Compares two atomic values and returns 0 as the deepEqual function would if equal, -1 for a < b, and +1 for a > b; -2 for unknown
-    function compareDeepAtomic(a, b: TXQValue; overrideCollation: TXQCollation): integer;
-    function compareDeepAtomic(const a, b: IXQValue; overrideCollation: TXQCollation): integer; inline;
+    function compareDeepAtomic(a, b: TXQValue; overrideCollation: TXQCollation): TXQCompareResult;
+    function compareDeepAtomic(const a, b: IXQValue; overrideCollation: TXQCollation): TXQCompareResult; inline;
     function equalDeepAtomic(a, b: TXQValue; overrideCollation: TXQCollation): boolean;
     function equalDeepAtomic(const a, b: IXQValue; overrideCollation: TXQCollation): boolean; inline;
     //**internally used (Returns if the eq operator is defined for the types of a and b)
@@ -319,6 +338,7 @@ type
     function toMicroSecondStamp(subtractTimeZone: Boolean = true): int64; //does not include timezone
     function toMonths: integer; inline;
     function toDayTime: int64;
+    function hasTimeZone: boolean; inline;
     case boolean of
       true: (values: array[1..7] of integer; );
       false: (year, month, day, hour, min, seconds, microsecs, timezone: integer;);
@@ -328,8 +348,8 @@ type
 
   TXQSerializerInsertWhitespace = (xqsiwNever, xqsiwConservative, xqsiwIndent);
   TXQSerializerOnString = procedure (const s: string) of object;
-  TXQSerializerOnNode = function (const n: TTreeNode): boolean of object;
-  TXQSerializerOnAttribute = function (const n: TTreeAttribute): boolean of object;
+  TXQSerializerOnNode = function (const n: TTreeNode; html: boolean): boolean of object;
+  TXQSerializerOnAttribute = procedure (const n: TTreeAttribute; html: boolean) of object;
   TXQSerializer = object(TJSONXHTMLStrBuilder)
     nodeFormat: TTreeNodeSerialization;
     allowDuplicateNames: boolean;
@@ -487,8 +507,13 @@ type
     function getSequenceCount: integer;  //**< Returns the number of values actually contained in this value (0 for undefined, element count for sequences, and  1 for everything else)
     function get(i: integer): IXQValue; //**< Returns the i-th value in this sequence. (non-sequence values are considered to be sequences of length 1) (1-based index)
     function hasProperty(const name: string; value: PXQValue): boolean; //**< Checks if an object has a certain property, and returns the property value directly (i.e. changing value^ will change the value stored in the object). @br The value is returned as TXQValue not IXQValue. (You can pass nil for value, if you don't need the value)
+    function hasProperty(const name: IXQValue; value: PXQValue): boolean; //**< Checks if an object has a certain property, and returns the property value directly (i.e. changing value^ will change the value stored in the object). @br The value is returned as TXQValue not IXQValue. (You can pass nil for value, if you don't need the value)
     function getProperty(const name: string): IXQValue; //**< Returns an object property. Returns empty sequence for non objects.
-    function getPropertyEnumerator: TXQValuePropertyEnumerator; //**< Returns an iterator over all object properties. Raises an exception for non-objects
+    function getProperty(const name: IXQValue): IXQValue; //**< Returns an object property. Returns empty sequence for non objects.
+    function getPropertyKeyKind: TXQMapPropertyKeyKind;
+    function getEnumeratorPropertyValuesUnsafe: TXQValuePropertyValueEnumerator; //**< Returns an iterator over all object property values. Raises an exception for non-objects
+    function getEnumeratorPropertiesUnsafe: TXQValueStandardPropertyEnumerator; //**< Returns an iterator over all object properties. Raises an exception for non-objects
+    function getEnumeratorStringPropertiesUnsafe: TXQValueStringPropertyEnumerator; //**< Returns an iterator over all object properties. Raises an exception for non-objects
     function getInternalDateTimeData: PXQValueDateTimeData;
     function Size: SizeInt;
 
@@ -498,6 +523,7 @@ type
     procedure jsonSerialize(var serializer: TXQSerializer);
     procedure xmlSerialize(var serializer: TXQSerializer);
     procedure adaptiveSerialize(var serializer: TXQSerializer);
+    function serialize(const context: TXQEvaluationContext): string;
     function stringifyNodes: IXQValue; //preliminary
     function hasNodes: boolean;
 
@@ -505,6 +531,7 @@ type
     function GetEnumerator: TXQValueEnumerator; //**< Implements the enumerator for for..in.@br Because it returns an IXQValue, it modifies the reference count of all objects in the sequence. For large sequences this is rather slow (e.g. it wastes 1 second to iterate over 10 million values in a simple benchmark.) and it is recommended to use GetEnumeratorPtrUnsafe. (it took 35ms for those 10 million values, comparable to the 30ms of a native loop not involving any enumerators)
     function GetEnumeratorPtrUnsafe: TXQValueEnumeratorPtrUnsafe; //**< Implements a faster version of GetEnumerator. It does not change any reference counts, not even of self, so it must not be used with values returned by functions!
     function GetEnumeratorMembersPtrUnsafe: TXQValueEnumeratorPtrUnsafe;
+    function GetEnumeratorArrayTransparentUnsafe: TXQValueEnumeratorArrayTransparentUnsafe;
 
     function query(const q: string): IXQValue; //**< Evaluates another XQuery expression on this value using the defaultQueryEngine. The return value is @code(query) whereby self is stored in $_. Use this to do an operation on all values of a sequence, e.g. @code(sum($_))
     function query(const q: string; const vs: array of ixqvalue): IXQValue; //**< Like query, sets the additional arguments as variables $_1, $_2, ...
@@ -525,6 +552,15 @@ type
 
     //**Same as toFloat, but throws an exception if the conversion is not invalid
     function toFloatChecked(scontext: TXQStaticContext): xqfloat;
+
+    //internally used
+    procedure enumeratePropertyKeys(var keyset: TXQHashsetStr);
+    function enumeratePropertyKeys(): IXQValue;
+    function enumeratePropertyValues: IXQValue;
+    function setImmutable(const name, value: IXQValue): TXQValueMapLike;  //**< Creates a new object with the same values as the current one and changes a property of it
+    function setImmutable(const name: string; const v: IXQValue): TXQValueMapLike;  //**< Creates a new object with the same values as the current one and changes a property of it
+    function setImmutable(const name: string; const s: string): TXQValueMapLike;    //**< Creates a new object with the same values as the current one and changes a property of it (string wrapper)
+    function hashCode: uint32;
   end;
 
 
@@ -569,8 +605,13 @@ type
     function getSequenceCount: integer; virtual; //**< Returns the number of values actually contained in this value (0 for undefined, element count for sequences, and  1 for everything else)
     function get(i: integer): IXQValue; virtual; //**< Returns the i-th value in this sequence. (non-sequence values are considered to be sequences of length 1)
     function hasProperty(const {%H-}name: string; {%H-}value: PXQValue): boolean; virtual; //**< Checks if an object has a certain property, and returns the property value directly (i.e. changing value^ will change the value stored in the object). @br The value is returned as TXQValue not IXQValue. (You can pass nil for value, if you don't need the value)
+    function hasProperty(const {%H-}name: ixqvalue; {%H-}value: PXQValue): boolean; virtual; //**< Checks if an object has a certain property, and returns the property value directly (i.e. changing value^ will change the value stored in the object). @br The value is returned as TXQValue not IXQValue. (You can pass nil for value, if you don't need the value)
+    function getProperty(const name: IXQValue): IXQValue; virtual; //**< Returns an object property. Returns empty sequence for non objects.
     function getProperty(const name: string): IXQValue; virtual; //**< Returns an object property. Returns empty sequence for non objects.
-    function getPropertyEnumerator: TXQValuePropertyEnumerator; virtual; //**< Returns an iterator over all object properties. Raises an exception for non-objects
+    function getPropertyKeyKind: TXQMapPropertyKeyKind; virtual;
+    function getEnumeratorPropertiesUnsafe: TXQValueStandardPropertyEnumerator; virtual;
+    function getEnumeratorPropertyValuesUnsafe: TXQValuePropertyValueEnumerator; virtual;
+    function getEnumeratorStringPropertiesUnsafe: TXQValueStringPropertyEnumerator; virtual;
     function getInternalDateTimeData: PXQValueDateTimeData; virtual;
     function Size: SizeInt; virtual;
 
@@ -580,6 +621,7 @@ type
     procedure jsonSerialize(var serializer: TXQSerializer); virtual;
     procedure xmlSerialize(var serializer: TXQSerializer); virtual;
     procedure adaptiveSerialize(var serializer: TXQSerializer); virtual;
+    function serialize(const context: TXQEvaluationContext): string;
     function stringifyNodes: IXQValue; virtual;
     function hasNodes: boolean; virtual;
 
@@ -600,10 +642,35 @@ type
     function GetEnumerator: TXQValueEnumerator;virtual; //**< Implements the enumerator for for..in. (Only use with IXQValue references, not TXQValue)@br Because it returns an IXQValue, it modifies the reference count of all objects in the sequence. For large sequences this is rather slow (e.g. it wastes 1 second to iterate over 10 million values in a simple benchmark.) and it is recommended to use GetEnumeratorPtrUnsafe. (it took 35ms for those 10 million values, comparable to the 30ms of a native loop not involving any enumerators)
     function GetEnumeratorPtrUnsafe: TXQValueEnumeratorPtrUnsafe;virtual; //**< Implements a faster version of GetEnumerator. It does not change any reference counts, not even of self, so it must not be used with values returned by functions!
     function GetEnumeratorMembersPtrUnsafe: TXQValueEnumeratorPtrUnsafe; virtual;
-  protected
+    function GetEnumeratorArrayTransparentUnsafe: TXQValueEnumeratorArrayTransparentUnsafe; virtual;
+  //for internal use:
+  public
     class function classKind: TXQValueKind; virtual; //**< Primary type of a value
     function instanceOf(const typ: TXSType): boolean;  //**< If the XPath expression "self instance of typ" should return true
+    procedure raiseInternalErrorObjectExpected(const functionname: string);
+  public
+    procedure enumeratePropertyKeys(var {%H-}keyset: TXQHashsetStr); virtual;
+    function enumeratePropertyKeys: IXQValue; virtual;
+    function enumeratePropertyValues: IXQValue;       virtual;
+    procedure prepareInternetRequest(out method, url, post: string; internet: TInternetAccess);
+    function setImmutable(const name, value: IXQValue): TXQValueMapLike; virtual; overload;
+    function setImmutable(const {%H-}name: string; const {%H-}v: IXQValue): TXQValueMapLike; virtual;
+    function setImmutable(const name: string; const s: string): TXQValueMapLike;   virtual;
+    function setImmutable(const {%H-}props: PString; {%H-}len: SizeInt; const {%H-}v: IXQValue): TXQValue; virtual;
+    function hashCode: uint32; virtual;
   end;
+
+  TXQValueOwnershipTracker = record
+    class procedure addRef(v: TXQValue); static;
+    class procedure release(v: TXQValue); static;
+    class function hash(const v: IXQValue): uint32; static;
+    class function equal(const v, w: IXQValue): boolean; static;
+    class function isStringKeyLike(const v: TXQValue): boolean; static;
+    class function isAtomicKeyValue(const v: IXQValue): boolean; static; inline;
+  end;
+
+  TXQHashmapStrOwningXQValue = specialize TXQHashmapStrOwning<TXQValue, TXQValueOwnershipTracker>;
+  TXQHashmapXQValue = specialize TXQBaseHashmapValuePointerLikeOwning<IXQValue, TXQValue, TXQValueOwnershipTracker, TXQValueOwnershipTracker>;
 
   { TXQValueUndefined }
   //**undefined/empty sequence
@@ -646,6 +713,7 @@ type
     function toInt64: int64; override; //**< Converts the TXQValue dynamically to int64
     function toDecimal: bigdecimal; override; //**< Converts the TXQValue dynamically to BigDecimal
     function toString: string; override; //**< Converts the TXQValue dynamically to string
+    function hashCode: uint32; override;
 
     function clone: IXQValue; override;
 
@@ -674,6 +742,7 @@ type
     function toFloatChecked(scontext: TXQStaticContext): xqfloat; override;
     function toString: string; override; //**< Converts the TXQValue dynamically to string
     function toDateTime: TDateTime; override; //**< Converts the TXQValue dynamically to TDateTime
+    function hashCode: uint32; override;
 
     procedure jsonSerialize(var serializer: TXQSerializer); override; overload;
     procedure adaptiveSerialize(var serializer: TXQSerializer); override;
@@ -703,6 +772,7 @@ type
     function toDecimal: BigDecimal; override; //**< Converts the TXQValue dynamically to BigDecimal
     function toString: string; override; //**< Converts the TXQValue dynamically to string
     function toDateTime: TDateTime; override; //**< Converts the TXQValue dynamically to TDateTime
+    function hashCode: uint32; override;
 
     procedure jsonSerialize(var serializer: TXQSerializer); override; overload;
     procedure adaptiveSerialize(var serializer: TXQSerializer); override;
@@ -730,6 +800,7 @@ type
     function toFloatChecked(scontext: TXQStaticContext): xqfloat; override;
     function toString: string; override; //**< Converts the TXQValue dynamically to string
     function toDateTime: TDateTime; override; //**< Converts the TXQValue dynamically to TDateTime
+    function hashCode: uint32; override;
 
     procedure jsonSerialize(var serializer: TXQSerializer); override; overload;
     procedure adaptiveSerialize(var serializer: TXQSerializer); override;
@@ -749,7 +820,25 @@ type
     constructor create(atypeAnnotation: TXSType; const value: IXQValue); override;
     destructor Destroy; override;
 
-    class function canCreateFromString(const v: string): boolean; virtual;
+    class function classKind: TXQValueKind; override;
+
+    function toBoolean: boolean; override;
+    function toBooleanEffective: boolean; override;
+    function toString: string; override;
+    function toDateTime: TDateTime; override;
+    function toFloatChecked(scontext: TXQStaticContext): xqfloat; override;
+    function hashCode: uint32; override;
+
+    function clone: IXQValue; override;
+  end;
+
+
+  //** string value
+  TXQValueBinary = class (TXQValue)
+    encoded:  string;
+
+    constructor create(atypeAnnotation: TXSType; const astr: string); reintroduce;
+    destructor Destroy; override;
 
     class function classKind: TXQValueKind; override;
 
@@ -758,15 +847,16 @@ type
     function toString: string; override;
     function toDateTime: TDateTime; override;
     function toFloatChecked(scontext: TXQStaticContext): xqfloat; override;
-
+    function hashCode: uint32; override;
 
     function toRawBinary: string;
+
+    class function compare(a, b: TXQValue): TXQCompareResult; static;
 
     function clone: IXQValue; override;
   end;
 
 
-  { TXQValueQName }
   //** QName value (namespace + local part)
   TXQValueQName = class (TXQValue)
     prefix, url, local: string;
@@ -783,6 +873,7 @@ type
 
     function toString: string; override; //**< Converts the TXQValue dynamically to string (excludes namespace url)
     function toBooleanEffective: boolean; override;
+    function hashCode: uint32; override;
 
     procedure adaptiveSerialize(var serializer: TXQSerializer); override;
 
@@ -812,6 +903,7 @@ type
     function toString: string; override; //**< Converts the TXQValue dynamically to string
     function toDateTime: TDateTime; override; //**< Converts the TXQValue dynamically to TDateTime
     function getInternalDateTimeData: PXQValueDateTimeData; override;
+    function hashCode: uint32; override;
 
     procedure setDateTime(const dateTime: TDateTime);
     class procedure setDateTime(const dateTime: TDateTime; out v: TXQValueDateTimeData); static;
@@ -831,7 +923,7 @@ type
 
     procedure truncateRange();
 
-    class function compare(const a,b: TXQValueDateTime; implicitTimezone: integer): integer; static;
+    class function compare(const a,b: TXQValueDateTime; implicitTimezone: integer): TXQCompareResult; static;
 //    class procedure subtract(S, D: TXQValueDateTimeData; out E: TXQValueDateTimeData);
   end;
   TXQValueDateTimeClass = class of TXQValueDateTime;
@@ -859,6 +951,7 @@ type
     function toJoinedString(const sep: string=' '): string; override;
     function toDateTime: TDateTime; override; //**< Converts the first element to TDateTime
     function toNode: TTreeNode; override; //**< Converts the first element to a node
+    function hashCode: uint32; override;
 
     function toArray: TXQVArray; override; //**< Returns all elements as array
     function toXQVList: TXQVList; override; //**< Returns all elements as list (which must be freed by the caller)
@@ -883,15 +976,8 @@ type
     destructor Destroy; override;
   end;
 
-  //** Type for jsoniq structured-item()
-  TXQValueJSONIQStructuredItem = class(TXQValue)
-
-  end;
-
-  { TXQValueNode }
-
   //** Type for a node
-  TXQValueNode = class (TXQValueJSONIQStructuredItem)
+  TXQValueNode = class (TXQValue)
   private
     fnode: TTreeNode;
     procedure setNode(AValue: TTreeNode);
@@ -910,6 +996,7 @@ type
     function toDateTime: TDateTime; override; //**< Converts the TXQValue dynamically to TDateTime
     function toFloatChecked(scontext: TXQStaticContext): xqfloat; override;
     function toNode: TTreeNode; override; //**< Returns the node
+    function hashCode: uint32; override;
 
     function clone: IXQValue; override;
 
@@ -922,100 +1009,195 @@ type
 
     //for internal use
     class function nodeTypeAnnotation(tn: TTreeNode): TXSType; static;
+    class function nodeTypeAnnotationForAtomic(tn: TTreeNode): TXSType; static;
   end;
-
+                                                               {
   TXQPropertyEnumeratorInternal = class
     vars: TXQVariableChangeLog;
     idx: integer;
-  end;
+    hashmapEnumerator: TXQHashmapStrOwningXQValue.TKeyPairEnumerator;
+  end;                                                        }
 
   { TXQProperty }
 
-  TXQProperty = class
+  TXQProperty = TXQHashmapStrOwningXQValue.TKeyValuePairOption;
+  TXQStandardProperty = TXQHashmapXQValue.TKeyValuePairOption;
+  generic TXQValueGenericPropertyEnumerator<TProp> = class
   private
-    enum: TXQPropertyEnumeratorInternal;
-    function GetName: string; inline;
-    function GetValue: IXQValue; inline;
+    fcurrent: TProp;
   public
-    property Name: string read GetName;
-    property Value: IXQValue read GetValue;
+    function MoveNext: Boolean; virtual; abstract;
+    property Current: TProp read FCurrent;
+
+    function GetEnumerator: TXQValueGenericPropertyEnumerator;
   end;
 
-  { TXQValuePropertyEnumerator }
+  TXQValueStringPropertyEnumerator = class(specialize TXQValueGenericPropertyEnumerator<TXQProperty>) end;
+  TXQValueStandardPropertyEnumerator = class(specialize TXQValueGenericPropertyEnumerator<TXQStandardProperty>) end;
+  TXQValuePropertyValueEnumerator = class(specialize TXQValueGenericPropertyEnumerator<TXQValue>) end;
 
-  TXQValueObject = class;
-  TXQValuePropertyEnumerator = class(TXQPropertyEnumeratorInternal)
-  private
-    tempobj: TXQValueObject;
-    prop: TXQProperty;
-    visitedProperties: TStringList;
-    function GetCurrent: TXQProperty;
-  public
-    function MoveNext: Boolean;
-    property Current: TXQProperty read GetCurrent;
+  TXQValueMapLike = class (TXQValue)
+    class function classKind: TXQValueKind; override;
+    function toBooleanEffective: boolean; override;
+    function toString: string; override;
+    function toJoinedString(const sep: string=' '): string; override;
+    //function cloneLinked: TXQValueObject; //**< Creates a weak clone (linked to the current object)
+    function setImmutable(const props: PString; len: SizeInt; const v: IXQValue): TXQValueMapLike; overload; override;
 
-    function GetEnumerator: TXQValuePropertyEnumerator;
-
-    constructor create(obj: TXQValueObject);
-    destructor destroy; override;
+    class function newinstance : tobject;override;
+    procedure FreeInstance; override;
   end;
 
+  //** String Hash map
+  TXQValueStringMap = class (TXQValueMapLike)
+    mapdata: TXQHashmapStrOwningXQValue;
 
-  //** Type corresponding to jsoniq json-item()
-  TXQValueJSONIQItem = class (TXQValueJSONIQStructuredItem)
+    type
+      TXQValueStringPropertyEnumeratorForStringMap = class(TXQValueStringPropertyEnumerator)
+        enumerator: TXQHashmapStrOwningXQValue.TKeyPairEnumerator;
+        constructor create(map: TXQValueStringMap);
+        function MoveNext: Boolean; override;
+      end;
+      TXQValueStandardPropertyEnumeratorForStringMap = class(TXQValueStandardPropertyEnumerator)
+        enumerator: TXQHashmapStrOwningXQValue.TKeyPairEnumerator;
+        tempEntity: TXQHashmapXQValue.THashMapEntity;
+        constructor create(map: TXQValueStringMap);
+        function MoveNext: Boolean; override;
+      end;
+      TXQValuePropertyValueEnumeratorForStringMap = class(TXQValuePropertyValueEnumerator)
+        enumerator: TXQHashmapStrOwningXQValue.TKeyPairEnumerator;
+        constructor create(map: TXQValueStringMap);
+        function MoveNext: Boolean; override;
+      end;
 
-  end;
-
-  { TXQValueObject }
-
-  //**(Experimental) object type.
-  //**Every object obj has properties obj.something which are arbitrary TXQValue-s and a prototype from which it inherits all properties. @br
-  //**The objects can be used mutable and immutable. If used immutable, they still appear mutable, but every change creates a new object
-  //**that is linked to the previous objects (i.e. has the old object as prototype). @br
-  //**(Having the objects immutable, is necessary for the template matcher, so that it can correctly rollback all changes)
-  TXQValueObject = class (TXQValueJSONIQItem)
-    values: TXQVariableChangeLog; //todo: can there be multiple properties with the same name? some parts assume they are unique
-    prototype: IXQValue;
 
     constructor create(); reintroduce; virtual;
-    constructor createTakingVariableLog(log: TXQVariableChangeLog);
     destructor Destroy; override;
 
-    class function classKind: TXQValueKind; override;
+    function Size: SizeInt; override;
+    function getPropertyKeyKind: TXQMapPropertyKeyKind; override;
+    function hasProperty(const name: string; value: PXQValue): boolean; override; //**< Checks if the object (or its prototype) has a certain property, and returns the property value directly (i.e. changing value^ will change the value stored in the object). @br (You can pass nil for value, if you don't need the value)
+    function hasProperty(const {%H-}name: ixqvalue; {%H-}value: PXQValue): boolean; override; //**< Checks if an object has a certain property, and returns the property value directly (i.e. changing value^ will change the value stored in the object). @br The value is returned as TXQValue not IXQValue. (You can pass nil for value, if you don't need the value)
+    function getProperty(const name: IXQValue): IXQValue; override; //**< Returns an object property. Returns empty sequence for non objects.
+    function getProperty(const name: string): IXQValue; override; //**< Returns the value of a property
+
+    function getEnumeratorPropertiesUnsafe: TXQValueStandardPropertyEnumerator; override;
+    function getEnumeratorPropertyValuesUnsafe: TXQValuePropertyValueEnumerator; override;
+    function getEnumeratorStringPropertiesUnsafe: TXQValueStringPropertyEnumerator; override;
+
+    procedure setMutable(const name: string; const v: IXQValue); reintroduce; //**< Changes a property
+    procedure setMutable(const name: string; const s: string); reintroduce; //**< Changes a property (string wrapper)
+
+    function setImmutable(const name: string; const v: IXQValue): TXQValueMapLike; overload; override; //**< Creates a new object with the same values as the current one and changes a property of it
+
+    procedure enumeratePropertyKeys(var keyset: TXQHashsetStr); override;
+    function enumeratePropertyValues: IXQValue;       override;
+
+    function clone: IXQValue; override; //**< Creates a hard clone of the object (i.e. also clones all properties)
+  end;
+
+  TXQValueStringMapPendingUpdate = class(TXQValueStringMap)
+    prototype: IXQValue; //txqvaluestringmap
+
+    type
+      TXQHashmapRawEnumerators = array[0..1] of TXQHashmapStrOwningXQValue.TKeyPairEnumerator;
+      TXQValueStringPropertyEnumeratorForStringMapPendingUpdate = class(TXQValueStringPropertyEnumerator)
+        enumerators: TXQHashmapRawEnumerators;
+        constructor create(map: TXQValueStringMapPendingUpdate);
+        function MoveNext: Boolean; override;
+      end;
+      TXQValueStandardPropertyEnumeratorForStringMapPendingUpdate = class(TXQValueStandardPropertyEnumerator)
+        enumerators: TXQHashmapRawEnumerators;
+        tempEntity: TXQHashmapXQValue.THashMapEntity;
+        constructor create(map: TXQValueStringMapPendingUpdate);
+        function MoveNext: Boolean; override;
+      end;
+      TXQValuePropertyValueEnumeratorForStringMapPendingUpdate = class(TXQValuePropertyValueEnumerator)
+        enumerators: TXQHashmapRawEnumerators;
+        constructor create(map: TXQValueStringMapPendingUpdate);
+        function MoveNext: Boolean; override;
+      end;
+
+    constructor create(); reintroduce; virtual;
+    constructor create(p: TXQValueStringMap); reintroduce; virtual;
+    destructor Destroy; override;
 
     function Size: SizeInt; override;
     function hasProperty(const name: string; value: PXQValue): boolean; override; //**< Checks if the object (or its prototype) has a certain property, and returns the property value directly (i.e. changing value^ will change the value stored in the object). @br (You can pass nil for value, if you don't need the value)
     function getProperty(const name: string): IXQValue; override; //**< Returns the value of a property
-    function getPropertyEnumerator: TXQValuePropertyEnumerator; override;
+  private
+    function getEnumerators: TXQHashmapRawEnumerators; inline;
+    class function moveNextEnumerators(var enums: TXQHashmapRawEnumerators): boolean; inline; static;
+  public
+    function getEnumeratorPropertiesUnsafe: TXQValueStandardPropertyEnumerator; override;
+    function getEnumeratorPropertyValuesUnsafe: TXQValuePropertyValueEnumerator; override;
+    function getEnumeratorStringPropertiesUnsafe: TXQValueStringPropertyEnumerator; override;
 
+    procedure setMutable(const name: string; const v: IXQValue); reintroduce; //**< Changes a property
+    procedure setMutable(const name: string; const s: string); reintroduce; //**< Changes a property (string wrapper)
 
-    procedure setMutable(const name: string; const v: IXQValue); //**< Changes a property
-    function setImmutable(const name: string; const v: IXQValue): TXQValueObject; //**< Creates a new object with the same values as the current one and changes a property of it
-    procedure setMutable(const name: string; const s: string); //**< Changes a property (string wrapper)
-    function setImmutable(const name: string; const s: string): TXQValueObject; //**< Creates a new object with the same values as the current one and changes a property of it (string wrapper)
+    function setImmutable(const name: string; const v: IXQValue): TXQValueMapLike; overload; override;
 
-    function setImmutable(const props: PString; len: SizeInt; const v: IXQValue): TXQValueObject;
+    procedure enumeratePropertyKeys(var keyset: TXQHashsetStr); override;
+    function enumeratePropertyValues: IXQValue;       override;
 
-    procedure enumerateKeys(sl: TStringList);
-    function enumerateValues: IXQValue;
-
-    function toBooleanEffective: boolean; override;
-
-    function clone: IXQValue; override; //**< Creates a hard clone of the object (i.e. also clones all properties)
-    function cloneLinked: TXQValueObject; //**< Creates a weak clone (linked to the current object)
-
-    procedure jsonSerialize(var serializer: TXQSerializer); override; overload;
-    procedure xmlSerialize(var serializer: TXQSerializer); override; overload;
-    procedure adaptiveSerialize(var serializer: TXQSerializer); override;
-    function stringifyNodes: IXQValue; override;
-    function hasNodes: boolean; override;
-
-    class procedure prepareInternetRequest(const obj: IXQValue; out method, url, post: string; internet: TInternetAccess); static;
+    function clone: IXQValue; override;
   end;
 
-  { TXQValueJSONArray }
-  //** Experimental type for a JSON array of other IXQValue
-  TXQValueJSONArray = class (TXQValueJSONIQItem)
+  TXQValueStandardMap = class (TXQValueMapLike)
+    mapdata: TXQHashmapXQValue;
+
+    type
+      TXQValueStringPropertyEnumeratorForStandardMap = class(TXQValueStringPropertyEnumerator)
+        enumerator: TXQHashmapXQValue.TKeyPairEnumerator;
+        tempEntity: TXQHashmapStrOwningXQValue.THashMapEntity;
+        constructor create(map: TXQValueStandardMap);
+        function MoveNext: Boolean; override;
+      end;
+      TXQValueStandardPropertyEnumeratorForStandardMap = class(TXQValueStandardPropertyEnumerator)
+        enumerator: TXQHashmapXQValue.TKeyPairEnumerator;
+        constructor create(map: TXQValueStandardMap);
+        function MoveNext: Boolean; override;
+      end;
+      TXQValuePropertyValueEnumeratorForStandardMap = class(TXQValuePropertyValueEnumerator)
+        enumerator: TXQHashmapXQValue.TKeyPairEnumerator;
+        constructor create(map: TXQValueStandardMap);
+        function MoveNext: Boolean; override;
+      end;
+
+    constructor create(); reintroduce; virtual;
+    constructor create(const othermapdata: TXQHashmapXQValue); reintroduce; virtual;
+    destructor Destroy; override;
+
+    function Size: SizeInt; override;
+    function getPropertyKeyKind: TXQMapPropertyKeyKind; override;
+    function findKeyValuePair(const key: IXQValue): TXQHashmapXQValue.TKeyValuePairOption;
+    function hasProperty(const name: string; value: PXQValue): boolean; override; //**< Checks if the object (or its prototype) has a certain property, and returns the property value directly (i.e. changing value^ will change the value stored in the object). @br (You can pass nil for value, if you don't need the value)
+    function hasProperty(const key: IXQValue; value: PXQValue): boolean; override; //**< Checks if the object (or its prototype) has a certain property, and returns the property value directly (i.e. changing value^ will change the value stored in the object). @br (You can pass nil for value, if you don't need the value)
+    function getProperty(const name: string): IXQValue; override; //**< Returns the value of a property
+    function getProperty(const key: IXQValue): IXQValue; override; //**< Returns the value of a property
+
+    function getEnumeratorPropertiesUnsafe: TXQValueStandardPropertyEnumerator; override;
+    function getEnumeratorPropertyValuesUnsafe: TXQValuePropertyValueEnumerator; override;
+    function getEnumeratorStringPropertiesUnsafe: TXQValueStringPropertyEnumerator; override;
+
+    procedure setMutable(const name: string; const v: IXQValue); reintroduce; //**< Changes a property
+    procedure setMutable(const name: string; const s: string); reintroduce; //**< Changes a property (string wrapper)
+    procedure setMutable(const key: IXQValue; const v: IXQValue); reintroduce; //**< Changes a property
+
+    function setImmutable(const name, value: IXQValue): TXQValueMapLike; overload; override;
+    function setImmutable(const name: string; const v: IXQValue): TXQValueMapLike; overload; override; //**< Creates a new object with the same values as the current one and changes a property of it
+
+    function enumeratePropertyKeys: IXQValue; override;
+    procedure enumeratePropertyKeys(var keyset: TXQHashsetStr); override;
+    function enumeratePropertyValues: IXQValue;       override;
+
+    function clone: IXQValue; override; //**< Creates a hard clone of the object (i.e. also clones all properties)
+  end;
+
+
+  //** JSON array of other IXQValue
+  TXQValueJSONArray = class (TXQValue)
     seq: TXQVList;
 
     constructor create(takeList: TXQVList); reintroduce; virtual;
@@ -1035,7 +1217,7 @@ type
 
     function clone: IXQValue; override;
 
-    function setImmutable(const props: PString; len: SizeInt; const v: IXQValue): TXQValueJSONArray;
+    function setImmutable(const props: PString; len: SizeInt; const v: IXQValue): TXQValue; override;
 
     procedure jsonSerialize(var serializer: TXQSerializer); override; overload;
     procedure xmlSerialize(var serializer: TXQSerializer); override; overload;
@@ -1056,6 +1238,7 @@ type
     function clone: IXQValue; override;
 
     function toString: string; override;
+    function hashCode: uint32; override;
 
     procedure jsonSerialize(var serializer: TXQSerializer); override; overload;
     procedure xmlSerialize(var serializer: TXQSerializer); override; overload;
@@ -1232,6 +1415,10 @@ type
     class function commonDecimalType(a,b: TXSType; const failureType: TXSType): TXSType; //static;
     class function commonDecimalType(const a,b: IXQValue): TXSType; static;
 
+  private
+    procedure failCreateValue(err: TXSCastingError; v: int64);
+  public
+
     //** Creates a new value from the argument array (directly maps to the xs:something constructors of XPath)
     function createValue(const v: IXQValue): IXQValue; inline;
     function createValue(const v: Int64): IXQValue; inline;
@@ -1270,7 +1457,7 @@ type
       cardinality: (fcFinite, fcCountableInfinite);
       numeric: boolean;
     end;}
-    variety: (xsvAbsent, xsvAtomic, xsvList, xsvUnion);
+    variety: (xsvAtomic, xsvAbsent, xsvList, xsvUnion);
     primitive: TXSType;
     //items
     //members
@@ -1415,7 +1602,7 @@ type
     function findType(const typeName: string): TXSType;
 
     //for internal use
-    class function isValidNCName(const s: string): boolean; static;
+    class function isValidNCName(const s: string): boolean; static; inline;
     class function isValidQName(s: string): boolean;  static;
     function isValidationOnlyType(t: TXSType): boolean;
     function isAbstractType(t: TXSType): boolean;
@@ -1481,6 +1668,7 @@ type
   TXQEvaluationStack = class(TXQVCustomList)
   private
     {$ifdef TRACK_STACK_VARIABLE_NAMES}debugNames: array of string;{$endif}
+    procedure failTop(const name: TXQTermVariable; i: integer = 0);
   public
     procedure push(const value: ixqvalue);
     procedure pop();
@@ -1513,7 +1701,7 @@ type
   TXQFunctionParameterTypes = record
     types: array of TXQTermSequenceType;
     returnType: TXQTermSequenceType;
-    function serialize: string;
+    function serialize(separator: string = ''): string;
     function clone: TXQFunctionParameterTypes;
     procedure raiseErrorMessage(values: PIXQValue; count: integer; const context: TXQEvaluationContext; term: TXQTerm; const addendum: string);
     procedure checkOrConvertTypes(values: PIXQValue; count: integer; const context:TXQEvaluationContext; term: TXQTerm);
@@ -1746,15 +1934,15 @@ type
   { TXQTermType }
 
   type
-  TXQTypeInformationKind = (tikNone, tikAny, tikAtomic, tikFunctionTest, tikElementTest, tikUnion);
+  TXQTypeInformationKind = (tikNone, tikAny, tikAtomic, tikFunctionTest, tikElementTest, tikArrayTest, tikMapTest, tikJSONiqTest, tikUnion);
 
   { TXQTermSequenceType }
 
   TXQTermSequenceType = class(TXQTermWithChildren)
     name: string;
-    allowNone, allowMultiple: boolean;
+    allowNone, allowMultiple: boolean; //?, *, and + modifiers. (note: tikNone/empty-sequence() does not have allowNone set)
     kind: TXQTypeInformationKind;
-    atomicTypeInfo: TXSType; //only for tikAtomic (or tikFunctionTest during parsing)
+    atomicTypeInfo: TXSType; //used for tikAtomic (or tikFunctionTest during parsing) or tikJSONiqTest
     nodeMatching: TXQPathMatchingStep; //only for tikElementTest
     arguments: array of TXQTermSequenceType; //only for tikFunctionTest, last is return type
 
@@ -1775,7 +1963,7 @@ type
     function castAs(v: IXQValue; const context: TXQEvaluationContext): IXQValue;
     function castableAs(v: IXQValue; staticContext: TXQStaticContext): boolean;
     function instanceOf(const ta: IXQValue; const context: TXQEvaluationContext): boolean;
-    function instanceOf(const ta: IXQValue): boolean;
+    //function instanceOf(const ta: IXQValue): boolean;
     function instanceOf(const node: TTreeNode): boolean;
     function subtypeOf(tb: TXQTermSequenceType): boolean;
   private
@@ -1975,9 +2163,6 @@ type
     function getContextDependencies: TXQContextDependencies; override;
   end;
 
-  { TXQDynamicFunctionCall }
-
-  { TXQTermDynamicFunctionCall }
 
   TXQTermDynamicFunctionCall = class (TXQTermWithChildren)
     constructor create(func: TXQTerm = nil; arg: TXQTerm = nil);
@@ -2226,6 +2411,7 @@ type
     root: TTreeNode;
     baseOffset: TTreeNodeIntOffset;
     olddocumentnamespacecount: Integer;
+    namespaceOverrides: TNamespaceList;
   end;
 
   TXQTermConstructor = class(TXQTermWithChildren)
@@ -2248,11 +2434,16 @@ type
 
   { TXQTermJSONObjectConstructor }
 
-  TXQTermJSONObjectConstructor = class(TXQTermWithChildren)
-    optionals: array of boolean;
-    objectsRestrictedToJSONTypes: boolean;
+  TXQTermMapConstructor = class(TXQTermWithChildren)
+    procedure duplicateError(const map: IXQValue; errStandardCode: boolean = true);
     function evaluate(var context: TXQEvaluationContext): IXQValue; override;
     function getContextDependencies: TXQContextDependencies; override;
+  end;
+  TXQTermJSONiqObjectConstructor = class(TXQTermMapConstructor)
+    optionals: array of boolean;
+    objectsRestrictedToJSONTypes: boolean;
+    allowDuplicates: boolean;
+    function evaluate(var context: TXQEvaluationContext): IXQValue; override;
     function clone: TXQTerm; override;
   end;
 
@@ -2322,6 +2513,7 @@ type
     constructor Create(asStaticContext: TXQStaticContext; aterm: TXQTerm = nil);
     function evaluate(const tree: TTreeNode = nil): IXQValue;
     function evaluate(var context: TXQEvaluationContext): IXQValue;
+    function evaluateInConstContext(const context: TXQEvaluationContext): IXQValue;
     function evaluate(const contextItem: IXQValue): IXQValue;
 
     function clone: IXQuery;
@@ -2667,8 +2859,8 @@ public
     function evaluateCSS3(expression: string; const contextItem: IXQValue): IXQValue;
 
     //** Evaluates an expression with a certain tree element as current node.
-    class function evaluateStaticXPath2(expression: string; tree:TTreeNode = nil): IXQValue;
-    class function evaluateStaticXPath2(expression: string; const contextItem: IXQValue): IXQValue;
+    class function evaluateStaticXPath2(expression: string; tree:TTreeNode = nil): IXQValue; overload;
+    class function evaluateStaticXPath2(expression: string; const contextItem: IXQValue): IXQValue; overload;
     class function evaluateStaticXPath3(expression: string; tree:TTreeNode = nil): IXQValue;
     class function evaluateStaticXPath3(expression: string; const contextItem: IXQValue): IXQValue;
     class function evaluateStaticXQuery1(expression: string; tree:TTreeNode = nil): IXQValue;
@@ -2680,6 +2872,7 @@ public
 
     procedure registerModule(module: IXQuery);  //**< Registers an XQuery module. A XQuery module is created by parsing (not evaluating) a XQuery expression that contains a "module" declaration
     function findModule(const namespaceURL: string): TXQuery; //**< Finds a certain registered XQuery module
+    function findModule(context: TXQStaticContext; const namespace: string; const at: array of string): TXQuery; //**< Finds a certain registered XQuery module or tries to load one
     class function findNativeModule(const ns: string): TXQNativeModule; //**< Finds a native module.
 
     //** Registers a collation for custom string comparisons
@@ -2722,7 +2915,7 @@ public
     LastDebugInfo: TXQDebugInfo;
 
     class procedure registerNativeModule(const module: TXQNativeModule);
-    class function collationsInternal: TStringList;
+    {$ifdef DUMPFUNCTIONS}class procedure dumpFunctions;{$endif}
 
     function getEvaluationContext(staticContextOverride: TXQStaticContext = nil): TXQEvaluationContext;
 
@@ -2779,6 +2972,7 @@ public
   function xqvalue(sl: TStringList): IXQValue; //**< Creates a sequence of strings (does *not* free the list)
   function xqvalue(const sl: array of string): IXQValue; //**< Creates a sequence of untyped strings
   function xqvalue(const sl: array of IXQValue): IXQValue; //**< Creates a sequence
+  function xqvalue(const s: TXQHashsetStr): IXQValue; //**< Creates a sequence
 
   procedure xqvalueSeqSqueeze(var v: IXQValue); //**< Squeezes an IXQValue (single element seq => single element, empty seq => undefined)
   procedure xqvalueSeqSqueezed(out result: IXQValue; l: TXQVList); //**< Creates an IXQValue from a list sequence  (assume it FREEs the list)
@@ -2893,6 +3087,7 @@ type
 
     procedure addObjectModification(const variable: string; value: IXQValue; const namespaceURL: string; const props: PString; len: SizeInt);
 
+    function toStringMap: TXQValueStringMap;
   protected
     shared: boolean;
     varCount, historyCount: integer;
@@ -2907,59 +3102,6 @@ type
     property count: integer read varcount;
   end;
 
-
-{ TXQCollation }
-
-//** Class to perform string comparisons, so they different comparison rules can be used in different languages
-TXQCollation = class
-  id: string;
-  constructor Create(const aid: string);
-  function compare(const a, b: string): integer;
-  function equal(const a, b: string): boolean; virtual;
-  function indexOf(const strToBeExaminated, searched: string): SizeInt; virtual;
-  function contains(const strToBeExaminated, searched: string): boolean; virtual;
-  function startsWith(const strToBeExaminated, expectedStart: string): boolean; virtual;
-  function endsWith(const strToBeExaminated, expectedEnd: string): boolean; virtual;
-  function key(s: string): string; virtual;
-protected
- function compare(a,b: pansichar; len: SizeInt): integer;
- function doCompare(a,b: pansichar; len: SizeInt): integer; virtual;
- function doCompare(const a, b: string): integer; virtual;
-end;
-TXQCollationCodepoint = class(TXQCollation)
- function doCompare(const a, b: string): integer; override;
- function equal(const a, b: string): boolean; override;
- function indexOf(const strToBeExaminated, searched: string): SizeInt; override;
- function contains(const strToBeExaminated, searched: string): boolean; override;
- function startsWith(const strToBeExaminated, expectedStart: string): boolean; override;
- function endsWith(const strToBeExaminated, expectedEnd: string): boolean; override;
- function key(s: string): string; override;
-end;
-TXQCollationCodepointClever = class(TXQCollationCodepoint)
- function doCompare(const a, b: string): integer; override;
- function key(s: string): string; override;
-end;
-TXQCollationCodepointInsensitive = class(TXQCollation)
- function doCompare(const a, b: string): integer; override;
- function equal(const a, b: string): boolean; override;
- function indexOf(const strToBeExaminated, searched: string): SizeInt; override;
- function contains(const strToBeExaminated, searched: string): boolean; override;
- function startsWith(const strToBeExaminated, expectedStart: string): boolean; override;
- function endsWith(const strToBeExaminated, expectedEnd: string): boolean; override;
- function key(s: string): string; override;
-end;
-TXQCollationCodepointInsensitiveClever = class(TXQCollationCodepointInsensitive)
- function doCompare(const a, b: string): integer; override;
- function key(s: string): string; override;
-end;
-TXQCollationCodepointLocalized = class(TXQCollation)
- function doCompare(const a, b: string): integer; override;
- function doCompare(a, b: pansichar; len: SizeInt): integer; override;
-end;
-TXQCollationCodepointLocalizedInsensitive = class(TXQCollation)
- function doCompare(const a, b: string): integer; override;
- function doCompare(a, b: pansichar; len: SizeInt): integer; override;
-end;
 
 TXQDecimalFormatProperty = (xqdfpDecimalSeparator, xqdfpGroupingSeparator, xqdfpMinusSign, xqdfpPercent, xqdfpPerMille, xqdfpZeroDigit, xqdfpDigit, xqdfpPatternSeparator, xqdfpExponentSeparator);
 TXQDecimalFormatPropertyData = record
@@ -3043,6 +3185,7 @@ public
   //function findBinaryOp(const name: string; model: TXQParsingModel = xqpmXQuery3_1): TXQOperatorInfo;
 
   function findSimilarFunctionsDebug(searched: TList; const localname: string): string;
+  {$ifdef DUMPFUNCTIONS}procedure dumpFunctions;{$endif}
 protected
   basicFunctions, complexFunctions, interpretedFunctions: TXQMapStringOwningObject;
   binaryOpLists: TXQMapStringOwningObject;
@@ -3055,7 +3198,7 @@ end;
 //**Checks the length of the args array (internally used)
 procedure requiredArgCount(argc: sizeint; minc: sizeint; maxc: sizeint = -2);
 procedure requiredArgType(const v: IXQValue; typ: TXSType);
-function xqfloatRounded(f: xqfloat; prec: integer = 0): xqfloat;
+
 //**Calculates starting position / length from a range definition (checks for things like NaN, INF, ...) (internally used)
 procedure xpathRangeDefinition(argc: sizeint; args: PIXQValue; const maxLen: longint; out from, len: integer);
 function xqvalueAtomize(const v: IXQValue): IXQValue;
@@ -3171,12 +3314,6 @@ procedure ignore(const intentionallyUnusedParameter: TXQEvaluationContext); over
 procedure ignore(const intentionallyUnusedParameter: IXQValue); overload;inline;
 procedure ignore(const intentionallyUnusedParameter: TXQVArray); overload;inline;
 const MicroSecsPerSec = int64(1000000);
-function getNaN: xqfloat;
-function getPosInf: xqfloat;
-function getNegInf: xqfloat;
-function isPosInf(const f: xqfloat): boolean;
-function isNegInf(const f: xqfloat): boolean;
-function isSignedXQFloat(const v: xqfloat): boolean;
 function isValidXMLCharacter(const codepoint: integer): boolean; inline;
 procedure raiseFORG0001InvalidConversion(const v: IXQValue; const convTo: string);
 procedure raiseXPTY0004TypeError(const v: IXQValue; const convTo: string);
@@ -3264,38 +3401,21 @@ public
 end;
 var globalTypes: TXQGlobalTypes;
 
+type TXQGlobalSerializationCallback = function (const context: TXQEvaluationContext; const value: IXQValue): string;
+var globalSerializationCallback: TXQGlobalSerializationCallback;
+
 implementation
-uses base64, jsonscanner, strutils, xquery__regex, bbutilsbeta;
+uses base64, jsonscanner, strutils, xquery__regex, bbutilsbeta, xquery.internals.floathelpers;
 
 var
-  XQFormats : TFormatSettings = (
-    CurrencyFormat: 1;
-    NegCurrFormat: 5;
-    ThousandSeparator: #0;
-    DecimalSeparator: '.';
-    CurrencyDecimals: 2;
-    DateSeparator: '-';
-    TimeSeparator: ':';
-    ListSeparator: ',';
-    CurrencyString: '$';
-    ShortDateFormat: 'y-m-d';
-    LongDateFormat: 'yyyy-mm-dd';
-    TimeAMString: 'AM';
-    TimePMString: 'PM';
-    ShortTimeFormat: 'hh:nn';
-    LongTimeFormat: 'hh:nn:ss';
-    ShortMonthNames: ('Jan','Feb','Mar','Apr','May','Jun',
-                      'Jul','Aug','Sep','Oct','Nov','Dec');
-    LongMonthNames: ('January','February','March','April','May','June',
-                     'July','August','September','October','November','December');
-    ShortDayNames: ('Sun','Mon','Tue','Wed','Thu','Fri','Sat');
-    LongDayNames:  ('Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday');
-    TwoDigitYearCenturyWindow: 50;
-  );
   interpretedFunctionSynchronization: TRTLCriticalSection;
 
   const ALL_CONTEXT_DEPENDENCIES = [xqcdFocusItem, xqcdFocusPosition, xqcdFocusLast, xqcdContextCollation, xqcdContextTime, xqcdContextVariables, xqcdContextOther];
   const ALL_CONTEXT_DEPENDENCIES_FOCUS = [xqcdFocusItem, xqcdFocusPosition, xqcdFocusLast];
+
+threadvar globalCurrentQueryInfo: record
+  AllowJSONiqOperations: boolean;
+end;
 
 
 
@@ -3333,6 +3453,16 @@ begin
   PPointer(@a)^ := PPointer(@b)^;
   PPointer(@b)^ := t;
 end;
+
+
+
+function TXQValueDateTimeData.hasTimeZone: boolean;
+begin
+  result := timezone = high(integer);
+end;
+
+
+
 
 
 procedure TXQParsingOptions.SetAllowJSON(AValue: boolean);
@@ -3387,12 +3517,10 @@ end;
 procedure TXQSerializer.appendJSONArrayStart;
 begin
   inherited appendJSONArrayStart;
-  case insertWhitespace of
-    xqsiwIndent: begin
-      indent;
-      append(LineEnding);
-      appendIndent;
-    end;
+  if insertWhitespace = xqsiwIndent then begin
+    indent;
+    append(LineEnding);
+    appendIndent;
   end;
 end;
 
@@ -3411,12 +3539,10 @@ end;
 
 procedure TXQSerializer.appendJSONArrayEnd;
 begin
-  case insertWhitespace of
-    xqsiwIndent: begin
-      unindent;
-      append(LineEnding);
-      appendIndent;
-    end;
+  if insertWhitespace = xqsiwIndent then begin
+    unindent;
+    append(LineEnding);
+    appendIndent;
   end;
   inherited appendJSONArrayEnd;
 end;
@@ -3424,12 +3550,10 @@ end;
 procedure TXQSerializer.appendJSONObjectStart;
 begin
   inherited appendJSONObjectStart;
-  case insertWhitespace of
-    xqsiwIndent: begin
-      indent;
-      append(LineEnding);
-      appendIndent;
-    end;
+  if insertWhitespace = xqsiwIndent then begin
+    indent;
+    append(LineEnding);
+    appendIndent;
   end;
 end;
 
@@ -3447,12 +3571,10 @@ end;
 
 procedure TXQSerializer.appendJSONObjectEnd;
 begin
-  case insertWhitespace of
-    xqsiwIndent: begin
-      unindent;
-      append(LineEnding);
-      appendIndent;
-    end;
+  if insertWhitespace = xqsiwIndent then begin
+    unindent;
+    append(LineEnding);
+    appendIndent;
   end;
   inherited appendJSONObjectEnd;
 end;
@@ -3683,6 +3805,40 @@ begin
   result := self;
 end;
 
+function TXQValueEnumeratorArrayTransparentUnsafe.MoveNext: Boolean;
+label enter, leaveArray, currentEnumeratorMoveNext;
+begin
+  currentEnumeratorMoveNext:
+    result := ptrs[currentEnumerator].MoveNext;
+    if result then begin
+      fcurrent := Ptrs[currentEnumerator].Current^.toValue;
+      case fcurrent.kind of
+        pvkArray, pvkSequence, pvkUndefined: goto enter;
+        else exit;
+      end;
+    end else goto leaveArray;
+
+  enter: //fcurrent = ptrs[currentEnumerator].current^ is an array or sequence
+    if currentEnumerator = high(ptrs) then
+      SetLength(ptrs, length(ptrs) * 2);
+    inc(currentEnumerator);
+    if fcurrent.kind = pvkArray then
+      ptrs[currentEnumerator] := fcurrent.GetEnumeratorMembersPtrUnsafe
+     else
+      ptrs[currentEnumerator] := fcurrent.GetEnumeratorPtrUnsafe;
+    goto currentEnumeratorMoveNext;
+
+  leaveArray: //ptrs[currentEnumerator].current^ is nil
+    dec(currentEnumerator);
+    if currentEnumerator < 0 then exit(false);
+    goto currentEnumeratorMoveNext;
+end;
+
+
+function TXQValueEnumeratorArrayTransparentUnsafe.GetEnumerator: TXQValueEnumeratorArrayTransparentUnsafe;
+begin
+  result := self
+end;
 
 
 
@@ -4014,6 +4170,18 @@ begin
   xqvalueSeqSqueeze(result);
 end;
 
+function xqvalue(const s: TXQHashsetStr): IXQValue;
+var
+  resseq: TXQValueSequence;
+  k: string;
+begin
+  resseq := TXQValueSequence.create(s.Count);
+  for k in s do
+    resseq.add(xqvalue(k));
+  result := resseq;
+  xqvalueSeqSqueeze(result);
+end;
+
 function xqvalue(v: TTreeNode): IXQValue;
 begin
   if v = nil then exit(xqvalue());
@@ -4081,17 +4249,25 @@ begin
 end;
 
 
-function TXQFunctionParameterTypes.serialize: string;
+function TXQFunctionParameterTypes.serialize(separator: string = ''): string;
 var
   j: Integer;
+  humanReadable: Boolean;
 begin
-  result := '(';
+  result := '';
+  humanReadable := separator = '';
+  if humanReadable then separator := ', ';
+  if humanReadable then result := '(';
   for j := 0 to high(types) do begin
-    if j <> 0 then result += ', ';
+    if j <> 0 then result += separator;
     result += types[j].serialize;
   end;
-  result += ')';
-  if returnType <> nil then result += ' as ' + returnType.serialize
+  if humanReadable then result += ')';
+  if returnType <> nil then begin
+    if humanReadable then result += ' as '
+    else result += separator;
+    result += returnType.serialize
+  end;
 end;
 
 function TXQFunctionParameterTypes.clone: TXQFunctionParameterTypes;
@@ -4108,19 +4284,35 @@ end;
 
 procedure TXQFunctionParameterTypes.raiseErrorMessage(values: PIXQValue; count: integer; const context: TXQEvaluationContext;
   term: TXQTerm; const addendum: string);
+var errCode: string = 'XPTY0004';
+  function needsSpecialErrorCode(st: TXQTermSequenceType; const v: IXQValue): boolean;
+  begin
+    result := false;
+    if not (st.kind in [tikFunctionTest, tikElementTest, tikAny, tikArrayTest, tikMapTest, tikJSONiqTest]) then begin
+      case v.kind of
+        pvkFunction, pvkObject: begin
+          errCode := 'FOTY0013';
+          exit(true);
+        end;
+        pvkArray: if v.Size = 1 then exit(needsSpecialErrorCode(st, (v as TXQValueJSONArray).seq[0]));
+        else;
+      end;
+    end;
+    if (context.staticContext.model in PARSING_MODEL3)
+              and (st.kind = tikAtomic) and (st.atomicTypeInfo.storage = TXQValueQName)
+              and ((v.kind = pvkNode) or v.instanceOf(baseSchema.untypedAtomic)) then begin
+     errCode := 'XPTY0117';
+     exit(true);
+    end;
+  end;
+
 var
-  errCode, errMessage, name: String;
+  errMessage, name: String;
   i: Integer;
 begin
-  errCode := 'XPTY0004';
   for i := 0 to high(types) do
-    if not (types[i].kind in [tikFunctionTest, tikElementTest, tikAny]) and (values[i].kind = pvkFunction) then begin
-     errCode := 'FOTY0013'; //wtf?
-     break;
-    end else if (context.staticContext.model in PARSING_MODEL3) and (types[i].kind = tikAtomic) and (types[i].atomicTypeInfo.storage = TXQValueQName) and (values[i].instanceOf(baseSchema.untypedAtomic)) then begin
-     errCode := 'XPTY0117'; //wtf?
-     break;
-    end;
+    if needsSpecialErrorCode(types[i], values[i]) then
+      break;
   name := '';
   if (term is TXQTermNamedFunction) and (TXQTermNamedFunction(term).func is TXQAbstractFunctionInfo) then
     name := 'function ' + TXQAbstractFunctionInfo(TXQTermNamedFunction(term).func).name
@@ -4204,7 +4396,7 @@ begin
      case typ of
        tneaSameNode: result := 'self::';
        tneaDirectParent: result := 'parent::';
-       tneaDirectChild: result := 'child::';
+       tneaDirectChild: result := '';//child::';
        tneaDirectChildImplicit: result := '';
        tneaSameOrDescendant: result := 'same-or-descendant::';
        tneaDescendant: result := 'descendant::';
@@ -4218,17 +4410,22 @@ begin
        tneaFunctionSpecialCase: result := '(:special-case::)';
        else result := '???';
      end;
-   if qmElement in matching then result += 'element';
-   if qmText in matching then result += 'text';
-   if qmComment in matching then result += 'comment';
-   if qmProcessingInstruction in matching then result += 'document';
-   if qmAttribute in matching then result += 'attribute';
-   if qmDocument in matching then result += 'document';
+   if matching = [qmElement,qmText,qmComment,qmProcessingInstruction,qmAttribute,qmDocument] then result += 'node'
+   else begin
+     if qmElement in matching then result += 'element';
+     if qmText in matching then result += 'text';
+     if qmComment in matching then result += 'comment';
+     if qmProcessingInstruction in matching then result += 'processing-instruction';
+     if qmAttribute in matching then result += 'attribute';
+     if qmDocument in matching then result += 'document-node';
+   end;
    result += '(';
-   if qmCheckNamespacePrefix in matching then result += 'Q{'+namespaceURLOrPrefix+'}';
-   if qmCheckNamespaceURL in matching then result += namespaceURLOrPrefix + ':';
+   if qmCheckNamespaceURL in matching then
+     if namespaceURLOrPrefix = 'http://www.w3.org/2010/xslt-xquery-serialization' then result += 'output:'
+     else result += 'Q{'+namespaceURLOrPrefix+'}';
+   if qmCheckNamespacePrefix in matching then result += namespaceURLOrPrefix + ':';
    if qmValue in matching then result += value;
-   if qmCheckOnSingleChild in matching then result += '(:single child:)';
+   if qmCheckOnSingleChild in matching then result += 'element(*)';
 
    if requiredType <> nil then result += ', '+requiredType.serialize;
    result += ')';
@@ -4478,6 +4675,7 @@ end;
 
 
 
+
 { TXQFunctionParameter }
 
 function TXQFunctionParameter.toString(def: string): string;
@@ -4604,12 +4802,11 @@ begin
   inherited create(messagePrefix + amessage);
 end;
 
-var collations: TStringList;
-    nativeModules: TStringList;
+var nativeModules: TStringList;
 
 
 class function EXQException.searchClosestFunction(const addr: pointer): string;
-const terms: array[1..39] of TXQTermClass = (TXQTermWithChildren, TXQTermVariable, TXQTermSequenceType, TXQTermDefineFunction, TXQTerm, TXQTermWithChildren, TXQTermConstant, TXQTermSequence, TXQTermJSONArray, TXQTermSequenceType, TXQTermVariable, TXQTermDefineVariable, TXQTermDefineFunction, TXQTermNodeMatcher, TXQTermFilterSequence, TXQTermPatternMatcher, TXQTermNamedFunction, TXQTermDynamicFunctionCall, TXQTermBinaryOp  , TXQTermFlowerSubClause, TXQTermFlowerLet, TXQTermFlowerFor, TXQTermFlowerWindow, TXQTermFlowerLetPattern, TXQTermFlowerForPattern, TXQTermFlowerWhere, TXQTermFlowerOrder, TXQTermFlowerCount, TXQTermFlowerGroup, TXQTermFlower, TXQTermSomeEvery, TXQTermIf, TXQTermTypeSwitch, TXQTermSwitch, TXQTermReadObjectProperty, TXQTermConstructor, TXQTermJSONObjectConstructor, TXQTermTryCatch, TXQTermModule);
+const terms: array[1..40] of TXQTermClass = (TXQTermWithChildren, TXQTermVariable, TXQTermSequenceType, TXQTermDefineFunction, TXQTerm, TXQTermWithChildren, TXQTermConstant, TXQTermSequence, TXQTermJSONArray, TXQTermSequenceType, TXQTermVariable, TXQTermDefineVariable, TXQTermDefineFunction, TXQTermNodeMatcher, TXQTermFilterSequence, TXQTermPatternMatcher, TXQTermNamedFunction, TXQTermDynamicFunctionCall, TXQTermBinaryOp  , TXQTermFlowerSubClause, TXQTermFlowerLet, TXQTermFlowerFor, TXQTermFlowerWindow, TXQTermFlowerLetPattern, TXQTermFlowerForPattern, TXQTermFlowerWhere, TXQTermFlowerOrder, TXQTermFlowerCount, TXQTermFlowerGroup, TXQTermFlower, TXQTermSomeEvery, TXQTermIf, TXQTermTypeSwitch, TXQTermSwitch, TXQTermReadObjectProperty, TXQTermConstructor, TXQTermMapConstructor, TXQTermJSONiqObjectConstructor, TXQTermTryCatch, TXQTermModule);
 var
   i, j: Integer;
   module: TXQNativeModule;
@@ -4680,37 +4877,6 @@ end;
 {$I disableRangeOverflowChecks.inc}
 
 
-function getNaN: xqfloat;
-begin
-  result := NaN;
-end;
-function getPosInf: xqfloat;
-begin
-  result := Infinity;
-end;
-function getNegInf: xqfloat;
-begin
-  result := -Infinity;
-end;
-function isPosInf(const f: xqfloat): boolean;
-begin
-  result := f = Infinity;
-end;
-function isNegInf(const f: xqfloat): boolean;
-begin
-  result := f = -Infinity;
-end;
-function isSignedXQFloat(const v: xqfloat): boolean;
-begin
-  result := PQWord(@v)^ shr 63 = 1;
-end;
-
-
-
-{function xqtruncdecimal(const f: Decimal): Decimal;
-begin
-  result := f - frac(f);
-end;}
 
 
 
@@ -4738,32 +4904,9 @@ begin
   if XQGlobalTrimNodes then result := strTrim(Result);
 end;
 
-function compareValue(a, b: xqfloat): integer;
-begin
-  if IsNan(a) or IsNan(b) then exit(-2);
-  if isPosInf(a) or isPosInf(b) then
-    if isPosInf(a) and isPosInf(b) then exit(0)
-    else if isPosInf(b) then exit(-1)
-    else exit(1);
-  if isNegInf(a) or isNegInf(b) then
-    if isNegInf(a) and isNegInf(b) then exit(0)
-    else if isNegInf(b) then exit(1)
-    else exit(-1);
-  if a < b then exit(-1);
-  if a > b then exit(1);
-  exit(0);
-end;
 
 
 
-function myStrToFloat(s:string): xqfloat;
-begin
-  s := trim(s);
-  if not TryStrToFloat(s, result, XQFormats) then
-    if striEqual(s, 'INF') or striEqual(s, '+INF') then result:=getPosInf
-    else if striEqual(s, '-INF') then result:=getNegInf
-    else {if strliEqual(string(v.varstr), 'NaN') then }result:=getNaN;
-end;
 
 
 
@@ -4791,17 +4934,16 @@ begin
   result := temp;
 end;
 
+procedure TXSType.failCreateValue(err: TXSCastingError; v: int64);
+begin
+  TXQueryInternals.raiseXSCEError(err, IntToStr(v), name)
+end;
 function TXSType.createValue(const v: Int64): IXQValue;
 var err: TXSCastingError;
-  procedure fail;
-  begin
-    TXQueryInternals.raiseXSCEError(err, IntToStr(v), name)
-  end;
-
-var temp: TXQValue;
+    temp: TXQValue;
 begin
   err := tryCreateValue(v, @temp);
-  if err <> xsceNoError then fail;
+  if err <> xsceNoError then failCreateValue(err, v);
   result := temp;
 end;
 
@@ -4861,17 +5003,16 @@ begin
       exit
     end;
     pvkNode: begin
-      t := TXQValueNode.nodeTypeAnnotation(v.toNode);
-      if t = baseSchema.untyped then t := baseSchema.untypedAtomic; //????
+      t := TXQValueNode.nodeTypeAnnotationForAtomic(v.toNode);
       result := t.createValue(v.toString);
     end;
-    pvkFunction: raise EXQEvaluationException.create('FOTY0013', 'Function values cannot be atomized.');
     pvkArray: begin
       seqResult := TXQValueSequence.create(v.getSequenceCount);
       for x in v.GetEnumeratorMembersPtrUnsafe do seqResult.seq.add(xqvalueAtomize(x^));
       result := seqResult;
       exit;
     end;
+    pvkFunction, pvkObject: raise EXQEvaluationException.create('FOTY0013', 'Maps and function values cannot be atomized.' + v.toXQuery);
     else if v.instanceOf(baseSchema.AnyAtomicType) then exit(v)
     else raise EXQEvaluationException.Create('XPTY0004','Invalid value for atomization: '+v.toXQuery());
   end;
@@ -4883,22 +5024,115 @@ begin
   result := varstorage[i].value;
 end;
 
-function TXQProperty.GetName: string;
-begin
-  with enum do
-    result := vars.getName(idx);
-end;
-
-function TXQProperty.GetValue: IXQValue;
-begin
-  with enum do
-    result := vars.get(idx);
-end;
 
 function TXQStaticContext.equalDeepAtomic(const a, b: IXQValue; overrideCollation: TXQCollation): boolean;
 begin
   result := equalDeepAtomic(a.toValue, b.toValue, overrideCollation);
 end;
+
+
+{$ImplicitExceptions off}
+class procedure TXQValueOwnershipTracker.addRef(v: TXQValue);
+begin
+  v._AddRef;
+end;
+
+class procedure TXQValueOwnershipTracker.release(v: TXQValue);
+begin
+  v._Release;
+end;
+
+class function TXQValueOwnershipTracker.hash(const v: IXQValue): uint32;
+begin
+  result := v.hashCode;
+end;
+
+class function TXQValueOwnershipTracker.equal(const v, w: IXQValue): boolean;
+  function compareIntToFloat(i: int64; f: xqfloat): boolean;
+  begin
+    result := i = f;
+  end;
+  function compareIntToBCD(i: int64; const bcd: BigDecimal): boolean;
+  begin
+    result := i = bcd;
+  end;
+  function compareFloatToBCD(f: xqfloat; const bcd: BigDecimal): boolean;
+  begin
+    result := FloatToBigDecimal(f, bdffExact) = bcd;
+  end;
+
+var
+  vk, wk: TXQValueKind;
+begin
+  vk := v.kind;
+  wk := w.kind;
+  if vk = wk then begin
+    case vk of
+      pvkString: exit(v.toString = w.toString);
+      pvkBinary: exit( (v.typeAnnotation.base = w.typeAnnotation.base) and (v.toString = w.toString)) ;
+      pvkFloat:
+        exit(   (v.toFloat = w.toFloat)
+            or  (v.toFloat.IsNan() and w.toFloat.IsNan())
+        );
+      pvkInt64: exit(v.toInt64 = w.toInt64);
+      pvkBigDecimal: exit(v.toDecimal = w.toDecimal);
+      pvkDateTime:
+        if v.instanceOf(baseSchema.duration) <> w.instanceOf(baseSchema.duration) then exit(false)
+        else if not v.instanceOf(baseSchema.duration) and (v.getInternalDateTimeData.hasTimeZone <> w.getInternalDateTimeData.hasTimeZone) then
+          exit(false);
+      pvkBoolean, pvkQName: {fallthrough};
+      else exit(false);
+    end;
+  end else begin
+    if v.hashCode <> w.hashCode then exit(false);
+    case vk of
+      pvkFloat: if not (v.toFloat.isFinite) then exit(false);
+      pvkInt64, pvkBigDecimal: {fallthrough};
+      else exit(false)
+    end;
+    case wk of
+      pvkFloat: if not (w.toFloat.isFinite) then exit(false);
+      pvkInt64, pvkBigDecimal: {fallthrough};
+      else exit(false)
+    end;
+    case vk of
+      pvkInt64: case wk of
+        pvkFloat: exit(compareIntToFloat(v.toInt64, w.toFloat));
+        pvkBigDecimal: exit(compareIntToBCD(v.toInt64, w.toDecimal));
+        else ;
+      end;
+      pvkBigDecimal: case wk of
+        pvkFloat: exit(compareFloatToBCD(w.toFloat, v.toDecimal));
+        pvkInt64: exit(compareIntToBCD(w.toInt64, v.toDecimal));
+        else ;
+      end;
+      pvkFloat: case wk of
+        pvkInt64: exit(compareIntToFloat(w.toInt64, v.toFloat));
+        pvkBigDecimal: exit(compareFloatToBCD(v.toFloat, w.toDecimal));
+        else ;
+      end;
+      else ;
+    end;
+    exit(false);
+  end;
+  result := GlobalInterpretedNativeFunctionStaticContext.equalDeepAtomic(v,w,nil);
+end;
+
+class function TXQValueOwnershipTracker.isStringKeyLike(const v: TXQValue): boolean;
+begin
+  result := (v.kind = pvkString) and (v.instanceOf(baseSchema.string_) or v.instanceOf(baseSchema.untypedAtomic) or v.instanceOf(baseSchema.anyURI))
+end;
+
+class function TXQValueOwnershipTracker.isAtomicKeyValue(const v: IXQValue): boolean;
+begin
+  case v.kind of
+    pvkSequence, pvkNode, pvkArray, pvkFunction, pvkObject, pvkUndefined: result := false;
+    else result := true;
+  end;
+end;
+
+{$ImplicitExceptions on}
+
 
 
 function xqvalueDeep_equal(const context: TXQEvaluationContext; const a, b: IXQValue; collation: TXQCollation): boolean;
@@ -4907,11 +5141,27 @@ function xqvalueDeep_equal(const context: TXQEvaluationContext; const a, b: IXQV
     raise EXQEvaluationException.create('FOTY0015', 'Function item ' + v.toXQuery() + ' passed to deep-equal')
   end;
 
+  function compareStandardMapToStringMap(standardMap: PIXQValue; stringMap: PIXQValue): boolean;
+  var
+    pp2: TXQStandardProperty;
+    k, tempv: TXQValue;
+  begin
+    result := true;
+    for pp2 in standardMap.getEnumeratorPropertiesUnsafe do begin
+      k := pp2.key.toValue;
+      if not TXQValueOwnershipTracker.isStringKeyLike(k) then
+        exit(false);
+      if not stringMap.hasProperty(k.toString, @tempv) then exit(false)
+      else if not xqvalueDeep_equal(context, pp2.Value, tempv, collation) then exit(false);
+    end;
+  end;
+
 var i, j:integer;
     enum1, enum2, enum1array, enum2array: TXQValueEnumeratorPtrUnsafe;
     pa, pb: PIXQValue;
     tempv: TXQValue;
     pp: TXQProperty;
+    pp2: TXQStandardProperty;
 begin
   if a.getSequenceCount <> b.getSequenceCount then
     exit(false);
@@ -4940,9 +5190,26 @@ begin
       pvkObject: begin
         if pa.kind <> pvkObject then exit(false);
         if pa.Size <> pb.Size then exit(false);
-        for pp in pa.getPropertyEnumerator do
-          if not pb.hasProperty(pp.Name, @tempv) then exit(false)
-          else if not xqvalueDeep_equal(context, pp.Value, tempv, collation) then exit(false);
+        case pa.getPropertyKeyKind of
+          xqmpkkStringKeys:
+            case pb.getPropertyKeyKind of
+              xqmpkkStringKeys:
+                for pp in pa.getEnumeratorStringPropertiesUnsafe do
+                  if not pb.hasProperty(pp.key, @tempv) then exit(false)
+                  else if not xqvalueDeep_equal(context, pp.Value, tempv, collation) then exit(false);
+              xqmpkkStandardKeys:
+                result := compareStandardMapToStringMap(pb, pa);
+            end;
+          xqmpkkStandardKeys:
+            case pb.getPropertyKeyKind of
+              xqmpkkStringKeys:
+                result := compareStandardMapToStringMap(pa, pb);
+              xqmpkkStandardKeys:
+                for pp2 in pa.getEnumeratorPropertiesUnsafe do
+                  if not pb.hasProperty(pp2.key, @tempv) then exit(false)
+                  else if not xqvalueDeep_equal(context, pp2.Value, tempv, collation) then exit(false);
+            end;
+        end;
       end
       else begin
         if pa.instanceOf(baseSchema.AnyAtomicType) then begin
@@ -4953,6 +5220,7 @@ begin
           case pa.kind of
             pvkFunction: raiseFOTY0015(pa^);
             pvkObject, pvkArray: exit(false);
+            else ;
           end;
           if collation = nil then
             collation := context.staticContext.nodeCollation;
@@ -4967,44 +5235,29 @@ begin
   result := true;
 end;
 
-function xqfloatRounded(f: xqfloat; prec: integer = 0): xqfloat;
-var
-  ff: xqfloat;
-  p: math.float;
-begin
-  if IsNan(f) or IsInfinite(f) then exit((f));
-  if prec = 0 then begin
-    ff := frac(f);
-    if ff = 0 then exit((f));
-    f := f + 0.5;
-    ff := frac(f);
-    if ff >= 0 then result := (f - ff)
-    else result := (f - ff - 1);
-  end else begin
-    p := power(10, prec);
-    result := xqfloatRounded(f / p) * p;
-  end;
-
-end;
 
 procedure xpathRangeDefinition(argc: sizeint; args: PIXQValue; const maxLen: longint; out from, len: integer);
 var unti: integer;  //excluding last
   temp: BigDecimal;
-  temp64: Int64;
+  temp64: SizeInt64;
+  f: xqfloat;
 begin
   case args[1].kind of
     pvkInt64: from := args[1].toInt64;
     pvkFloat: begin
-      if IsNan(args[1].toFloat) or isPosInf(args[1].toFloat) then begin
-        len := 0;
-        exit;
-      end else if isNegInf(args[1].toFloat) then begin
-        from := 1;
-        if argc <= 2 then len := maxLen
-        else len := 0;
-        exit;
-      end;
-      from := round(xqfloatRounded(args[1].toFloat));
+      f := args[1].toFloat;
+      if f.isFinite() then
+        from := round(f.round())
+       else if f.IsNegativeInfinity() then begin
+         from := 1;
+         if argc <= 2 then len := maxLen
+         else len := 0;
+         exit;
+       end else begin //+inf, nan
+         from := 1;
+         len := 0;
+         exit;
+       end;
     end;
     {pvkBigDecimal:}else begin
       temp := round(args[1].toDecimal);
@@ -5028,11 +5281,14 @@ begin
         else unti := from + temp64;
       end;
       pvkFloat: begin
-        if IsNan(args[2].toFloat) or isNegInf(args[2].toFloat) then begin //Since -INF + INF returns NaN, no characters are selected.
-           len := 0;
-           exit();
-        end else if isPosInf(args[2].toFloat) then unti := maxLen+1
-        else unti := from + round(xqfloatRounded(args[2].toFloat));
+        f := args[2].toFloat;
+        if f.isFinite() then
+          unti := from + round(f.round)
+        else if f.IsPositiveInfinity then unti := maxLen+1
+        else begin //nan, -inf
+          len := 0;
+          exit;
+        end;
       end;
       else begin
         temp := round(args[2].toDecimal);
@@ -5058,6 +5314,7 @@ begin
     case args[i].kind of
       pvkSequence: if args[i].getSequenceCount > 1 then raiseXPTY0004TypeError(args[i], 'singleton');
       pvkFunction: raiseFOTY0013TypeError(args[i]);
+      else;
     end;
     temp+=args[i].toString;
   end;
@@ -5094,11 +5351,10 @@ begin
   if not hasVariable(variable, oldObj, namespaceURL) then
     raise EXQEvaluationException.Create('pxp:OBJECT', 'Failed to find object variable '+variable+LineEnding+'(when changing properties: '+strJoin(props, len, '.')+')');
 
-
-  if not (oldObj is TXQValueObject) then begin
-    if not (oldObj is TXQValueJSONArray) then raise EXQEvaluationException.Create('pxp:OBJECT', 'Variable '+variable+' is not an object or array, but '+oldObj.toXQuery()+LineEnding+'(when changing properites: '+strJoin(props, len, '.')+')');
-    newValue := (oldObj as TXQValueJSONArray).setImmutable(props, len, value);
-  end else newValue := (oldObj as TXQValueObject).setImmutable(props, len, value);
+  case oldObj.kind of
+    pvkArray, pvkObject: newValue := oldObj.toValue.setImmutable(props, len, value);
+    else raise EXQEvaluationException.Create('pxp:OBJECT', 'Variable '+variable+' is not an object or array, but '+oldObj.toXQuery()+LineEnding+'(when changing properites: '+strJoin(props, len, '.')+')');
+  end;
 
   reserve(count + 1);
 
@@ -5108,6 +5364,15 @@ begin
   varstorage[count].propertyChange := true;
 
   inc(varcount);
+end;
+
+function TXQVariableChangeLog.toStringMap: TXQValueStringMap;
+var
+  i: Integer;
+begin
+  result := TXQValueStringMap.create();
+  for i := 0 to count - 1 do
+    result.setMutable(getName(i), get(i));
 end;
 
 procedure TXQVariableChangeLog.add(const name: string; const value: string);
@@ -5538,7 +5803,6 @@ begin
 end;
 
 
-
 procedure TXQEvaluationStack.push(const value: ixqvalue);
 begin
   if fcount >= fcapacity then
@@ -5548,7 +5812,7 @@ begin
   fcount += 1;
 end;
 
-procedure TXQEvaluationStack.pop;
+procedure TXQEvaluationStack.pop();
 begin
   assert(fcount > 0);
   fbuffer[fcount-1] := nil;
@@ -5588,18 +5852,17 @@ begin
   push(v);
 end;
 
+procedure TXQEvaluationStack.failTop(const name: TXQTermVariable; i: integer);
+begin
+  raise EXQEvaluationException.create('pxp:INTERNAL','Stack name mismatch: '+debugNames[count - i - 1]+' <> '+name.value);
+end;
 function TXQEvaluationStack.top(const name: TXQTermVariable; i: integer): IXQValue;
-  procedure fail;
-  begin
-    raise EXQEvaluationException.create('pxp:INTERNAL','Stack name mismatch: '+debugNames[count - i - 1]+' <> '+name.value);
-  end;
-
 begin
   result := top(i);
   {$ifdef TRACK_STACK_VARIABLE_NAMES}
   if not strEqual(debugNames[count - i - 1], name.value)
   //   and (debugNames[count - i - 1][1] <> '0') {and (v.namespace = XMLNamespaceURL_MyExtensionOperators}
-     then fail;
+     then failTop(name, i);
 
   {$endif}
 end;
@@ -5673,7 +5936,7 @@ procedure TXQJsonParser.setConfigFromMap(const map: IXQValue);
 
   procedure checkType(const v: TXQValue; t: TXSType);
   begin
-    if (v.getSequenceCount <> 1) or not (v.instanceOf(t)) then
+    if (v.getSequenceCount <> 1) or (not v.instanceOf(t) and not (v.instanceOf(baseSchema.untypedAtomic)) and (v.kind <> pvkNode)) then
       raiseInvalidParam;
   end;
 var vo: TXQValue;
@@ -5700,6 +5963,7 @@ begin
     if (jpoEscapeCharacters in options) then
       raise EXQEvaluationException.create('FOJS0005', 'fallback can''t be used with escape', nil, map);
     escapeFunction := vo as TXQValueFunction;
+    if length(escapeFunction.parameters) <> 1 then raiseInvalidParam();
   end;
   if jpoJSONiq in options then begin
     if map.hasProperty('jsoniq-multiple-top-level-items', @vo) then begin
@@ -5718,6 +5982,7 @@ function TXQJsonParser.parse(argc: SizeInt; args: PIXQValue): IXQValue;
 begin
   if (argc = 2) then
     setConfigFromMap(args[1]);
+  if args[0].isUndefined then exit(xqvalue);
   result := parse(args[0].toString);
 end;
 
@@ -5775,8 +6040,8 @@ var
         case scanner.CurTokenString of
           'INF', 'Inf', 'inf', 'INFINITY', 'Infinity', 'infinity':
             case tempchar of
-              '+': exit(xqvalue(getPosInf)); //this actually never happens, because + is parsed as tkWhitespace rather than tkNumber
-              '-': exit(xqvalue(getNegInf));
+              '+': exit(xqvalue(xqfloat.PositiveInfinity)); //this actually never happens, because + is parsed as tkWhitespace rather than tkNumber
+              '-': exit(xqvalue(xqfloat.NegativeInfinity));
             end;
         end;
     end;
@@ -5835,12 +6100,12 @@ var containerStack: array of TXQValue;
         parsingPhase := jppArrayExpectComma;
       end;
       jppObjectExpectValue: begin
-        if currentContainer.ClassType <> TXQValueObject then raiseError();
+        if currentContainer.ClassType <> TXQValueStringMap then raiseError();
         parsingPhase := jppObjectExpectComma;
-        if (duplicateResolve <> xqmdrUseLast) and TXQValueObject(currentContainer).hasProperty(objectKey, nil) then
+        if (duplicateResolve <> xqmdrUseLast) and TXQValueStringMap(currentContainer).hasProperty(objectKey, nil) then
           if duplicateResolve = xqmdrUseFirst then exit
           else raiseError('Duplicate key', 'FOJS0003');
-        TXQValueObject(currentContainer).setMutable(objectKey, v);
+        TXQValueStringMap(currentContainer).setMutable(objectKey, v);
       end;
       jppRoot: begin
         hadResult := (result <> nil);
@@ -5978,7 +6243,7 @@ begin
         end;
         //tkColon,                 // ':'
         tkCurlyBraceOpen: begin
-          pushValue(pushContainer(TXQValueObject.create()));
+          pushValue(pushContainer(TXQValueStringMap.create()));
           setCurrentContainer;
           case nextToken of
             tkCurlyBraceClose: popContainer;
@@ -6009,8 +6274,8 @@ begin
           if jpoLiberal in options then begin
             if parsingPhase = jppObjectExpectKey then readObjectKey
             else case scanner.CurTokenString of
-              'INF', 'Inf', 'inf', 'INFINITY', 'Infinity', 'infinity': pushValue(xqvalue(getPosInf));
-              'NAN', 'NaN', 'nan': pushValue(xqvalue(getNaN));
+              'INF', 'Inf', 'inf', 'INFINITY', 'Infinity', 'infinity': pushValue(xqvalue(xqfloat.PositiveInfinity));
+              'NAN', 'NaN', 'nan': pushValue(xqvalue(xqfloat.NaN));
               else raiseError();
             end;
           end else raiseError();
@@ -6024,11 +6289,14 @@ begin
     if containerCount > 0 then begin
       for i := containerCount - 1 downto 0 do //this prevents a crash on deeply nested invalid inputs in nst's JSONTestSuite. Still could not be used for valid inputs as the recursive free crashes later.
         if containerStack[i].ClassType = TXQValueJSONArray then TXQValueJSONArray(containerStack[i]).seq.clear
-        else TXQValueObject(containerStack[i]).values.clear;
+        else TXQValueStringMap(containerStack[i]).mapdata.clear;
       raiseError('unclosed');
     end;
 
-    if result = nil then result := xqvalue;
+    if result = nil then begin
+     if not (jpoLiberal in options) then raiseError('No data');
+      result := xqvalue;
+    end;
   finally
     //for i := 0 to containerCount - 1 do containerStack[i]._Release;
     scanner.free;
@@ -6145,7 +6413,7 @@ begin
   if data <> nil then t += ' ; got: ' + data.toXQuery();
   raise EXQEvaluationException.create(code, t);
 end;
-procedure raiseInternalError(const s: string);
+procedure raiseInternalError(const s: string); noreturn;
 begin
   raise EXQEvaluationException.create('pxp:INTERNAL', 'Internal error: ' + s);
 end;
@@ -6277,6 +6545,7 @@ begin
     result.strictTypeChecking:=strictTypeChecking;
     Result.useLocalNamespaces:=useLocalNamespaces;
     result.jsonPXPExtensions := jsonPXPExtensions;
+    result.AllowJSONiqOperations := AllowJSONiqOperations;
     if decimalNumberFormats <> nil then begin
       result.decimalNumberFormats:= TFPList.Create;
       for i := 0 to decimalNumberFormats.Count - 1 do
@@ -6285,6 +6554,7 @@ begin
     if result.temporaryNodes <> nil then result.temporaryNodes.release;
     result.temporaryNodes := temporaryNodes;
     if temporaryNodes <> nil then temporaryNodes.addRef;
+    result.serializationOptions:=serializationOptions;
   end;
 end;
 
@@ -6463,102 +6733,33 @@ end;
 
 
 
-function TXQStaticContext.compareCommon(a, b: TXQValue; overrideCollation: TXQCollation; castUnknownToString: boolean): integer;
+function TXQStaticContext.compareCommon(a, b: TXQValue; overrideCollation: TXQCollation; castUnknownToString: boolean): TXQCompareResult;
 var ak, bk: TXQValueKind;
-  function compareCommonFloat(): integer;
+  function compareCommonFloat(): TXQCompareResult;
   var
     cmpClass: TXSType;
     ad, bd: xqfloat;
   begin
-    if ((ak = pvkFloat) and IsNan(TXQValueFloat(a).value)) or ((bk = pvkFloat) and IsNan(TXQValueFloat(b).value)) then
-      exit(-2);
+    if ((ak = pvkFloat) and TXQValueFloat(a).value.IsNan()) or ((bk = pvkFloat) and TXQValueFloat(b).value.IsNan()) then
+      exit(xqcrNaN);
     cmpClass := TXSType.commonDecimalType(a, b);
     ad := a.toFloatChecked(Self);
     bd := b.toFloatChecked(self);
     if cmpClass.derivedFrom(baseSchema.Double) then begin
-      result := compareValue(double(ad), double(bd));
+      result := xqfloat(ad).compare((bd));
     end else if cmpClass.derivedFrom(baseSchema.Float) then begin
-      result := compareValue(Single(ad), Single(bd));
+      result := xqfloat(single(ad)).compare(Single(bd));
     end else
-      result := -2; //should not happen, but hides warning
+      result := xqcrIncomparable; //should not happen, but hides warning
   end;
 
-  function compareCommonAsStrings(): integer;
-    function compareStrSignCapped(const sa, sb: string): integer;
-    begin
-      result := CompareStr(sa, sb);
-      if result <> 0 then
-        if result < 0 then result := -1
-        else result := 1
-    end;
-
-    function compareCommonAsBinary(): integer;
-    var sa, sb, temp: string;
-        at, bt: (tBase64, tHex, tUntyped, tOther);
-    begin
-      sa := '';
-      sb := '';
-      if a.typeAnnotation <> b.typeAnnotation then begin
-        if a.instanceOf(baseSchema.base64Binary) then at := tBase64
-        else if a.instanceOf(baseSchema.hexBinary) then at := tHex
-        else if a.instanceOf(baseSchema.untypedAtomic) then at := tUntyped
-        else at := tOther;
-        if b.instanceOf(baseSchema.base64Binary) then bt := tBase64
-        else if b.instanceOf(baseSchema.hexBinary) then bt := tHex
-        else if b.instanceOf(baseSchema.untypedAtomic) then bt := tUntyped
-        else bt := tOther;
-
-        result := 0;
-        if (at = tUntyped) or (bt = tUntyped) then begin
-          try
-            if at = tUntyped then temp := a.toString
-            else temp := b.toString;
-            if (at = tBase64) or (bt = tBase64) then temp := base64.DecodeStringBase64(temp)
-            else begin
-              if length(temp) and 1 = 1 then exit(-2);
-              temp := temp.DecodeHex;
-            end;
-            if at = tUntyped then sa := temp
-            else sb := temp;
-          except
-            on e: Exception do exit(-2); {StreamError for base64, exception for hex}
-          end;
-        end else if ((at = tHex) and (bt = tHex)) or ((at = tBase64) and (bt = tBase64)) then begin
-         //okay
-        end else begin
-          if strictTypeChecking then raiseXPTY0004TypeError(a, 'binary like ' + b.toXQuery);
-          exit(-2);
-        end;
-      end;
-      if sa = '' then sa := (a as TXQValueString).toRawBinary;
-      if sb = '' then sb := (b as TXQValueString).toRawBinary;
-      result := compareStrSignCapped(sa, sb);
-      //todo: less-than/greater-than should raise exception unless 3.1 mode is enabled
-    end;
-
+  function compareCommonAsStrings(): TXQCompareResult;
   begin
-    if    a.instanceOf(baseSchema.base64Binary) or a.instanceOf(baseSchema.hexBinary)
-       or b.instanceOf(baseSchema.base64Binary) or b.instanceOf(baseSchema.hexBinary)
-    then exit(compareCommonAsBinary());
-
     if overrideCollation = nil then begin
       overrideCollation := collation;
-      if overrideCollation = nil then exit(compareStrSignCapped(a.toString, b.toString));
+      if overrideCollation = nil then exit(TXQCompareResult.fromIntegerResult(compareStr(a.toString, b.toString)));
     end;
     result := overrideCollation.compare(a.toString, b.toString)
-  end;
-  function compareBooleans(const ab, bb: boolean): integer; inline;
-  begin
-    if ab = bb then result := 0
-    else if ab then result := 1
-    else result := -1;
-  end;
-
-  function compareInts(delta: int64): integer;inline;
-  begin
-    if delta = 0 then exit(0)
-    else if delta < 0 then exit(-1)
-    else exit(1);
   end;
 
   function vtodecimalstr(k: TXQValueKind; v: txqvalue): string; //faster implementation of cast, mixed with vtod
@@ -6579,7 +6780,7 @@ var ak, bk: TXQValueKind;
       end
     end;
   end;
-  function compareAsBigDecimals: integer;
+  function compareAsBigDecimals: TXQCompareResult;
   var bda, bdb: BigDecimal;
       temps: string;
   begin
@@ -6601,45 +6802,49 @@ var ak, bk: TXQValueKind;
           else raiseFORG0001InvalidConversion(b, 'decimal');
       end;
     end;
-    result := compareBigDecimals(bda, bdb);
+    result := TXQCompareResult.fromIntegerResult(compareBigDecimals(bda, bdb));
   end;
-  function compareAsBigDecimals(const i: TXQValue; const s: string): integer;
+  function compareAsBigDecimals(const i: TXQValue; const s: string): TXQCompareResult;
   var
     temp: BigDecimal;
   begin
     if not tryStrToBigDecimal(s, @temp) then
       if strContains(s, 'N') then exit(compareCommonFloat())
       else raiseFORG0001InvalidConversion(xqvalue(s), 'decimal');
-    result := compareBigDecimals(i.toInt64, temp);
+    result := TXQCompareResult.fromIntegerResult(compareBigDecimals(i.toInt64, temp));
   end;
 
-  function compareAsPossibleInt64: integer; //assumption ak != bk; ak, bk != pvkBigDecimal
+  function compareAsPossibleInt64: TXQCompareResult; //assumption ak != bk; ak, bk != pvkBigDecimal
   const MaxInt64LogDec = 18;
   var
-    temp: Int64;
     s: String;
+    temp: int64;
   begin
     if ak = pvkInt64 then begin
       s := vtodecimalstr(bk, b);
       if (length(s) >= MaxInt64LogDec) or not TryStrToInt64(s, temp) then exit(compareAsBigDecimals(a, s));
-      temp := TXQValueInt64(a).value - temp;
+      result := TXQCompareResult.compare( TXQValueInt64(a).value, temp);
     end else if bk = pvkInt64 then begin
       s := vtodecimalstr(ak, a);
-      if length(s) >= MaxInt64LogDec then exit(-compareAsBigDecimals(b, s));
+      if length(s) >= MaxInt64LogDec then exit(compareAsBigDecimals(b, s).inverted());
         if (length(s) >= MaxInt64LogDec) or not TryStrToInt64(s, temp) then
           if strContains(s, 'N') then exit(compareCommonFloat())
-          else exit(-compareAsBigDecimals(b, s));
-      temp := temp - TXQValueInt64(b).value;
-    end else begin raisePXPInternalError; temp := 0; end;
-    result := compareInts(temp);
+          else exit(compareAsBigDecimals(b, s).inverted());
+      result := TXQCompareResult.compare(temp,  TXQValueInt64(b).value);
+    end else begin raisePXPInternalError; result := xqcrIncomparable; end;
   end;
 
-  function getFirst(const seq: TXQValue): txqvalue;
+  function compareMultiple(enuma, enumb: TXQValueEnumeratorPtrUnsafe): TXQCompareResult;
   begin
-    result := seq.get(1).toValue;
+    if not enuma.MoveNext then exit(xqcrEmptySequence);
+    if not enumb.MoveNext then exit(xqcrEmptySequence);
+    result := compareCommon(enuma.Current.toValue, enumb.Current.toValue, overrideCollation, castUnknownToString);
+    if enuma.MoveNext then raiseXPTY0004TypeError(a, 'singleton');
+    if enumb.MoveNext then raiseXPTY0004TypeError(b, 'singleton');
   end;
 
-  function compareCommonEqualKind(): integer;
+
+  function compareCommonEqualKind(): TXQCompareResult;
   var
     adate: PXQValueDateTimeData;
     bdate: PXQValueDateTimeData;
@@ -6647,39 +6852,37 @@ var ak, bk: TXQValueKind;
 
     case ak of
       pvkBoolean:
-        result := compareBooleans(TXQValueBoolean(a).bool, TXQValueBoolean(b).bool);
+        result := TXQCompareResult.compare(TXQValueBoolean(a).bool, TXQValueBoolean(b).bool);
       pvkInt64:
-        result := compareInts(TXQValueInt64(a).value - TXQValueInt64(b).value);
+        result := TXQCompareResult.compare(TXQValueInt64(a).value, TXQValueInt64(b).value);
       pvkBigDecimal: result := compareAsBigDecimals();
       pvkFloat: result := compareCommonFloat();
       pvkDateTime: begin
-        if (a.typeAnnotation.derivedFrom(baseSchema.duration)) <> (b.typeAnnotation.derivedFrom(baseSchema.duration)) then exit(-2);
+        if (a.typeAnnotation.derivedFrom(baseSchema.duration)) <> (b.typeAnnotation.derivedFrom(baseSchema.duration)) then exit(xqcrIncomparable);
         adate := @TXQValueDateTime(a).value;
         bdate := @TXQValueDateTime(b).value;
         if a.typeAnnotation.derivedFrom(baseSchema.duration) and b.typeAnnotation.derivedFrom(baseSchema.duration) then begin
-          result := compareValue(adate^.toMonths(), bdate^.toMonths());
-          if result <> 0 then exit;
-          result := compareValue(adate^.toDayTime(), bdate^.toDayTime());
+          result := TXQCompareResult.compare(adate^.toMonths(), bdate^.toMonths());
+          if result <> xqcrEqual then exit;
+          result := TXQCompareResult.compare(adate^.toDayTime(), bdate^.toDayTime());
         end else //result := compareValue(TXQValueDateTime(a).toDateTime, TXQValueDateTime(b).toDateTime);
           result := TXQValueDateTime.compare(TXQValueDateTime(a),TXQValueDateTime(b),ImplicitTimezoneInMinutes);
       end;
       pvkQName: begin
-        result := -2;
+        result := xqcrIncomparable;
         if (a.instanceOf(baseSchema.QName) and b.instanceOf(baseSchema.QName))
            or (a.instanceOf(baseSchema.NOTATION) and b.instanceOf(baseSchema.NOTATION)) then
           if (TXQValueQName(a).url = TXQValueQName(b).url) and (TXQValueQName(a).local = TXQValueQName(b).local) then //ignore prefix
-            result := 0
+            result := xqcrEqual;
       end;
-      pvkNull: result := 0;
-      pvkUndefined: result := -2;
+      pvkNull: result := xqcrEqual;
+      pvkUndefined: result := xqcrEmptySequence;
       pvkNode, pvkString: result := compareCommonAsStrings;
-      pvkSequence: begin
-        if a.getSequenceCount <> 1 then raiseXPTY0004TypeError(a, 'singleton');
-        if b.getSequenceCount <> 1 then raiseXPTY0004TypeError(b, 'singleton');
-        result := compareCommon(getFirst(a), getFirst(b), overrideCollation, castUnknownToString);
-      end;
-      pvkFunction: raise EXQEvaluationException.create('FOTY0013', 'Functions are incomparable')
-      else begin result := -2; raisePXPInternalError; end;
+      pvkBinary: result := TXQValueBinary.compare(a, b);
+      pvkSequence: result := compareMultiple(a.GetEnumeratorPtrUnsafe, b.GetEnumeratorPtrUnsafe);
+      pvkFunction: raise EXQEvaluationException.create('FOTY0013', 'Functions are incomparable');
+      pvkArray: result := compareMultiple(a.GetEnumeratorMembersPtrUnsafe, b.GetEnumeratorMembersPtrUnsafe);
+      else begin result := xqcrIncomparable; raisePXPInternalError; end;
     end;
   end;
 
@@ -6711,24 +6914,22 @@ begin
   ak := a.kind; bk := b.kind;
   if ak = bk then exit(compareCommonEqualKind());
   case ak of
-    pvkUndefined: exit(-2);
-    pvkSequence: begin
-      if a.getSequenceCount <> 1 then raiseXPTY0004TypeError(a, 'singleton');
-      exit(compareCommon(getFirst(a),b,overrideCollation,castUnknownToString));
-    end;
+    pvkUndefined: exit(xqcrEmptySequence);
+    pvkSequence: exit(compareMultiple(a.GetEnumeratorPtrUnsafe, b.GetEnumeratorPtrUnsafe));
     pvkString, pvkNode: if bk in [pvkString, pvkNode] then exit(compareCommonEqualKind());
     pvkFunction: raise EXQEvaluationException.create('FOTY0013', 'Functions are incomparable');
+    pvkArray: exit(compareMultiple(a.GetEnumeratorMembersPtrUnsafe, b.GetEnumeratorPtrUnsafe));
+    else;
   end;
   case bk of
-    pvkUndefined: exit(-2);
-    pvkSequence: begin
-      if b.getSequenceCount <> 1 then raiseXPTY0004TypeError(b, 'singleton');
-      exit(compareCommon(a,getFirst(b),overrideCollation,castUnknownToString));
-    end;
-    pvkNull: exit(1);
-    pvkFunction: raise EXQEvaluationException.create('FOTY0013', 'Functions are incomparable')
+    pvkUndefined: exit(xqcrEmptySequence);
+    pvkSequence: exit(compareMultiple(a.GetEnumeratorPtrUnsafe, b.GetEnumeratorPtrUnsafe));
+    pvkNull: exit(xqcrGreaterThan);
+    pvkFunction: raise EXQEvaluationException.create('FOTY0013', 'Functions are incomparable');
+    pvkArray: exit(compareMultiple(a.GetEnumeratorPtrUnsafe, b.GetEnumeratorMembersPtrUnsafe));
+    else;
   end;
-  if ak = pvkNull then exit(-1); //can only test this after checkin b's sequence state
+  if ak = pvkNull then exit(xqcrLessThan); //can only test this after checkin b's sequence state
   if castUnknownToString and ( (ak in [pvkString, pvkNode]) or (bk in [pvkString, pvkNode]) ) then
     exit(compareCommonAsStrings());
   if strictTypeChecking then begin
@@ -6779,30 +6980,29 @@ begin
   exit(compareCommonAsStrings());
 end;
 
-function TXQStaticContext.compareAtomic(a, b: TXQValue; overrideCollation: TXQCollation): integer;
+function TXQStaticContext.compareAtomic(a, b: TXQValue; overrideCollation: TXQCollation): TXQCompareResult;
 begin
   result := compareCommon(a, b, overrideCollation, true);
 end;
 
-function TXQStaticContext.compareAtomic(const a, b: IXQValue; overrideCollation: TXQCollation): integer;
+function TXQStaticContext.compareAtomic(const a, b: IXQValue; overrideCollation: TXQCollation): TXQCompareResult;
 begin
   result := compareAtomic(a.toValue, b.toValue, overrideCollation);
 end;
 
-procedure TXQStaticContext.compareAtomic(const a, b: IXQValue; out result: IXQValue; accept1: integer; accept2: integer);
+procedure TXQStaticContext.compareAtomic(const a, b: IXQValue; out result: IXQValue; accept1: TXQCompareResult; accept2: TXQCompareResult);
 var
- compres: Integer;
+ compres: TXQCompareResult;
 begin
-  if not (a.kind in [pvkUndefined]) and not (b.kind in [pvkUndefined]) then begin
-    compres := compareAtomic(a,b, nil);
-    result := xqvalue((compres = accept1) or (compres = accept2) );
-  end else
-    result := xqvalue();
+  compres := compareAtomic(a,b, nil);
+  if (compres = accept1) or (compres = accept2) then result := xqvalueTrue
+  else if compres = xqcrEmptySequence then result := xqvalue
+  else result := xqvalueFalse;
 end;
 
 function TXQStaticContext.equalAtomic(a, b: TXQValue; overrideCollation: TXQCollation): boolean;
 begin
-  result:=compareAtomic(a,b,overrideCollation)=0;
+  result:=compareAtomic(a,b,overrideCollation)=xqcrEqual;
 end;
 
 function TXQStaticContext.equalAtomic(const a, b: IXQValue; overrideCollation: TXQCollation): boolean;
@@ -6810,70 +7010,79 @@ begin
   result := equalAtomic(a.toValue,b.toValue,overrideCollation);
 end;
 
-function TXQStaticContext.compareGeneral(const a, b: TXQValueEnumeratorPtrUnsafe; overrideCollation: TXQCollation; accept1: integer; accept2: integer): boolean;
+function TXQStaticContext.compareGeneral(const a, b: TXQValueEnumeratorPtrUnsafe; overrideCollation: TXQCollation; accept1: TXQCompareResult; accept2: TXQCompareResult): boolean;
 var enum1, enum2: TXQValueEnumeratorPtrUnsafe;
-  compres: Integer;
+  compres: TXQCompareResult;
   va, vb: TXQValue;
 begin
   enum1 := a;
   while enum1.MoveNext do begin
     va := enum1.Current^.toValue;
-    if va.kind <> pvkArray then begin
-      enum2 := b;
-      while enum2.MoveNext do begin
-        vb := enum2.Current^.toValue;
-        if vb.kind <> pvkArray then begin;
-          compres := compareCommon(va, vb, overrideCollation, false);
-          result := (compres = accept1) or (compres = accept2);
-        end else result := compareGeneral(va.GetEnumeratorPtrUnsafe, (vb as TXQValueJSONArray).GetEnumeratorMembersPtrUnsafe, overrideCollation, accept1, accept2);;
+    case va.kind of
+      pvkArray: begin
+        result := compareGeneral( va.GetEnumeratorMembersPtrUnsafe, b, overrideCollation, accept1, accept2);
         if result then exit;
       end;
-    end else begin
-      result := compareGeneral( (va as TXQValueJSONArray).GetEnumeratorMembersPtrUnsafe, b, overrideCollation, accept1, accept2);
-      if result then exit;
-    end;
+      pvkSequence: begin
+        result := compareGeneral( va.GetEnumeratorPtrUnsafe, b, overrideCollation, accept1, accept2);
+        if result then exit;
+      end;
+      else
+        enum2 := b;
+        while enum2.MoveNext do begin
+          vb := enum2.Current^.toValue;
+          case vb.kind of
+            pvkArray: result := compareGeneral(va.GetEnumeratorPtrUnsafe, vb.GetEnumeratorMembersPtrUnsafe, overrideCollation, accept1, accept2);
+            pvkSequence: result := compareGeneral(va.GetEnumeratorPtrUnsafe, vb.GetEnumeratorPtrUnsafe, overrideCollation, accept1, accept2);
+            else
+              compres := compareCommon(va, vb, overrideCollation, false);
+              result := (compres = accept1) or (compres = accept2);
+          end;
+          if result then exit;
+        end;
+    end
   end;
   result := false;
 end;
 
-function TXQStaticContext.compareGeneral(a, b: TXQValue; overrideCollation: TXQCollation; accept1: integer; accept2: integer): boolean;
+function TXQStaticContext.compareGeneral(a, b: TXQValue; overrideCollation: TXQCollation; accept1: TXQCompareResult; accept2: TXQCompareResult): boolean;
 begin
   result := compareGeneral(a.GetEnumeratorPtrUnsafe, b.GetEnumeratorPtrUnsafe, overrideCollation,  accept1, accept2);
 end;
 
-function TXQStaticContext.compareGeneral(a, b: IXQValue; overrideCollation: TXQCollation; accept1: integer; accept2: integer): boolean;
+function TXQStaticContext.compareGeneral(a, b: IXQValue; overrideCollation: TXQCollation; accept1: TXQCompareResult; accept2: TXQCompareResult): boolean;
 begin
   result := compareGeneral(a.GetEnumeratorPtrUnsafe, b.GetEnumeratorPtrUnsafe, overrideCollation,  accept1, accept2);
 end;
 
-procedure TXQStaticContext.compareGeneral(a, b: IXQValue; out result: IXQValue; accept1: integer; accept2: integer);
+procedure TXQStaticContext.compareGeneral(a, b: IXQValue; out result: IXQValue; accept1: TXQCompareResult; accept2: TXQCompareResult);
 begin
   result := xqvalue(compareGeneral(a,b, nil, accept1,accept2));
 end;
 
-function TXQStaticContext.compareDeepAtomic(a, b: TXQValue; overrideCollation: TXQCollation): integer;
+function TXQStaticContext.compareDeepAtomic(a, b: TXQValue; overrideCollation: TXQCollation): TXQCompareResult;
 var
   ak: TXQValueKind;
   bk: TXQValueKind;
 begin
-  if not comparableTypes(a, b) then exit(-2); //todo:   nodes?
+  if not comparableTypes(a, b) then exit(xqcrIncomparable); //todo:   nodes?
 
   ak := a.kind; bk := b.kind;
   if ((ak = pvkFloat) and IsNan(TXQValueFloat(a).value)) then begin
-    if ((bk = pvkFloat) and IsNan(TXQValueFloat(b).value)) then exit(0)
-    else exit(-1); //randomly choosen
-  end else if ((bk = pvkFloat) and IsNan(TXQValueFloat(b).value)) then exit(1);
+    if ((bk = pvkFloat) and IsNan(TXQValueFloat(b).value)) then exit(xqcrEqual)
+    else exit(xqcrLessThan); //move NaNs first for fn:sort
+  end else if ((bk = pvkFloat) and IsNan(TXQValueFloat(b).value)) then exit(xqcrGreaterThan);
   result := compareAtomic(a,b,overrideCollation);
 end;
 
-function TXQStaticContext.compareDeepAtomic(const a, b: IXQValue; overrideCollation: TXQCollation): integer;
+function TXQStaticContext.compareDeepAtomic(const a, b: IXQValue; overrideCollation: TXQCollation): TXQCompareResult;
 begin
   result := compareDeepAtomic(a.toValue, b.toValue, overrideCollation);
 end;
 
 function TXQStaticContext.equalDeepAtomic(a, b: TXQValue; overrideCollation: TXQCollation): boolean;
 begin
-  result := compareDeepAtomic(a,b,overrideCollation) = 0;
+  result := compareDeepAtomic(a,b,overrideCollation) = xqcrEqual;
 {var
   ak: TXQValueKind;
   bk: TXQValueKind;
@@ -6896,7 +7105,7 @@ begin
   ak := a.kind;
   bk := b.kind;
   if ((ak in [pvkInt64, pvkFloat, pvkBigDecimal]) and (bk in [pvkInt64, pvkFloat, pvkBigDecimal]))
-     or ((ak = bk) and (ak in [pvkBoolean, pvkString])) then
+     or ((ak = bk) and (ak in [pvkBoolean, pvkString, pvkBinary])) then
     exit(true);
 
   ac := a.typeAnnotation;
@@ -7090,9 +7299,11 @@ end;
 function TXQuery.evaluate(var context: TXQEvaluationContext): IXQValue;
 var
   stackSize: Integer;
+  oldAllowJSONiqOperations: Boolean;
 begin
   if fterm = nil then exit(xqvalue());
   stackSize := context.temporaryVariables.Count;
+  oldAllowJSONiqOperations := globalCurrentQueryInfo.AllowJSONiqOperations;
   try
     if (context.staticContext <> nil) and (staticContext.importedModules = nil) and not objInheritsFrom(fterm, TXQTermModule) then begin
       //fast track. also we want to use the functions declared in the old static context
@@ -7102,10 +7313,22 @@ begin
       staticContext.temporaryNodes.release;
       staticContext.temporaryNodes := nil;
     end;
+    globalCurrentQueryInfo.AllowJSONiqOperations := staticContext.AllowJSONiqOperations;
     result := fterm.evaluate(context);
   finally
+    globalCurrentQueryInfo.AllowJSONiqOperations := oldAllowJSONiqOperations;
     context.temporaryVariables.popTo(stackSize);
   end;
+end;
+
+function TXQuery.evaluateInConstContext(const context: TXQEvaluationContext): IXQValue;
+var
+  temp: TXQStaticContext;
+begin
+  temp := context.staticContext;
+  //this can still destroy temporaryNodes. But it does not seem to matter?
+  result := evaluate((PXQEvaluationContext(@context))^);
+  (PXQEvaluationContext(@context))^.staticContext := temp;
 end;
 
 function TXQuery.evaluate(const contextItem: IXQValue): IXQValue;
@@ -7311,31 +7534,49 @@ end;
 { TXQAbstractFunctionInfo }
 
 class procedure TXQAbstractFunctionInfo.convertType(var result: IXQValue; const typ: TXQTermSequenceType; const context: TXQEvaluationContext; term: TXQTerm);
+  procedure checkSequenceCount;
+  begin
+    case result.getSequenceCount of
+    0:  if not typ.allowNone then term.raiseTypeError0004('Expected value, but got empty sequence.');
+    1: ; //ok
+    else if (not typ.allowMultiple) then
+      term.raiseTypeError0004('Expected singleton', result);
+    end;
+  end;
 
-  function conversionSingle(const w: IXQValue): IXQValue;
+  procedure convertFunctionTestSequence;
+  var
+    temp: IXQValue;
+    seq: TXQVList;
+    pv: PIXQValue;
+  begin
+    checkSequenceCount;
+    temp := result;
+    seq := TXQVList.create(temp.getSequenceCount);
+    result := TXQValueSequence.create(seq);
+    for pv in temp.GetEnumeratorPtrUnsafe do begin
+      case pv.kind of
+        pvkFunction:
+          if context.staticContext.strictTypeChecking then seq.add(typ.functionCoercion(pv^))
+          else seq.add(pv^);
+        pvkArray, pvkObject:
+          seq.add(typ.functionCoercion(pv^));
+        else
+          term.raiseTypeError0004('Expected function', pv^);
+      end;
+    end;
+    xqvalueSeqSqueeze(result);
+  end;
+
+  function atomizeAndCastSingle(const w: IXQValue): IXQValue;
   var
     t: TXSType;
     errCode: String;
   begin
+    //assert: w is not a sequence, node, function or array
     result := w;
-    if typ.kind = tikFunctionTest then begin
-      case w.kind of
-        pvkFunction:
-          if context.staticContext.strictTypeChecking then result := typ.functionCoercion(w);
-        pvkArray, pvkObject:
-          result := typ.functionCoercion(w);
-        else
-          term.raiseTypeError0004('Expected function', result);
-      end;
-      exit;
-    end;
-
-    t := result.typeAnnotation;
-    if t.derivedFrom(baseSchema.node) then begin
-      result := xqvalueAtomize(result);
-      t := result.typeAnnotation;
-    end;
     if typ.instanceOf(result, context) then exit;
+    t := w.typeAnnotation;
     if t.derivedFrom(baseSchema.UntypedAtomic) then begin
       if (typ.atomicTypeInfo.storage <> TXQValueQName) then exit(typ.castAs(result, context))
       else if context.staticContext.model in PARSING_MODEL3 then errCode := 'XPTY0117'
@@ -7352,73 +7593,95 @@ class procedure TXQAbstractFunctionInfo.convertType(var result: IXQValue; const 
 
   procedure convert;
   var
-    seq: TXQVList;
-    temp: IXQValue;
     p: PIXQValue;
+    seqResult: TXQValueSequence;
   begin
-    case result.getSequenceCount of
-    0:  if not typ.allowNone then term.raiseTypeError0004('Expected value, but got empty sequence.')
-        else exit;
-    1: ; //later
-    else if (not typ.allowMultiple) then
-      term.raiseTypeError0004('Expected singleton', result);
-  end;
-  case typ.kind of
-    tikAtomic, tikFunctionTest: begin
-      if result.kind <> pvkSequence then begin
-        result := conversionSingle(result);
-        exit;
+    case typ.kind of
+      tikAtomic: begin
+        result := xqvalueAtomize(result);
+        checkSequenceCount;
+        if typ.instanceOf(result, context) then exit;
+        if result.kind <> pvkSequence then result := atomizeAndCastSingle(result)
+        else begin
+          seqResult := TXQValueSequence.create(result.getSequenceCount);
+          for p in result.GetEnumeratorPtrUnsafe do
+            seqResult.seq.add(atomizeAndCastSingle(p^));
+          result := seqResult;
+        end;
       end;
-      temp := result;
-      seq := TXQVList.create(temp.getSequenceCount);
-      result := TXQValueSequence.create(seq);
-      for p in temp.GetEnumeratorPtrUnsafe do
-        seq.add(conversionSingle(p^));
+      else begin
+        checkSequenceCount;
+        //if typ.kind <> tikAny then
+        term.raiseTypeError0004('Expected '+typ.serialize, result);
+      end;
     end;
-    tikNone, tikElementTest: term.raiseTypeError0004('Expected '+typ.serialize, result);
-  end;
   end;
 
 begin
   if typ = nil then exit;
-  if (typ.kind <> tikFunctionTest) and typ.instanceOf(result, context) then exit;
-  convert;
+  if typ.kind <> tikFunctionTest then begin
+    if typ.instanceOf(result, context) then exit;
+    convert;
+  end else convertFunctionTestSequence;
 end;
 
 class function TXQAbstractFunctionInfo.checkType(const v: IXQValue; const typ: TXQTermSequenceType; const context: TXQEvaluationContext): boolean;
-  function checkSingle(const wpre: IXQValue): boolean;
-  var w: IXQValue;
+var atomicCount: integer;
+  function checkAtomicRecursion(const w: IXQValue): boolean;
+    function fullAtomization: boolean;
+    begin
+      result := checkAtomicRecursion(xqvalueAtomize(w));
+    end;
+
+  var
+    px: PIXQValue;
     st: TXSType;
   begin
-    if wpre.typeAnnotation.derivedFrom(baseSchema.node) then w := xqvalueAtomize(wpre)
-    else w := wpre;
-    if typ.instanceOf(w, context) then exit(true);
-    if (w.kind = pvkNull) and (typ.allowNone) then exit(true);
-    st := w.typeAnnotation;
-    if st.derivedFrom(baseSchema.UntypedAtomic) then begin
-      if typ.atomicTypeInfo.storage = TXQValueQName then exit(false); //XPTY0117
-      exit(typ.castableAs(w, context.staticContext))
+    case w.kind of
+      pvkSequence: begin
+        result := true;
+        for px in w.GetEnumeratorPtrUnsafe do
+          if not checkAtomicRecursion(px^) then
+            exit(false);
+      end;
+      pvkArray: begin
+        result := true;
+        for px in w.GetEnumeratorMembersPtrUnsafe do
+          if not checkAtomicRecursion(px^) then
+            exit(false);
+      end;
+      pvkNode: begin
+        //st := TXQValueNode.nodeTypeAnnotationForAtomic(w.toNode);
+        result := fullAtomization;
+        //checkNode(xqvalueAtomize(w));
+      end;
+      else
+        inc(atomicCount);
+        if typ.instanceOf(w, context) then exit(true);
+        if (w.kind = pvkNull) and (typ.allowNone) then exit(true); //???
+        st := w.typeAnnotation;
+        if st.derivedFrom(baseSchema.UntypedAtomic) then begin
+          if typ.atomicTypeInfo.storage = TXQValueQName then exit(false); //XPTY0117
+          exit(typ.castableAs(w, context.staticContext))
+        end;
+        if    (typ.atomicTypeInfo.derivedFrom(baseSchema.Double) and (st.derivedFrom(baseSchema.Float) or st.derivedFrom(baseSchema.Double)))
+          or ((st.derivedFrom(baseSchema.Decimal) and (typ.atomicTypeInfo.derivedFrom(baseSchema.Float) or typ.atomicTypeInfo.derivedFrom(baseSchema.Double) )) )
+          or (st.derivedFrom(baseSchema.AnyURI) and (typ.atomicTypeInfo.derivedFrom(baseSchema.string_))) then
+            exit(typ.castableAs(w, context.staticContext));
+        result := false;
     end;
-    if    (typ.atomicTypeInfo.derivedFrom(baseSchema.Double) and (st.derivedFrom(baseSchema.Float) or st.derivedFrom(baseSchema.Double)))
-       or ((st.derivedFrom(baseSchema.Decimal) and (typ.atomicTypeInfo.derivedFrom(baseSchema.Float) or typ.atomicTypeInfo.derivedFrom(baseSchema.Double) )) )
-       or (st.derivedFrom(baseSchema.AnyURI) and (typ.atomicTypeInfo.derivedFrom(baseSchema.string_))) then
-         exit(typ.castableAs(w, context.staticContext));
-    result := false;
   end;
 
-var
-  w: PIXQValue;
 begin
   if typ = nil then exit(true);
   if typ.instanceOf(v, context) then exit(true);
   result := false;
   if typ.kind = tikAtomic then begin
-    if v.kind <> pvkSequence then
-      exit(checkSingle(v));
-    if ((not typ.allowMultiple) and (v.getSequenceCount > 1)) then exit(false);
-    if ((not typ.allowNone) and (v.getSequenceCount = 0)) then exit(false);
-    for w in v.GetEnumeratorPtrUnsafe do
-      if not checkSingle(w^) then exit(false);
+    atomicCount := 0;
+    result := checkAtomicRecursion(v);
+    if not result then exit;
+    if ((not typ.allowMultiple) and (atomicCount > 1)) then exit(false);
+    if ((not typ.allowNone) and (atomicCount = 0)) then exit(false);
     result := true;
   end;
 end;
@@ -7580,90 +7843,6 @@ begin
   end;
 end;
 
-{ TXQCollation }
-
-constructor TXQCollation.Create(const aid: string);
-begin
-  id := aid;
-  if strBeginsWith(id, MY_NAMESPACE_PREFIX_URL) then id := strCopyFrom(id, length(MY_NAMESPACE_PREFIX_URL)+1);
-end;
-
-function TXQCollation.compare(const a, b: string): integer;
-begin
-  result := docompare(a,b);
-  if result <> 0 then
-    if result < 0 then result := -1
-    else result := 1;
-end;
-
-function TXQCollation.compare(a, b: pansichar; len: SizeInt): integer;
-begin
-  result := docompare(a,b,len);
-  if result <> 0 then
-    if result < 0 then result := -1
-    else result := 1;
-end;
-
-function TXQCollation.doCompare(a, b: pansichar; len: SizeInt): integer;
-var
-  i: Integer;
-begin
-  for i := 1 to len do begin
-    if a^ <> b^ then begin
-      if a^ < b^ then exit(-1)
-      else exit(1);
-    end;
-    inc(a);
-    inc(b);
-  end;
-  result := 0;
-end;
-
-function TXQCollation.doCompare(const a, b: string): integer;
-begin
-  if length(a) = length(b) then
-    result := compare(pchar(a), pchar(b), length(a))
-  else
-    result := length(a) - length(b);
-end;
-
-function TXQCollation.equal(const a, b: string): boolean;
-begin
-  result := compare(a,b) = 0;
-end;
-
-function TXQCollation.indexOf(const strToBeExaminated, searched: string): SizeInt;
-var
-  i: Integer;
-begin
-  for i:=1 to length(strToBeExaminated) - length(searched) + 1 do
-    if compare(@strToBeExaminated[i], @searched[1], length(searched)) = 0 then exit(i);
-  exit(0);
-end;
-
-function TXQCollation.contains(const strToBeExaminated, searched: string): boolean;
-begin
-  result := indexOf(strToBeExaminated, searched) >= 0
-end;
-
-function TXQCollation.startsWith(const strToBeExaminated, expectedStart: string): boolean;
-begin
-  result := (length(expectedStart) <= length(strToBeExaminated))
-           and (compare(@strToBeExaminated[1], @expectedStart[1], length(expectedStart)) = 0);
-end;
-
-function TXQCollation.endsWith(const strToBeExaminated, expectedEnd: string): boolean;
-begin
-  result := (length(expectedEnd) <= length(strToBeExaminated))
-            and (compare(@strToBeExaminated[length(strToBeExaminated) - length(expectedEnd) + 1], @expectedEnd[1], length(expectedEnd)) = 0);
-end;
-
-function TXQCollation.key(s: string): string;
-begin
-  ignore(s);
-  raiseXQEvaluationError('FOCH0004', 'Collation ' + id + ' cannot create collation keys.', nil);
-  result := '';
-end;
 
 
 
@@ -7871,7 +8050,7 @@ begin
   StaticContext := TXQStaticContext.Create;
   StaticContext.defaultFunctionNamespace := XMLNamespace_MyExtensionsMerged; XMLNamespace_MyExtensionsMerged._AddRef;
   StaticContext.sender := self;
-  StaticContext.collation := TXQCollation(collations.Objects[0]);
+  StaticContext.collation := internalDefaultCollation;
   StaticContext.emptyOrderSpec:=xqeoEmptyGreatest;
   StaticContext.defaultTypeNamespace := XMLNamespace_XMLSchema; XMLNamespace_XMLSchema._AddRef;
   StaticContext.copyNamespaceInherit:=true;
@@ -7886,7 +8065,11 @@ begin
   inc(threadLocalCache.runningEngines);
   FCreationThread := GetThreadID;
   DefaultJSONParser.init;
-  if AllowJSONDefaultInternal then DefaultJSONParser.options := [jpoAllowMultipleTopLevelItems, jpoLiberal, jpoAllowTrailingComma, jpoJSONiq];
+  if AllowJSONDefaultInternal then begin
+    DefaultJSONParser.options := [jpoAllowMultipleTopLevelItems, jpoLiberal, jpoAllowTrailingComma, jpoJSONiq];
+    StaticContext.AllowJSONiqOperations := true;
+    globalCurrentQueryInfo.AllowJSONiqOperations := true;
+  end;
 end;
 
 procedure threadSafetyViolated;
@@ -8108,9 +8291,17 @@ begin
   exit(nil);
 end;
 
+function TXQueryEngine.findModule(context: TXQStaticContext; const namespace: string; const at: array of string): TXQuery;
+begin
+  result := findModule(namespace);
+  if result <> nil then exit;
+  if assigned(OnImportModule) then onImportModule(self, staticContext, namespace, at);
+  result := findModule(namespace);
+end;
+
 class procedure TXQueryEngine.registerCollation(const collation: TXQCollation);
 begin
-  collations.AddObject(collation.id, collation);
+  internalRegisterCollation(collation);
 end;
 
 function TXQueryEngine.parseTerm(str: string; model: TXQParsingModel; context: TXQStaticContext): TXQuery;
@@ -8662,9 +8853,8 @@ var oldnode,newnode: TTreeNode;
 procedure jsoniqDescendants(const node: IXQValue; const searchedProperty: string);
 var
   seq: TXQVList;
-  obj: TXQValueObject;
+  obj: TXQValue;
   temp: TXQValue;
-  tempprop: TXQProperty;
   tempvi: PIXQValue;
   i: Integer;
 begin
@@ -8675,13 +8865,13 @@ begin
         jsoniqDescendants(seq[i], searchedProperty);
     end;
     pvkObject: begin
-      obj := (node as TXQValueObject);
+      obj := node.toValue;
       if searchedProperty <> '' then begin
         if obj.hasProperty(searchedProperty, @temp) then newList.add(temp);
-      end else newList.add(obj.enumerateValues);
+      end else newList.add(obj.enumeratePropertyValues);
 
-      for tempprop in obj.getPropertyEnumerator do
-        jsoniqDescendants(tempprop.Value, searchedProperty);
+      for temp in obj.getEnumeratorPropertyValuesUnsafe do
+        jsoniqDescendants(temp, searchedProperty);
     end;
     pvkSequence:
       for tempvi in node.GetEnumeratorPtrUnsafe do
@@ -8849,10 +9039,10 @@ begin
                     end;
                   end else begin
                     //get all properties
-                    if tempKind = pvkObject then newList.add((n^ as TXQValueObject).enumerateValues())
+                    if tempKind = pvkObject then newList.add(n^.enumeratePropertyValues())
                     else for pv in (n^ as TXQValueJSONArray).GetEnumeratorMembersPtrUnsafe do begin
                       if pv^.kind <> pvkObject then raise EXQEvaluationException.create('pxp:JSON', 'The / operator can only be applied to xml nodes, json objects and jsson arrays of only objects. Got array containing "'+pv^.toXQuery()+'"');
-                      newList.add((pv^ as TXQValueObject).enumerateValues());
+                      newList.add(pv^.enumeratePropertyValues());
                     end;
                   end;
                 end;
@@ -8929,15 +9119,18 @@ begin
   nativeModules.AddObject(module.namespace.getURL, module);
 end;
 
-class function TXQueryEngine.collationsInternal: TStringList;
+{$ifdef DUMPFUNCTIONS}
+class procedure TXQueryEngine.dumpFunctions;
+var
+  i: Integer;
 begin
-  result := collations;
+  for i := 0 to nativeModules.count -  1 do
+    (nativeModules.Objects[i] as TXQNativeModule).dumpFunctions;
 end;
-
+{$endif}
 
 class function TXQueryEngine.getCollation(id: string; base: string; errCode: string): TXQCollation;
 var
-  i: Integer;
   oldid: string;
 begin
   if strEndsWith(id, '/') then delete(id, length(id), 1);
@@ -8945,13 +9138,11 @@ begin
   id := strResolveURI(id, base);
   if strBeginsWith(id, MY_NAMESPACE_PREFIX_URL) then
     id := strCopyFrom(id, length(MY_NAMESPACE_PREFIX_URL)+1);
-  i := collations.IndexOf(id);
-  if i < 0 then begin
-    i := collations.IndexOf(oldid);
-    if i < 0 then
-      raise EXQEvaluationException.Create(errCode, 'Collation ' + id + ' is not defined');
-  end;
-  result:=TXQCollation(collations.Objects[i]);
+  result := internalGetCollation(id);
+  if result = nil then
+    result := internalGetCollation(oldid);
+  if result = nil then
+    raise EXQEvaluationException.Create(errCode, 'Collation ' + id + ' is not defined');
 end;
 
 function TXQueryEngine.GetNativeModules: TStringList;
@@ -9143,7 +9334,7 @@ begin
     end;
 
     for i := 0 to high(staticContext.moduleContextItemDeclarations) do
-      if (staticContext.moduleContextItemDeclarations[i].getSequenceType <> nil) and not staticContext.moduleContextItemDeclarations[i].getSequenceType.instanceOf(context.SeqValue) then
+      if (staticContext.moduleContextItemDeclarations[i].getSequenceType <> nil) and not staticContext.moduleContextItemDeclarations[i].getSequenceType.instanceOf(context.SeqValue, context) then
         raiseXPTY0004TypeError(context.SeqValue, staticContext.moduleContextItemDeclarations[i].getSequenceType.debugTermToString);
   end;
   //the variables must be evaluated now, because an evaluation-when-accessed might be after the context item has changed
@@ -9536,7 +9727,7 @@ begin
       moduleResult += '    ' + functionName(complexFunctions[i], TXQComplexFunctionInfo(complexFunctions.Objects[i]));
   if moduleResult <> '' then begin
     result += '  In module ' + namespaceGetURL(namespace);
-    if equalNamespaces(namespace, XMLNamespace_XPathFunctions) then
+//    if equalNamespaces(namespace, XMLNamespace_XPathFunctions) then
       result += acceptedModels.requiredModelToString;
     result += ':'+LineEnding+moduleResult+LineEnding;
   end;
@@ -9546,22 +9737,40 @@ end;
 
 
 {$ifdef dumpFunctions}
-procedure TXQNativeModule.logFunctionCreation(const name: string; const info: TXQAbstractFunctionInfo; const typeChecking: array of string);
+var dumpedModules: array of TXQNativeModule;
+procedure TXQNativeModule.dumpFunctions();
 var
-  i: Integer;
-  version: String;
+  prefix,version: String;
+  procedure logFunction(f: TXQAbstractFunctionInfo);
+  var i: Integer;
+  begin
+    with f do begin
+      if length(versions) = 0 then
+        writeln(prefix,' name="', xmlStrEscape(name,true), '" min-arg-count="',minArgCount,'" max-arg-count="', maxArgCount,'"/>')
+      else
+        for i := 0 to high(versions) do begin
+          write(prefix,' name="', xmlStrEscape(name,true), '" arg-count="',length(versions[i].types),'" args="');
+          if i < length(versions) then write(xmlStrEscape(versions[i].serialize(';'), true));
+          writeln('"/>');
+        end;
+    end;
+  end;
+
+var i: Integer;
 begin
+//  writeln(self.namespace.getURL);
+  for i := 0 to high(dumpedModules) do if dumpedModules[i] = self then exit;
+  dumpedModules := concat(dumpedModules, [self]);
+  //const name: string; const info: TXQAbstractFunctionInfo; const typeChecking: array of string
   if xqpmXQuery1 in acceptedModels then version := '1.0'
-  else version := '3.0';
-  i := 0;
-  repeat
-    write('<f m="', xmlStrEscape(trim(namespace.getURL),true), '" version="'+version+'" name="', xmlStrEscape(name,true), '" args="');
-    if i < length(typeChecking) then write(xmlStrEscape(typeChecking[i], true))
-    else if info.minArgCount = info.maxArgCount then write(info.minArgCount, ' argument', IfThen(info.minArgCount = 1, '', 's'))
-    else write(info.minArgCount, ' to ',info.maxArgCount, ' arguments');
-    writeln('"/>');
-    inc(i);
-  until i >= length(typeChecking);
+  else if xqpmXQuery3_0 in acceptedModels then version := '3.0'
+  else version := '3.1';
+  prefix := '<f m="' + xmlStrEscape(trim(namespace.getURL),true) + '" version="'+version+'"';
+  for i := 0 to basicFunctions.Count - 1 do logFunction(basicFunctions.Objects[i] as TXQAbstractFunctionInfo);
+  for i := 0 to complexFunctions.Count - 1 do logFunction(complexFunctions.Objects[i] as TXQAbstractFunctionInfo);
+  for i := 0 to interpretedFunctions.Count - 1 do logFunction(interpretedFunctions.Objects[i] as TXQAbstractFunctionInfo);
+
+  for i := 0 to high(parents) do parents[i].dumpFunctions;
 end;
 {$endif}
 
@@ -9651,169 +9860,6 @@ end;
 
 
 
-function TXQCollationCodepoint.doCompare(const a, b: string): integer;
-begin
-  result := CompareStr(a,b);
-end;
-
-function TXQCollationCodepoint.equal(const a, b: string): boolean;
-begin
-  result := strEqual(a,b);
-end;
-
-function TXQCollationCodepoint.indexOf(const strToBeExaminated, searched: string): SizeInt;
-begin
-  result := strIndexOf(strToBeExaminated, searched);
-end;
-
-function TXQCollationCodepoint.contains(const strToBeExaminated, searched: string): boolean;
-begin
-  result := strContains(strToBeExaminated, searched);
-end;
-
-function TXQCollationCodepoint.startsWith(const strToBeExaminated, expectedStart: string): boolean;
-begin
-  result := strBeginsWith(strToBeExaminated, expectedStart);
-end;
-
-function TXQCollationCodepoint.endsWith(const strToBeExaminated, expectedEnd: string): boolean;
-begin
-  result := strEndsWith(strToBeExaminated, expectedEnd);
-end;
-
-function TXQCollationCodepoint.key(s: string): string;
-begin
-  Result := s;
-end;
-
-function TXQCollationCodepointClever.doCompare(const a, b: string): integer;
-begin
-  result := strCompareClever(a,b);
-end;
-
-function makeCleverKey(s: string): string;
-var sb: TStrBuilder;
-
-  procedure appendSize(s: SizeInt);
-  begin
-    s := NtoBE(s); //so byte wise comparison in string matches comparison of ints
-    sb.appendBuffer(s, sizeof(s));
-  end;
-
-var
-  p, e, start: PChar;
-  inDigits: boolean;
-  digitLengths: TSizeIntArrayList;
-
-  procedure endBlock;
-  var
-    blockLength: sizeint;
-  begin
-    if inDigits then begin
-      digitLengths.add(p - start);
-      while (start < p) and (start^ = '0') do
-        inc(start);
-    end;
-    blockLength := p - start;
-    if inDigits then appendSize(blockLength);
-    sb.append(start, blockLength);
-  end;
-
-var tl: SizeInt;
-begin
-  if s = '' then
-    exit('');
-  digitLengths.init;
-  sb.init(@result, length(s));
-  p := pchar(s);
-  e := p + length(s);
-  start := p;
-  inDigits := p^ in ['0'..'9'];
-  while p < e do begin
-    if inDigits <> (p^ in ['0'..'9']) then begin
-      endBlock;
-      start := p;
-      inDigits := p^ in ['0'..'9']
-    end;
-    inc(p);
-  end;
-  endBlock;
-  for tl in digitLengths do //since leading 0s are removed from numbers, we need to add something for them
-    appendSize(tl);
-  sb.final;
-end;
-
-
-function TXQCollationCodepointClever.key(s: string): string;
-begin
-  result := makeCleverKey(s);
-end;
-
-
-function TXQCollationCodepointInsensitive.doCompare(const a, b: string): integer;
-begin
-  result := CompareText(a,b);
-end;
-
-function TXQCollationCodepointInsensitive.equal(const a, b: string): boolean;
-begin
-  result := striEqual(a,b);
-end;
-
-function TXQCollationCodepointInsensitive.indexOf(const strToBeExaminated, searched: string): SizeInt;
-begin
-  result := striIndexOf(strToBeExaminated, searched);
-end;
-
-function TXQCollationCodepointInsensitive.contains(const strToBeExaminated, searched: string): boolean;
-begin
-  result := striContains(strToBeExaminated, searched);
-end;
-
-function TXQCollationCodepointInsensitive.startsWith(const strToBeExaminated, expectedStart: string): boolean;
-begin
-  result := striBeginsWith(strToBeExaminated, expectedStart);
-end;
-
-function TXQCollationCodepointInsensitive.endsWith(const strToBeExaminated, expectedEnd: string): boolean;
-begin
-  result := striEndsWith(strToBeExaminated, expectedEnd);
-end;
-
-function TXQCollationCodepointInsensitive.key(s: string): string;
-begin
-  Result:=UpperCase(s);
-end;
-
-function TXQCollationCodepointInsensitiveClever.doCompare(const a, b: string): integer;
-begin
-  result := striCompareClever(a,b);
-end;
-
-function TXQCollationCodepointInsensitiveClever.key(s: string): string;
-begin
-  result := makeCleverKey(UpperCase(s));
-end;
-
-function TXQCollationCodepointLocalizedInsensitive.doCompare(const a, b: string): integer;
-begin
-  Result:= AnsiCompareText(a,b);
-end;
-
-function TXQCollationCodepointLocalizedInsensitive.doCompare(a, b: pansichar; len: SizeInt): integer;
-begin
-  Result:= AnsiStrLIComp(a,b,len);
-end;
-
-function TXQCollationCodepointLocalized.doCompare(const a, b: string): integer;
-begin
-  result := AnsiCompareStr(a,b);
-end;
-
-function TXQCollationCodepointLocalized.doCompare(a, b: pansichar; len: SizeInt): integer;
-begin
-  result := AnsiStrLComp(a,b,len);
-end;
 
 
 
@@ -9830,8 +9876,6 @@ initialization
 raiseXQEvaluationExceptionCallback := @raiseXQEvaluationExceptionCallbackImpl;
 
 assert(SizeOf(IXQValue) = sizeof(pointer));
-collations:=TStringList.Create;
-collations.OwnsObjects:=true;
 nativeModules := TStringList.Create;
 globalTypeParsingContext := createXQParsingContext as TXQAbstractParsingContext;
 globalTypeParsingContext.parsingModel := xqpmXQuery3_1;
@@ -9863,7 +9907,7 @@ TXQueryEngine.registerCollation(TXQCollationCodepointLocalizedInsensitive.Create
 
 GlobalInterpretedNativeFunctionStaticContext:=TXQStaticContext.Create;
 GlobalInterpretedNativeFunctionStaticContext.defaultFunctionNamespace := XMLNamespace_MyExtensionsMerged; XMLNamespace_MyExtensionsMerged._AddRef;
-GlobalInterpretedNativeFunctionStaticContext.collation := TXQCollation(collations.Objects[0]);
+GlobalInterpretedNativeFunctionStaticContext.collation := internalDefaultCollation;
 GlobalInterpretedNativeFunctionStaticContext.emptyOrderSpec:=xqeoEmptyGreatest;
 GlobalInterpretedNativeFunctionStaticContext.defaultTypeNamespace := XMLNamespace_XMLSchema; XMLNamespace_XMLSchema._AddRef;
 GlobalInterpretedNativeFunctionStaticContext.copyNamespaceInherit:=true;
@@ -9907,8 +9951,6 @@ xs.free;
 
 globalTypes.free;
 
-collations.Clear;
-collations.Free;
 nativeModules.free;
 globalUnnamedVariable.free;
 globalTypeParsingContext.staticContext.Free;

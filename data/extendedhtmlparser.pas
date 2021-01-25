@@ -711,7 +711,7 @@ THtmlTemplateParser=class
     function replaceEnclosedExpressions(str:string):string;
 
     function debugMatchings(const width: integer): string;
-    function debugMatchings(const width: integer; includeText: boolean; includeAttributes: array of string): string;
+    function debugMatchings(const width: integer; includeText: boolean; includeElements, includeAttributes: array of string): string;
     function parseQuery(const expression: string): IXQuery; //**< Returns a IXQuery that accesses the variable storage of the template engine. Mostly intended for internal use, but you might find it useful to evaluate external XPath expressions which are not part of the template
 
     property variables: TXQVariableChangeLog read GetVariables;//**<List of all variables (variableChangeLog is usually faster)
@@ -1285,25 +1285,6 @@ begin
   raise EHTMLParseMatchingException.Create(message);
 end;
 
-{procedure THtmlTemplateParser.defineXQVariable(sender: TObject; const variable: string; const value: IXQValue);
-var
-  base: string;
-  varname: string;
-  temp: IXQValue;
-begin
-  if not FVariableLog.splitName(variable,base,varname) or not FVariableLog.allowPropertyDotNotation then begin
-    FVariableLog.defineVariable(sender, variable, value);
-    exit;
-  end;
-  if FVariableLog.hasVariable(base, nil) or not FOldVariableLog.hasVariable(base, nil) then begin
-    FVariableLog.defineVariable(sender, variable, value);
-    exit;
-  end;
-  temp := FOldVariableLog.get(base);
-  if not (temp is TXQValueObject) then raise EXQEvaluationException.create('pxp:OBJECT', 'Set object property, but variable is no object');
-  FVariableLog.defineVariable(sender, base, (temp as TXQValueObject).setImmutable(varname, value));
-end;}
-
 function THtmlTemplateParser.GetVariableLogCondensed: TXQVariableChangeLog;
 begin
   if FVariableLogCondensed = nil then FVariableLogCondensed := FVariableLog.condensed;
@@ -1318,19 +1299,6 @@ begin
   end;
   result := FVariables;
 end;
-
-{function THtmlTemplateParser.evaluateXQVariable(sender: TObject; const variable: string; var value: IXQValue): boolean;
-var
-  temp: TXQValue;
-begin
-  ignore(sender);
-  temp := nil;
-  if not FVariableLog.hasVariableOrObject(variable, @temp) then
-    if not FOldVariableLog.hasVariableOrObject(variable, @temp) then exit(false);
-  if temp <> nil then value := temp
-  else value := xqvalue();
-  result := true;
-end;}
 
 type TXQCollationRawStrBoolFunction = function (const a,b: RawByteString): boolean;
 type TXQCollationStrBoolFunction = function (const a,b: string): boolean;
@@ -1725,7 +1693,7 @@ var xpathText: TTreeNode;
         if not result then exit;
         if e.valuepxp = nil then exit;
         evaluatedvalue := performPXPEvaluation(e.valuepxp);
-        result := FQueryEngine.StaticContext.compareGeneral(evaluatedvalue, value, nil, 0);
+        result := FQueryEngine.StaticContext.compareGeneral(evaluatedvalue, value, nil, xqcrEqual);
       end;
 
     begin
@@ -2090,7 +2058,7 @@ begin
   oldFunctionCount := length(FQueryEngine.StaticContext.functions);
 
   initializeCaches;
-  FTemplate.getLastTree.setEncoding(outputEncoding,true,false); //todo: check this for &amp; in templates!
+  //FTemplate.getLastTree.setEncoding(outputEncoding,true,false); //todo: check this for &amp; in templates!
   lastTrimTextNodes := FTrimTextNodes;
 
 
@@ -2325,7 +2293,7 @@ begin
       if pos('.', temp) = 0 then tempxqvalue := FVariableLog.get(temp)
       else begin
         tempxqvalue := FVariableLog.get(strSplitGet('.', temp));
-        while (temp <> '') and (tempxqvalue is TXQValueObject) do
+        while (temp <> '') and (tempxqvalue.kind = pvkObject) do
           tempxqvalue := tempxqvalue.getProperty(strSplitGet('.', temp));
       end;
 
@@ -2355,10 +2323,10 @@ end;
 
 function THtmlTemplateParser.debugMatchings(const width: integer): string;
 begin
-  result := debugMatchings(width, true, ['*']);
+  result := debugMatchings(width, true, ['th'], ['*']);
 end;
 
-function THtmlTemplateParser.debugMatchings(const width: integer; includeText: boolean; includeAttributes: array of string): string;
+function THtmlTemplateParser.debugMatchings(const width: integer; includeText: boolean; includeElements, includeAttributes: array of string): string;
 var res: TStringArray;
     template: TTemplateElement;
     html: TTreeNode;
@@ -2366,6 +2334,7 @@ var res: TStringArray;
     tsl, hsl: TStringArray;
     templateIndent, htmlIndent: integer;
     tempTemplateIndent, tempHTMLIndent: String;
+    inIncludeOverrideElement: integer = 0;
 
   procedure updateIndentation(element: TTreeNode; var count: integer; var cache: string);
   begin
@@ -2376,7 +2345,10 @@ var res: TStringArray;
 
   function htmlToString(): string;
   begin
-    if (length(includeAttributes) = 1) and (includeAttributes[0] = '*') then result := html.toString
+    if (html.typ in [tetOpen, tetClose]) and arrayContains(includeElements, html.value) then
+      if html.typ = tetOpen then inc(inIncludeOverrideElement)
+      else dec(inIncludeOverrideElement);
+    if (inIncludeOverrideElement > 0) or ( (length(includeAttributes) = 1) and (includeAttributes[0] = '*') ) then result := html.toString
     else result := html.toString(includeText, includeAttributes);
   end;
 
@@ -2496,8 +2468,6 @@ function xqFunctionMatches(const context: TXQEvaluationContext; argc: sizeint; a
 var temp: THtmlTemplateParser;
     template, html: IXQValue;
     cols: TXQVariableChangeLog;
-    tempobj: TXQValueObject;
-    i: Integer;
     list: TXQVList;
 begin
   requiredArgCount(argc, 2);
@@ -2527,12 +2497,9 @@ begin
           try
             if (cols.count = 1) and (cols.getName(0) = temp.UnnamedVariableName) then
               list.add(cols.get(0))
-            else begin
-              tempobj := TXQValueObject.create();
-              for i := 0 to cols.count - 1 do
-                tempobj.setMutable(cols.getName(i), cols.get(i));
-              list.add(tempobj);
-            end;
+            else
+             list.add(cols.toStringMap);
+
           finally
             cols.free;
           end;

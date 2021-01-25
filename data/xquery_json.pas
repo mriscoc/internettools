@@ -48,7 +48,7 @@ uses
 
 implementation
 
-uses jsonscanner, simplehtmltreeparser, bbutils, xquery.namespaces;
+uses jsonscanner, simplehtmltreeparser, bbutils, xquery.namespaces, xquery.internals.common;
 
 
 function xqFunctionIsNull({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
@@ -66,30 +66,26 @@ end;
 
 
 function xqFunctionObject({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
-var resobj: TXQValueObject;
-    procedure merge(another: TXQValueObject);
+var resobj: TXQValueStringMap;
+    procedure merge(another: TXQValue);
     var
-      i: Integer;
+      p: TXQProperty;
     begin
-      if another.prototype <> nil then merge(another.prototype as TXQValueObject);
-      for i := 0 to another.values.count-1 do begin
-        if resobj.hasProperty(another.values.getName(i),nil) then raise EXQEvaluationException.create('jerr:JNDY0003', 'Duplicated key names in '+resobj.jsonSerialize(tnsText)+' and '+another.jsonSerialize(tnsText));
-        resobj.values.add(another.values.getName(i), another.values.get(i));
+      for p in another.getEnumeratorStringPropertiesUnsafe do begin
+        if resobj.hasProperty(p.key,nil) then raise EXQEvaluationException.create('jerr:JNDY0003', 'Duplicated key names in '+resobj.jsonSerialize(tnsText)+' and '+another.jsonSerialize(tnsText));
+        resobj.setMutable(p.key, p.Value);
       end;
     end;
 
 var v: IXQValue;
   i: Integer;
 begin
-  //requiredArgCount(args, 1);
-  resobj := TXQValueObject.create();
+  resobj := TXQValueStringMap.create();
   try
     for i := 0 to argc-1 do
       for v in args[i] do begin
-        if not (v is TXQValueObject) then raise EXQEvaluationException.create('XPTY0004', 'Expected object, got: '+v.toXQuery());
-        {if resobj.prototype = nil then resobj.prototype := v //that would be faster, but then it serializes the properties of the first object at the end
-        else}
-        merge(v as TXQValueObject);
+        if v.kind <> pvkObject then raise EXQEvaluationException.create('XPTY0004', 'Expected object, got: '+v.toXQuery());
+        merge(v.toValue);
       end;
   except
     on EXQEvaluationException do begin resobj.free; raise; end
@@ -135,6 +131,9 @@ var
   parser: TXQJsonParser;
   s, contenttype, data: String;
 begin
+  if assigned(context.staticContext.sender.OnWarningDeprecated) then
+    context.staticContext.sender.OnWarningDeprecated(context.staticContext.sender, 'json is deprecated. Use json-doc or parse-json functions.');
+
   parser.init;
   parser.options := context.staticContext.sender.DefaultJSONParser.options;
   if argc = 2 then parser.setConfigFromMap(args[1]);
@@ -148,15 +147,13 @@ end;
 function xqFunctionKeys({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 var
   v: IXQValue;
-  res: TStringList;
+  keyset: TXQHashsetStr;
 begin
-  res := TStringList.Create;
-  res.CaseSensitive := True;
+  keyset.init;
   for v in args[0] do
-    if v is TXQValueObject then
-      (v as TXQValueObject).enumerateKeys(res);
-  result := xqvalue(res);
-  res.free;
+    if v.kind = pvkObject then v.enumeratePropertyKeys(keyset);
+  result := xqvalue(keyset);
+  keyset.done;
 end;
 
 

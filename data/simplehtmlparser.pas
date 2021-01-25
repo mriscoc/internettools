@@ -33,7 +33,7 @@ uses
 
 
 type
-  TParsingOptions = set of (poRespectHTMLCDATAElements, poRespectProcessingInstructions);
+  TParsingOptions = set of (poRespectHTMLCDATAElements, poRespectHTMLProcessingInstructions, poRespectXMLProcessingInstructions);
   THTMLProperty=record
     name, value: pchar;
     nameLen, valueLen: longint;
@@ -83,9 +83,8 @@ type
   function findLinkWithProperty(const html:string;prop,value: string):string;
   function findTagPropertyValueWithProperty(const html:string;tag,prop_to_get,prop_must_match,value: string):string;
 
-  function htmlElementIsCDATA(const marker: pchar; const tempLen: integer): boolean;
 implementation
-uses bbutils;
+uses bbutils, htmlInformation;
 
 function pcharStartEqual(p1,p2:pchar;l1,l2: SizeInt):boolean;
 begin
@@ -99,7 +98,7 @@ procedure parseHTML(const html:string;
                     enterTagEvent: TEnterTagEvent; leaveTagEvent: TLeaveTagEvent;
                     textEvent: TTextEvent; commentEvent: TCommentEvent = nil);
 begin
-  parseML(html, [poRespectHTMLCDATAElements], enterTagEvent, leaveTagEvent, textEvent, commentEvent);
+  parseML(html, [poRespectHTMLCDATAElements,poRespectHTMLProcessingInstructions], enterTagEvent, leaveTagEvent, textEvent, commentEvent);
 end;
 
 
@@ -119,13 +118,26 @@ var pos,marker,htmlEnd,cdataTagStartMarker: pchar;
     while (pos<=htmlEnd) and  (pos^ in WHITE_SPACE) do inc(pos);
   end;
 
+  procedure readToProcessingInstrunctionEnd;
+  begin
+    if poRespectHTMLProcessingInstructions in options then begin
+      while (pos < htmlEnd) and ((pos)^ <> '>') do inc(pos);
+    end else
+      while (pos < htmlEnd) and ((pos^ <> '?') or ((pos+1)^ <> '>')) do inc(pos);
+  end;
+  procedure skipLastProcessingInstructionSymbols;
+  begin
+    if poRespectHTMLProcessingInstructions in options then inc(pos)
+    else inc(pos, 2);
+  end;
+
   procedure handleProcessingInstruction;
   begin
     inc(pos);
     marker := pos;
-    while (pos < htmlEnd) and ((pos^ <> '?') or ((pos+1)^ <> '>')) do inc(pos);
+    readToProcessingInstrunctionEnd;
     if Assigned(processingInstruction) then processingInstruction(marker, pos - marker, []);
-    inc(pos, 2);
+    skipLastProcessingInstructionSymbols;
     marker := pos;
   end;
   procedure handleDocType;
@@ -221,7 +233,7 @@ var pos,marker,htmlEnd,cdataTagStartMarker: pchar;
                 end;
               end;
               '?': begin
-                while (pos < htmlEnd) and ((pos^ <> '?') or ((pos+1)^ <> '>')) do inc(pos);
+                readToProcessingInstrunctionEnd;
               end;
               '-': begin
                 inc(pos);
@@ -299,7 +311,7 @@ begin
             inc(pos);
             marker:=pos;
           end;
-          else if (pos^ = '?') and (poRespectProcessingInstructions in options) then handleProcessingInstruction
+          else if (pos^ = '?') and ([poRespectHTMLCDATAElements, poRespectXMLProcessingInstructions, poRespectHTMLProcessingInstructions] * options <> []) then handleProcessingInstruction
           else begin //tag start
             marker:=pos;
 
@@ -365,7 +377,7 @@ begin
                   exit;
               if pos^ = '/'  then inc(pos);
             end else if poRespectHTMLCDATAElements in options then begin
-              cdataTag:=htmlElementIsCDATA(marker, tempLen);
+              cdataTag:=htmlElementIsImplicitCDATA(marker, tempLen);
               cdataTagStartMarker := marker;
             end;
             if pos^='>' then inc(pos);
@@ -507,12 +519,6 @@ begin
   temp.free;
 end;
 
-function htmlElementIsCDATA(const marker: pchar; const tempLen: integer): boolean;
-begin
-  //    If the parent of current node is a style, script, xmp, iframe, noembed, noframes, or plaintext element, or if the parent of current node is noscript element
-  result := strliequal(marker,'style',tempLen) or strliequal(marker,'script',tempLen) or strliequal(marker,'xmp',tempLen) or strliequal(marker,'iframe',tempLen)
-            or strliequal(marker,'noembed',tempLen) or strliequal(marker,'noframes',tempLen) or strliequal(marker,'plaintext',tempLen);
-end;
 
 function findLinkWithProperty(const html:string;prop,value: string):string;
 begin

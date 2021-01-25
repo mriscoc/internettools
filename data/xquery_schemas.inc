@@ -392,8 +392,8 @@ begin
     xsvList: raise EXQParsingException.Create('err:XQST0012', 'Invalid schema (nested list)');
     xsvUnion: for i := 0 to high((aitemType as TXSUnionType).members) do
       if not objInheritsFrom(TXSUnionType(aitemType).members[i], TXSSimpleType) or (TXSSimpleType(TXSUnionType(aitemType).members[i]).variety <> xsvAtomic) then
-        raise EXQParsingException.Create('err:XQST0012', 'Invalid schema (wrong union member type for usage in list)')
-    else raise EXQParsingException.Create('err:XQST0012', 'Invalid schema (wrong list type)')
+        raise EXQParsingException.Create('err:XQST0012', 'Invalid schema (wrong union member type for usage in list)');
+    xsvAbsent: raise EXQParsingException.Create('err:XQST0012', 'Invalid schema (wrong list type)')
   end;
 end;
 
@@ -456,60 +456,141 @@ end;
 function TXSNumericType.tryCreateValueInternal(const v: string; outv: PXQValue): TXSCastingError;
 var
   pure: Boolean;
-  temp: BigDecimal;
-  tempd: xqfloat;
-  errCode: TBigDecimalErrorCode;
+  procedure slowPath;
+  var
+    temp: BigDecimal;
+    errCode: TBigDecimalErrorCode;
+    tempd: xqfloat;
+  begin
+    result := xsceFORG0001;
+    if ((length(v) = 3) and (v[1] in ['N','I'])) or ((length(v) = 4) and (v[3] = 'N')) then begin
+      if pure then exit();
+      if strEqual(v, '+INF') and (baseSchema.version = xsd10) then exit;
+      case v of
+        'NaN':  if outv <> nil then outv^ := TXQValueFloat.create(self, xqfloat.NaN);
+        'INF', '+INF':  if outv <> nil then outv^ := TXQValueFloat.create(self, xqfloat.PositiveInfinity);
+        '-INF':  if outv <> nil then outv^ := TXQValueFloat.create(self, xqfloat.NegativeInfinity);
+        else exit();
+      end;
+      result := xsceNoError;
+      exit;
+    end;
+    if pure and striContains(v, 'e') then exit();
+    if (subType = xsstInteger) and (strContains(v, '.')) then exit();
+
+    if not TryStrToBigDecimal(v, @temp, @errCode) then begin
+      if errCode = bdceParsingTooBig then result := xsceFOAR0002;
+      exit;
+    end;
+    if not constraintsSatisfied(temp) then exit;
+    result := xsceNoError;
+    if (outv <> nil) then
+      case subType of
+        xsstInteger, xsstDecimal:
+          if isInt64(temp) then outv^ := TXQValueInt64.create(self, BigDecimalToInt64(temp))
+          else outv^ := TXQValueDecimal.create(self, temp);
+        xsstFloat, xsstDouble: begin
+          try
+            if isZero(temp) and strBeginsWith(v, '-') then tempd := -0.0
+            else if subType = xsstDouble then tempd := temp.toDouble
+            else tempd := temp.toSingle;
+            {$if defined(cpui386) or defined(CPUX86_64)} ClearExceptions();{$endif}
+            outv^ := TXQValueFloat.create(self, tempd);
+          except
+            on EOverflow do outv^ := TXQValueFloat.create(self, xqfloat.PositiveInfinity);
+            on EUnderflow do outv^ := TXQValueFloat.create(self, xqfloat.NegativeInfinity);
+          end;
+        end;
+      end
+      {result := TryStrDecodeDecimal(v, tempintstart, tempintend, tempdot, tempexp);
+      if not result then exit;
+      if length(constrainingFacets) > 0 then
+        if not constraintsSatisfied(StrToBigDecimal(v)) then exit(false);
+      if (tempexp = 0) or (length(v) - tempexp < 15) then tempe := StrToFloat(v)
+      else if v[tempexp+1] = '-' then tempe := 0
+      else if v[1]= '-' then tempe := getNegInf
+      else tempe := getPosInf;}
+  end;
+
+  procedure specialCaseDecimalTenth(tenth: integer);
+  var d: BigDecimal;
+  begin
+    d := Default(BigDecimal);
+    d.exponent := -1;
+    setlength(d.digits, 1);
+    d.digits[0] := (ELEMENT_OVERFLOW div 10) * tenth;
+    if not constraintsSatisfied(d) then begin
+      result := xsceFORG0001;
+      exit;
+    end else result := xsceNoError;
+    if assigned(outv) then outv^ := TXQValueDecimal.create(d);
+  end;
+
+var
 {  tempintstart, tempintend, tempdot, tempexp: integer;
   tempe: Extended;}
+  firstDigit, secondDigit: integer;
+  tempi: int64;
+  tempd: xqfloat;
+  valcode: integer;
 begin
   result := xsceFORG0001;
-  pure := subType in  [xsstInteger, xsstDecimal];
-  if ((length(v) = 3) and (v[1] in ['N','I'])) or ((length(v) = 4) and (v[3] = 'N')) then begin
-    if pure then exit(xsceFORG0001);
-    if strEqual(v, '+INF') and (baseSchema.version = xsd10) then exit;
-    case v of
-      'NaN':  if outv <> nil then outv^ := TXQValueFloat.create(self, getNaN);
-      'INF', '+INF':  if outv <> nil then outv^ := TXQValueFloat.create(self, getPosInf);
-      '-INF':  if outv <> nil then outv^ := TXQValueFloat.create(self, getNegInf);
-      else exit(xsceFORG0001);
+  //quick check for short numbers
+  if length(v) < 3 then begin
+    case length(v) of
+      1: begin
+           firstDigit := ord(v[1]) - ord('0');
+           if firstDigit in [0..9] then
+             result := tryCreateValue(firstDigit, outv);
+         end;
+      2: begin
+           firstDigit := ord(v[1]) - ord('0');
+           secondDigit := ord(v[2]) - ord('0');
+           case v[1] of
+             '0'..'9': case v[2] of
+               '0'..'9': result := tryCreateValue( firstDigit * 10 + secondDigit, outv);
+               '.': if subType <> xsstInteger then result := tryCreateValue( firstDigit , outv);
+               //'e', 'E': ;
+             end;
+             '.': if secondDigit in [0..9] then
+                    case subType of
+                      xsstInteger: {fail};
+                      xsstDecimal: specialCaseDecimalTenth(secondDigit);
+                      else result := tryCreateValue( secondDigit / 10, outv);
+                    end;
+             '+': if secondDigit in [0..9] then
+                    result := tryCreateValue( secondDigit , outv);
+             '-': case secondDigit of
+                0: if subType in [xsstInteger, xsstDecimal] then result := tryCreateValue( 0, outv)
+                   else result := tryCreateValue( xqfloat( -0.0 ), outv);
+                1..9: result := tryCreateValue( - secondDigit , outv);
+             end;
+         end;
+      end;
     end;
-    exit(xsceNoError);
-  end;
-  if pure and striContains(v, 'e') then exit();
-  if (subType = xsstInteger) and (strContains(v, '.')) then exit();
-
-  if not TryStrToBigDecimal(v, @temp, @errCode) then begin
-    if errCode = bdceParsingTooBig then result := xsceFOAR0002;
     exit;
   end;
-  if not constraintsSatisfied(temp) then exit;
-  result := xsceNoError;
-  if (outv <> nil) then
-    case subType of
-      xsstInteger, xsstDecimal:
-        if isInt64(temp) then outv^ := TXQValueInt64.create(self, BigDecimalToInt64(temp))
-        else outv^ := TXQValueDecimal.create(self, temp);
-      xsstFloat, xsstDouble: begin
-        try
-          if isZero(temp) and strBeginsWith(v, '-') then tempd := -0.0
-          else if subType = xsstDouble then tempd := double(BigDecimalToExtended(temp))
-          else tempd := single(BigDecimalToExtended(temp));
-          {$if defined(cpui386) or defined(CPUX86_64)} ClearExceptions();{$endif}
-          outv^ := TXQValueFloat.create(self, tempd);
-        except
-          on EOverflow do outv^ := TXQValueFloat.create(self, getPosInf);
-          on EUnderflow do outv^ := TXQValueFloat.create(self, getNegInf);
-        end;
+
+  //use fpc's parsers (but make sure it does not accept invalid formats)
+  pure := subType in  [xsstInteger, xsstDecimal];
+  if (v[1] in ['0'..'9','+','-','.']) and (v[2] in ['0'..'9','.','e','E']) and (v[3] in ['0'..'9','.','e','E']) then begin
+    if pure then begin
+      val(v, tempi, valcode);
+      if valcode = 0 then
+        exit(tryCreateValue(tempi, outv));
+    end else begin
+      val(v, tempd, valcode);
+      if valcode = 0 then begin
+        if v[length(v)] in ['e', 'E'] then exit(xsceFORG0001);
+        if (length(constrainingFacets) = 0) and (subType = xsstDouble) then begin
+          if outv <> nil then outv^ := TXQValueFloat.create(self, tempd);
+          exit(xsceNoError);
+        end else exit(tryCreateValue(tempd, outv))
       end;
-    end
-    {result := TryStrDecodeDecimal(v, tempintstart, tempintend, tempdot, tempexp);
-    if not result then exit;
-    if length(constrainingFacets) > 0 then
-      if not constraintsSatisfied(StrToBigDecimal(v)) then exit(false);
-    if (tempexp = 0) or (length(v) - tempexp < 15) then tempe := StrToFloat(v)
-    else if v[tempexp+1] = '-' then tempe := 0
-    else if v[1]= '-' then tempe := getNegInf
-    else tempe := getPosInf;}
+    end;
+  end;
+
+  slowPath;
 end;
 
 function TXSNumericType.tryCreateValue(const v: Int64; outv: PXQValue): TXSCastingError;
@@ -541,8 +622,8 @@ begin
       xsstDecimal:
         if isInt64(i) then outv^ := TXQValueInt64.create(self, BigDecimalToInt64(i))
         else outv^ := TXQValueDecimal.create(self, i);
-      xsstFloat:   outv^ := TXQValueFloat.create(self, single(BigDecimalToExtended(i)));
-      xsstDouble:  outv^ := TXQValueFloat.create(self, double(BigDecimalToExtended(i)));
+      xsstFloat:   outv^ := TXQValueFloat.create(self, i.toSingle);
+      xsstDouble:  outv^ := TXQValueFloat.create(self, i.toDouble);
     end;
 end;
 
@@ -571,7 +652,7 @@ var
   sispure: Boolean;
 begin
   result := xsceNoError;
-  sispure := not IsNan(v) and not IsInfinite(v);
+  sispure := v.isFinite();
   case subType of
     xsstInteger, xsstDecimal: begin
       if not sispure then exit(xsceFOCA0002);
@@ -583,6 +664,7 @@ begin
           case subType of
             xsstFloat:   outv^ := TXQValueFloat.create(self, single(v));
             xsstDouble:  outv^ := TXQValueFloat.create(self, double(v));
+            else;
           end;
         exit;
       end;
@@ -594,6 +676,7 @@ begin
         case subType of
           xsstFloat:   outv^ := TXQValueFloat.create(self, single(v));
           xsstDouble:  outv^ := TXQValueFloat.create(self, double(v));
+          else;
         end;
     end;
   end;
@@ -622,6 +705,7 @@ begin
       pattern = [\-+]?[0-9]+}
       xsfMaxInclusive: if (v > TXSConstrainingFacetValue(constrainingFacets[i]).value.toDecimal) then exit(false);
       xsfMinInclusive: if (v < TXSConstrainingFacetValue(constrainingFacets[i]).value.toDecimal) then exit(false);
+      else;
     end;
 end;
 
@@ -673,11 +757,11 @@ begin
       result := xsceNoError;
       if outv <> nil then
         if st.derivedFrom(schema.hexBinary) = (subType = xsstHexBinary) then
-          outv^ := TXQValueString.create(self, v.toString)
+          outv^ := TXQValueBinary.create(self, v.toString)
         else if subType = xsstHexBinary then
-          outv^ := TXQValueString.create(self, base64.DecodeStringBase64(v.toString).encodeHex)
+          outv^ := TXQValueBinary.create(self, base64.DecodeStringBase64(v.toString).encodeHex)
         else
-          outv^ := TXQValueString.create(self, base64.EncodeStringBase64(v.toString.decodeHex))
+          outv^ := TXQValueBinary.create(self, base64.EncodeStringBase64(v.toString.decodeHex))
     end;
     xsstUrl: begin
       if not st.derivedFrom(schema.anyURI) then
@@ -704,7 +788,8 @@ begin
   result := xsceNoError;
   if (outv <> nil) then
     case subType of
-      xsstHexBinary: outv^ := TXQValueString.create(self, UpperCase(v));
+      xsstHexBinary: outv^ := TXQValueBinary.create(self, UpperCase(v));
+      xsstBase64Binary: outv^ := TXQValueBinary.create(self, StringReplace(v, ' ', '', [rfReplaceAll]));
       else outv^ := TXQValueString.create(self, v);
     end;
 end;
@@ -837,6 +922,7 @@ begin
       xsfExplicitTimezone:
         if (v.timezone <> high(Integer)) <> (constrainingFacets[i].fixed) then
           exit(false);
+      else;
     end;
 
 end;
@@ -878,6 +964,7 @@ begin
     dtprFailure: exit(xsceFORG0001);
     dtprFailureValueTooHigh: exit(xsceFODT0001);
     dtprFailureValueTooHigh2: exit(xsceFODT0002);
+    else;
   end;
   if not constraintsSatisfied(tvd) then exit(xsceFORG0001);
   result := xsceNoError;
@@ -932,42 +1019,8 @@ begin
 end;
 
 class function TXSSchema.isValidNCName(const s: string): boolean;
-//this should do the same as RegExpr_XMLNCName
-//except being faster (and working)
-const AsciiNameStartChar = ['A'..'Z', '_', 'a'..'z'];
-      AsciiNameChar = AsciiNameStartChar + ['-', '.', '0'..'9'];
-var
-  curpos: SizeInt;
-  cp: Integer;
 begin
-  result := false;
-  if s = '' then exit();
-  curpos := 1;
-  if s[1] in AsciiNameStartChar then inc(curpos)
-  else begin
-    cp := strDecodeUTF8Character(s, curpos);
-    if not (((cp >= $C0) and (cp <= $D6)) or ((cp >= $D8) and (cp <= $F6))
-       or ((cp >= $F8) and (cp <= $2FF)) or((cp >= $370) and (cp <= $37D))
-       or ((cp >= $37F) and (cp <= $1FFF)) or((cp >= $200C) and (cp <= $200D))
-       or ((cp >= $2070) and (cp <= $218F)) or((cp >= $2C00) and (cp <= $2FEF))
-       or ((cp >= $3001) and (cp <= $D7FF)) or((cp >= $F900) and (cp <= $FDCF))
-       or ((cp >= $FDF0) and (cp <= $FFFD)) or ((cp >= $10000) and (cp <= $EFFFF))) then exit();
-  end;
-  while curpos <= length(s) do begin
-    if s[curpos] in AsciiNameChar then inc(curpos)
-    else begin
-      cp := strDecodeUTF8Character(s, curpos);
-      if not (((cp >= $C0) and (cp <= $D6)) or ((cp >= $D8) and (cp <= $F6))
-         or ((cp >= $F8) and (cp <= $2FF)) or((cp >= $370) and (cp <= $37D))
-         or ((cp >= $37F) and (cp <= $1FFF)) or((cp >= $200C) and (cp <= $200D))
-         or ((cp >= $2070) and (cp <= $218F)) or((cp >= $2C00) and (cp <= $2FEF))
-         or ((cp >= $3001) and (cp <= $D7FF)) or((cp >= $F900) and (cp <= $FDCF))
-         or ((cp >= $FDF0) and (cp <= $FFFD)) or ((cp >= $10000) and (cp <= $EFFFF))) then //like above
-         if not ((cp = $B7) or ((cp >= $0300) and (cp <= $036F)) or ((cp >= $203F) and (cp <= $2040))) then
-           exit();
-    end;
-  end;
-  result := true;
+  result := xquery.namespaces.isValidNCName(s);
 end;
 
 class function TXSSchema.isValidQName(s: string): boolean;
@@ -1201,8 +1254,10 @@ begin
   AnyURI := primitiveBaseType(TXSStringType.create('anyURI', AnyAtomicType, xsstUrl));
   anyURI.whiteSpaceFacet:=xsfwCollapse; anyURI.whiteSpaceFixed := true;
   Base64Binary := primitiveBaseType(TXSStringType.create('base64Binary', AnyAtomicType, xsstBase64Binary, '^(([A-Za-z0-9+/] *){4})*(([A-Za-z0-9+/] *){2}[AEIMQUYcgkosw048] *=|[A-Za-z0-9+/] *[AQgw] *= *=)?$'));
+  Base64Binary.storage := TXQValueBinary;
   base64Binary.whiteSpaceFacet:=xsfwCollapse; base64Binary.whiteSpaceFixed := true;
   hexBinary := primitiveBaseType(TXSStringType.create('hexBinary', AnyAtomicType, xsstHexBinary, '^([0-9A-Fa-f][0-9A-Fa-f])*$'));
+  Base64Binary.storage := TXQValueBinary;
   hexBinary.whiteSpaceFacet:=xsfwCollapse; hexBinary.whiteSpaceFixed := true;
   String_ := primitiveBaseType(TXSStringType.create('string', AnyAtomicType, xsstString));
 
@@ -1316,7 +1371,7 @@ begin
 
   jsonItem := TXSType.Create('json-item()', baseSchema.structuredItem);  jsonItem.schema := self;
   array_ := TXSSimpleType.Create('array()', jsonItem, TXQValueJSONArray);
-  object_ := TXSSimpleType.Create('object()', jsonItem, TXQValueObject);
+  object_ := TXSSimpleType.Create('object()', jsonItem, TXQValueMapLike);
 //  jsonItem, array_, object_: TXSType;
 end;
 
@@ -1373,8 +1428,8 @@ begin
 
 
 
-  map := TXQTermSequenceType.create(baseJSONiqSchema.object_); mapStar := star(map);
-  arrayt := TXQTermSequenceType.create(baseJSONiqSchema.array_); arrayOrEmpty := orEmpty(arrayt); arrayStar := star(arrayt);
+  map := TXQTermSequenceType.create(tikMapTest); mapStar := star(map);
+  arrayt := TXQTermSequenceType.create(tikArrayTest); arrayOrEmpty := orEmpty(arrayt); arrayStar := star(arrayt);
   null := TXQTermSequenceType.create(baseJSONiqSchema.jsNull);
   jsonItemOrEmpty := TXQTermSequenceType.create(baseJSONiqSchema.jsonItem, true);  jsonItemStar := star(jsonItemOrEmpty);
 

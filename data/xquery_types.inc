@@ -1,3 +1,17 @@
+type THashInfo = record
+  //same hash as python, see:
+  //https://stackoverflow.com/questions/56227419/why-does-pythons-hash-of-infinity-have-the-digits-of-π
+  //https://docs.python.org/3/library/stdtypes.html#hashing-of-numeric-types
+  //https://github.com/python/cpython/blob/master/Python/pyhash.c
+  const hash_pos_inf = 314159;
+  const hash_neg_inf = cardinal.MaxValue - hash_pos_inf;
+  const hash_nan = high(integer);
+  const modulus_bits = {$ifdef xxxCPU64xxxxx}61 no, only use 32 bit version{$else}31{$endif};
+  const modulus = (1 shl modulus_bits) - 1;
+  const bigdecimalInverse = 968029830;
+end;
+
+
 class function TXQValueUndefined.classKind: TXQValueKind;
 begin
   result := pvkUndefined;
@@ -115,7 +129,7 @@ end;
 
 function TXQValue.toFloat: xqfloat;
 begin
-  result:=myStrToFloat(toString);
+  result:= xqfloat.parse(toString);
 end;
 
 function TXQValue.toString: string;
@@ -225,6 +239,74 @@ begin
   result := typeAnnotation.derivedFrom(typ);
 end;
 
+procedure TXQValue.raiseInternalErrorObjectExpected(const functionname: string);
+begin
+  raiseInternalError('Function ' + functionname+ ' can only be called on an object, but was called on ' + toXQuery);
+end;
+
+procedure TXQValue.enumeratePropertyKeys(var keyset: TXQHashsetStr);
+begin
+  raiseInternalErrorObjectExpected('enumeratePropertyKeys');
+end;
+
+function TXQValue.enumeratePropertyKeys: IXQValue;
+var keyset: TXQHashsetStr;
+begin
+  keyset.init;
+  enumeratePropertyKeys(keyset);
+  result := xqvalue(keyset);
+  keyset.done;
+end;
+
+function TXQValue.enumeratePropertyValues: IXQValue;
+begin
+  raiseInternalErrorObjectExpected('enumeratePropertyValues');
+  result := nil
+end;
+
+
+procedure TXQValue.prepareInternetRequest(out method, url, post: string; internet: TInternetAccess);
+var h: IXQValue;
+  value: String;
+  name: RawByteString;
+begin
+  url := getProperty('url').toString;
+  method := getProperty('method').toString;
+  post := getProperty('post').toString;
+  for h in getProperty('headers') do begin
+    value := h.toString;
+    name := strSplitGet(':', value);
+    internet.additionalHeaders.Values[trim(name)] := trim(value);
+  end;
+end;
+
+function TXQValue.setImmutable(const name, value: IXQValue): TXQValueMapLike;
+begin
+  result := setImmutable(name.toString, value); //todo setting non-string key should work on string maps (e.g. map:put on empty map)
+end;
+
+function TXQValue.setImmutable(const name: string; const v: IXQValue): TXQValueMapLike;
+begin
+  raiseInternalErrorObjectExpected('setImmutable');
+  result := nil;
+end;
+
+function TXQValue.setImmutable(const name: string; const s: string): TXQValueMapLike;
+begin
+  result := setImmutable(xqvalue(name), xqvalue(s));
+end;
+
+function TXQValue.setImmutable(const props: PString; len: SizeInt; const v: IXQValue): TXQValue;
+begin
+  raiseInternalErrorObjectExpected('setImmutable (or array)');
+  result := nil;
+end;
+
+function TXQValue.hashCode: uint32;
+begin
+  result := 0
+end;
+
 function TXQValue.toDecimal: BigDecimal;
 begin
   if not tryStrToBigDecimal(toString, @result) then
@@ -273,7 +355,7 @@ begin
     pvkInt64:      result := qualifiedTypeName(toString, 'integer');
     pvkFloat:      result := qualifiedTypeName(toString, '');
     pvkBigDecimal: result := qualifiedTypeName(toString, IfThen(IsIntegral(toDecimal), 'integer', 'decimal') );
-    pvkString:     result := qualifiedTypeName(escapeToXQueryString(toString), 'string' );
+    pvkString, pvkBinary: result := qualifiedTypeName(escapeToXQueryString(toString), 'string' );
     pvkQName, pvkDateTime:
       result := qualifiedTypeName(escapeToXQueryString(toString), '' );
 
@@ -327,13 +409,42 @@ begin
   result := false;
 end;
 
+function TXQValue.hasProperty(const name: ixqvalue; value: PXQValue): boolean;
+begin
+  result := false;
+end;
+
+function TXQValue.getProperty(const name: IXQValue): IXQValue;
+begin
+  ignore(name);
+  result := xqvalue();
+end;
+
 function TXQValue.getProperty(const name: string): IXQValue;
 begin
   ignore(name);
   result := xqvalue();
 end;
 
-function TXQValue.getPropertyEnumerator: TXQValuePropertyEnumerator;
+function TXQValue.getPropertyKeyKind: TXQMapPropertyKeyKind;
+begin
+  result := xqmpkkStandardKeys;
+  raise EXQEvaluationException.create('pxp:JSON', 'Attempted to key kind of non-object');
+end;
+
+function TXQValue.getEnumeratorPropertiesUnsafe: TXQValueStandardPropertyEnumerator;
+begin
+  result := nil;
+  raise EXQEvaluationException.create('pxp:JSON', 'Attempted to read property of non-object');
+end;
+
+function TXQValue.getEnumeratorPropertyValuesUnsafe: TXQValuePropertyValueEnumerator;
+begin
+  result := nil;
+  raise EXQEvaluationException.create('pxp:JSON', 'Attempted to read property of non-object');
+end;
+
+function TXQValue.getEnumeratorStringPropertiesUnsafe: TXQValueStringPropertyEnumerator;
 begin
   result := nil;
   raise EXQEvaluationException.create('pxp:JSON', 'Attempted to read property of non-object');
@@ -362,6 +473,13 @@ begin
   result := default(TXQValueEnumeratorPtrUnsafe);
 end;
 
+function TXQValue.GetEnumeratorArrayTransparentUnsafe: TXQValueEnumeratorArrayTransparentUnsafe;
+begin
+  result.currentEnumerator := 0;
+  setlength(result.ptrs, 1);
+  result.ptrs[0] := GetEnumeratorPtrUnsafe;
+end;
+
 function TXQValue.toFloatChecked(scontext: TXQStaticContext): xqfloat;
 begin
   if scontext.strictTypeChecking then raiseXPTY0004TypeError(self, 'float/double');
@@ -370,9 +488,9 @@ end;
 
 function TXQValue.debugAsStringWithTypeAnnotation(textOnly: boolean = true): string;
 var
-  temp: TXQValueObject;
   i: Integer;
-  tempp: IXQValue;
+  prop: TXQStandardProperty;
+  first: Boolean;
 begin
   case self.kind of
     pvkSequence: begin
@@ -395,13 +513,12 @@ begin
     end;
     pvkObject: begin
       result := 'object: {';
-      tempp := self.clone; //need temporary variable to keep the reference count > 0
-      temp := tempp as TXQValueObject;
-      if temp.values.count > 0 then begin
-        result += temp.values.getName(0)+': '+temp.values.get(0).debugAsStringWithTypeAnnotation(textOnly){%H-};
-        for i:=1 to temp.values.count-1 do
-          result += ', '+temp.values.getName(i)+': '+temp.values.get(i).debugAsStringWithTypeAnnotation(textOnly){%H-};
-      end;
+      first := true;
+      for prop in getEnumeratorPropertiesUnsafe do
+        if first then begin
+          result += prop.key.debugAsStringWithTypeAnnotation+': '+prop.Value.debugAsStringWithTypeAnnotation(textOnly){%H-};
+          first := false
+        end else result += ', '+prop.key.debugAsStringWithTypeAnnotation+': '+prop.Value.debugAsStringWithTypeAnnotation(textOnly){%H-};
       result += '}';
     end;
     pvkNode: if textOnly then result := typeName+': '+toString else result := typeName + ': '+toNode.outerXML();
@@ -432,35 +549,178 @@ begin
   serializer.final;
 end;
 
+
+
+
 procedure TXQValue.jsonSerialize(var serializer: TXQSerializer);
+  procedure objectJsonSerialize(var serializer: TXQSerializer);
+  var
+    prop: TXQProperty;
+    isStringMap: Boolean;
+    nameCheck: ^TXQHashmapStrStr;
+    enumerator: TXQValueStringPropertyEnumerator;
+  begin
+    isStringMap := getPropertyKeyKind = xqmpkkStringKeys;
+    if isStringMap or serializer.allowDuplicateNames then nameCheck := nil
+    else new(nameCheck,init);
+    enumerator := getEnumeratorStringPropertiesUnsafe;
+    try
+      if not enumerator.MoveNext then serializer.appendJSONEmptyObject
+      else with serializer do begin
+        appendJSONObjectStart;
+        while true do begin
+          prop := enumerator.Current;
+          if assigned(nameCheck) then begin
+            if nameCheck.contains(prop.key) then
+              raiseXQEvaluationError('SERE0022', 'Duplicate key names when serializing.', self);
+            nameCheck.include(prop.key, '');
+          end;
+          appendJSONObjectKeyColon(prop.key);
+          prop.Value.jsonSerialize(serializer);
+          if not enumerator.MoveNext then break;
+          appendJSONObjectComma
+        end;
+        appendJSONObjectEnd;
+      end;
+    finally
+      if assigned(nameCheck) then nameCheck^.done;
+      enumerator.free;
+    end;
+  end;
+
 begin
-  serializer.appendJSONString(toString);
+  case kind of
+    pvkObject: objectJsonSerialize(serializer);
+    else serializer.appendJSONString(toString);
+  end;
 end;
 
 procedure TXQValue.xmlSerialize(var serializer: TXQSerializer);
+  procedure objectXmlSerialize(var serializer: TXQSerializer);
+  var
+    first: Boolean;
+    prop: TXQProperty;
+    tempName: String;
+  begin
+    first := true;
+    with serializer do begin
+      for prop in getEnumeratorStringPropertiesUnsafe do begin
+        if first then begin
+          appendXMLElementStartTag(objectTag);
+          first := false;
+        end;
+        tempName := prop.key;
+        if isValidNCName(tempName) then
+          appendXMLElementStartTag(tempName)
+        else begin
+          appendXMLElementStartOpen('_');
+          appendXMLElementAttribute('key', tempName);
+          appendXMLElementStartClose();
+          tempName := '_';
+        end;
+        prop.Value.xmlSerialize(serializer);
+        appendXMLElementEndTag(tempName);
+      end;
+      if first then appendXMLEmptyElement(objectTag) //no properties
+      else appendXMLElementEndTag(objectTag);
+    end;
+  end;
 begin
-  serializer.appendXMLText(toString);
+  case kind of
+    pvkObject: objectXmlSerialize(serializer);
+    else serializer.appendXMLText(toString);
+  end;
 end;
 
 procedure TXQValue.adaptiveSerialize(var serializer: TXQSerializer);
+  procedure objectAdaptiveSerialize(var serializer: TXQSerializer);
+  var
+    prop: TXQStandardProperty;
+    first: Boolean;
+  begin
+    first := true;
+    with serializer do begin
+      append('map');
+      for prop in getEnumeratorPropertiesUnsafe do begin
+        if not first then appendJSONObjectComma
+        else begin
+          first := false;
+          appendJSONObjectStart;
+        end;
+        prop.key.adaptiveSerialize(serializer);
+        append(':');
+        prop.Value.adaptiveSerialize(serializer);
+      end;
+      if not first then appendJSONObjectEnd
+      else appendJSONEmptyObject;
+    end;
+  end;
 var
   withType: Boolean;
 begin
-  withType := not (typeAnnotation.derivedFrom([baseSchema.string_, baseSchema.untypedAtomic, baseSchema.anyURI]));
-  if withType then serializer.appendTypeNameFunctionStart(typeAnnotation);
-  serializer.appendXQueryString(toString);
-  if withType then serializer.append(')');
+  case kind of
+    pvkObject: objectAdaptiveSerialize(serializer);
+    else
+      withType := not (typeAnnotation.derivedFrom([baseSchema.string_, baseSchema.untypedAtomic, baseSchema.anyURI]));
+      if withType then serializer.appendTypeNameFunctionStart(typeAnnotation);
+      serializer.appendXQueryString(toString);
+      if withType then serializer.append(')');
+  end;
+end;
+
+function TXQValue.serialize(const context: TXQEvaluationContext): string;
+begin
+  result := globalSerializationCallback(context, self);
 end;
 
 
 function TXQValue.stringifyNodes: IXQValue;
+  function objectStringifiedNodes: IXQValue;
+  var
+    prop: TXQProperty;
+    newMap: TXQValueStandardMap;
+    newStringMap: TXQValueStringMap;
+    prop2: TXQStandardProperty;
+  begin
+    case getPropertyKeyKind of
+      xqmpkkStringKeys: begin
+        newStringMap := TXQValueStringMap.create();
+        for prop in getEnumeratorStringPropertiesUnsafe do
+          newStringMap.setMutable(prop.key, prop.Value.stringifyNodes);
+        result := newStringMap;
+      end;
+      xqmpkkStandardKeys: begin
+        newMap := TXQValueStandardMap.create();
+        for prop2 in getEnumeratorPropertiesUnsafe do
+          newMap.setMutable(prop2.key, prop2.Value.stringifyNodes);
+        result := newMap;
+      end;
+    end;
+  end;
+
 begin
-  result := self;
+  case kind of
+    pvkObject: result := objectStringifiedNodes;
+    else result := self;
+  end;
 end;
 
 function TXQValue.hasNodes: boolean;
+  function objectHasNodes: boolean;
+  var
+    v: TXQValue;
+  begin
+    result := false;
+    for v in getEnumeratorPropertyValuesUnsafe do
+      if v.hasNodes then
+        exit(true);
+  end;
+
 begin
-  result := false;
+  case kind of
+    pvkObject: result := objectHasNodes;
+    else result := false;
+  end;
 end;
 
 function TXQValue.clone: IXQValue;
@@ -590,7 +850,7 @@ var tempContext: TXQEvaluationContext;
     case v.kind of
       pvkObject: begin
          tempHeaders := defaultInternet.additionalHeaders.Text;
-         TXQValueObject.prepareInternetRequest(v, method, uri, post, defaultInternet);
+         v.toValue.prepareInternetRequest(method, uri, post, defaultInternet);
          data := internetaccess.httpRequest(method, uri, post);
          defaultInternet.additionalHeaders.Text := tempHeaders;
          resseq.add(dataToXQV (data, uri, defaultInternet.getLastContentType));
@@ -676,6 +936,11 @@ begin
   if bool then result:='true' else result:='false';
 end;
 
+function TXQValueBoolean.hashCode: uint32;
+begin
+  Result:=ord(bool);
+end;
+
 function TXQValueBoolean.clone: IXQValue;
 begin
   result:=xqvalue(bool);
@@ -759,6 +1024,13 @@ function TXQValueInt64.toDateTime: TDateTime;
 begin
   result:=extended(value);
 end;
+
+{$push}{$RangeChecks off}{$OverflowChecks off}
+function TXQValueInt64.hashCode: uint32;
+begin
+  result := value mod THashInfo.modulus;
+end;
+{$pop}
 
 procedure TXQValueInt64.jsonSerialize(var serializer: TXQSerializer);
 begin
@@ -846,6 +1118,7 @@ begin
     case (typeAnnotation as TXSNumericType).subType of
       xsstDouble: result := FloatToBigDecimal(double(value), bdffShortest);
       xsstFloat: result := FloatToBigDecimal(single(value), bdffShortest);
+      else;
     end;
   except
     on EConvertError do raise EXQEvaluationException.Create('FOAR0002', 'Float ' + toXQuery()+  ' cannot be cast to decimal');
@@ -868,17 +1141,21 @@ function TXQValueFloat.toString: string;
       result := BigDecimalToStr(FloatToBigDecimal(v, bdffShortest), bdfExponent);
   end;
 begin
-  if IsNan(value) then exit('NaN');
-  if IsInfinite(value) then
-    if isPosInf(value) then exit('INF')
-    else exit('-INF');
+  if not value.isFinite() then begin
+    case value.SpecialType of
+      fsInf: exit('INF');
+      fsNInf: exit('-INF');
+      else exit('NaN');
+    end;
+  end;
   if value = 0 then
-    if isSignedXQFloat(value) then exit('-0')
+    if value.Sign then exit('-0')
     else exit('0');
   try
     case (typeAnnotation as TXSNumericType).subType of
       xsstDouble: result := doubleToString(double(value));
       xsstFloat: result := singleToString(single(value)); //this can overflow
+      else;
     end;
   except
     on EConvertError do exit('internal float: '+FloatToStr(value));
@@ -891,36 +1168,61 @@ begin
   Result:=nan;
 end;
 
+function TXQValueFloat.hashCode: uint32;
+var
+  m: QWord;
+  e: Integer;
+begin
+  if not value.isFinite() then
+    case value.SpecialType of
+      fsInf: exit(THashInfo.hash_pos_inf);
+      fsNInf: exit(THashInfo.hash_neg_inf);
+      else exit(THashInfo.hash_nan);
+    end;
+  result := 0;
+  m := value.Mantissa;
+  e := value.Exponent - 21; //it only works with -21 ??
+  result := m mod THashInfo.modulus;
+
+  //see pyhash
+  if e >= 0 then e := e mod THashInfo.modulus_bits
+  else e := THashInfo.modulus_bits - 1 - ( (-1 - e) mod THashInfo.modulus_bits );
+  result := ( (result shl e) and THashInfo.modulus) or (result shr ( THashInfo.modulus_bits - e ));
+
+  if value.Sign then result := cardinal.MaxValue - result + 1;
+end;
+
 procedure TXQValueFloat.jsonSerialize(var serializer: TXQSerializer);
 begin
-  if IsNan(value) or IsInfinite(value) then begin
+  if value.isFinite() then begin
+    if value = 0 then begin
+      if value.Sign then serializer.append('-0')
+      else serializer.append('0');
+    end else if frac(value) = 0 then begin
+      serializer.append(IntToStr(trunc(value)));
+    end else
+      serializer.append(toString);
+  end else begin
     if serializer.standard then serializer.error('SERE0020', self);
-    if IsNan(value) then serializer.append('NaN')
-    else if isPosInf(value) then serializer.appendJSONString('INF')
-    else serializer.appendJSONString('-INF');
-  end else if value = 0 then begin
-    if isSignedXQFloat(value) then serializer.append('-0')
-    else serializer.append('0');
-  end else if frac(value) = 0 then begin
-    serializer.append(IntToStr(trunc(value)));
-  end else
-    serializer.append(toString);
+    case value.SpecialType of
+      fsInf: serializer.appendJSONString('INF');
+      fsNInf: serializer.appendJSONString('-INF');
+      else serializer.append('NaN');
+    end;
+  end;
 end;
 
 procedure TXQValueFloat.adaptiveSerialize(var serializer: TXQSerializer);
 var s: shortstring;
   dot, e, i, cutoff: Integer;
-  withType: Boolean;
 begin
-  withType := typeAnnotation <> baseSchema.double;
-  if withType then serializer.appendTypeNameFunctionStart(typeAnnotation);
-  if IsNan(value) or IsInfinite(value) then begin
-    if withType then serializer.append('"');
-    if IsNan(value) then serializer.append('NaN')
-    else if isPosInf(value) then serializer.append('INF')
-    else serializer.append('-INF');
-    if withType then serializer.append('"');
-  end else begin
+  if typeAnnotation <> baseSchema.double then begin
+    inherited adaptiveSerialize(serializer);
+    exit
+  end;
+
+  //if withType then serializer.appendTypeNameFunctionStart(typeAnnotation);
+  if value.isFinite() then begin
     system.str(value, s);
     //trim
     cutoff := 0;
@@ -944,8 +1246,13 @@ begin
     if dot > 0 then while (e - cutoff - 1 > dot + 1) and (s[e - cutoff - 1] = '0') do inc(cutoff);
     if cutoff > 0 then delete(s, e - cutoff, cutoff);
     serializer.append(s);
+  end else begin
+    case value.SpecialType of
+      fsInf: serializer.append('INF');
+      fsNInf: serializer.append('-INF');
+      else serializer.append('NaN');
+    end;
   end;
-  if withType then serializer.append(')');
 end;
 
 function TXQValueFloat.clone: IXQValue;
@@ -1015,7 +1322,28 @@ end;
 
 function TXQValueDecimal.toDateTime: TDateTime;
 begin
- Result:= getNaN;
+ Result:= double.NaN;
+end;
+
+function TXQValueDecimal.hashCode: uint32;
+var r, digit: BigDecimalBinSquared;
+  i: sizeint;
+begin
+  r := 0;
+  digit := 1;
+  for i := 0 to high(value.digits) do begin
+    r := r + digit * value.digits[i] ;
+    if r >= THashInfo.modulus then r := r mod thashinfo.modulus;
+    digit := (digit * ELEMENT_OVERFLOW) mod THashInfo.modulus;
+  end;
+  if value.exponent > 0 then r := r * modPow(ELEMENT_OVERFLOW, value.exponent, thashinfo.modulus)
+  else if value.exponent < 0 then begin
+    assert((ELEMENT_OVERFLOW = 1000000000) and (thashinfo.bigdecimalInverse = 968029830));
+    r := r * modPow(THashInfo.bigdecimalInverse, -value.exponent, thashinfo.modulus);
+  end;
+  if r >= THashInfo.modulus then r := r mod thashinfo.modulus;
+  result := r;
+  if value.signed then result := uint32.MaxValue - result + 1;
 end;
 
 procedure TXQValueDecimal.jsonSerialize(var serializer: TXQSerializer);
@@ -1066,12 +1394,6 @@ end;
 
 {$ImplicitExceptions on}
 
-class function TXQValueString.canCreateFromString(const v: string): boolean;
-begin
-  ignore(v);
-  result := true;
-end;
-
 class function TXQValueString.classKind: TXQValueKind;
 begin
   Result:=pvkString;
@@ -1090,15 +1412,10 @@ begin
     raise EXQEvaluationException.create('FORG0006', 'Cannot convert '+toXQuery() + ' to boolean.');
 end;
 
-{$ImplicitExceptions off}
 function TXQValueString.toString: string;
 begin
   result := str;
-  //if ((typeAnnotation as TXSSimpleType).primitive as TXSStringType).subType in [xsstBase64Binary, xsstHexBinary] then
-  if instanceOf(baseSchema.base64Binary) then
-    result := StringReplace(result, ' ', '', [rfReplaceAll]);
 end;
-{$ImplicitExceptions on}
 
 function TXQValueString.toDateTime: TDateTime;
 begin
@@ -1108,23 +1425,137 @@ end;
 function TXQValueString.toFloatChecked(scontext: TXQStaticContext): xqfloat;
 begin
   if scontext.strictTypeChecking and not instanceOf(baseSchema.untypedAtomic) then raiseXPTY0004TypeError(self, 'float/double');
-  result := myStrToFloat(str);
-  if IsNan(result) and (trim(str) <> 'NaN') then raiseFORG0001InvalidConversion(self, 'float/double')
+  result := xqfloat.parse(str);
+  if result.IsNan() and (trim(str) <> 'NaN') then raiseFORG0001InvalidConversion(self, 'float/double')
 end;
 
-function TXQValueString.toRawBinary: string;
+function TXQValueString.hashCode: uint32;
 begin
-  if instanceOf(baseSchema.hexBinary) then result := str.decodeHex
-  else if instanceOf(baseSchema.base64Binary) then begin
-    if str = '' then exit('');
-    result := base64.DecodeStringBase64(str)
-  end else begin assert(false); result := ''; end;
+  Result:=TXQDefaultTypeInfo.hash(pchar(str), length(str));
 end;
+
 
 function TXQValueString.clone: IXQValue;
 begin
   result := TXQValueString.create(ftypeAnnotation, str);
 end;
+
+
+
+
+
+constructor TXQValueBinary.create(atypeAnnotation: TXSType; const astr: string);
+begin
+  inherited create(atypeAnnotation);
+  encoded := astr;
+end;
+
+destructor TXQValueBinary.Destroy;
+begin
+  encoded := '';
+  inherited Destroy;
+end;
+
+class function TXQValueBinary.classKind: TXQValueKind;
+begin
+  Result:=pvkBinary;
+end;
+
+function TXQValueBinary.toBoolean: boolean;
+begin
+  Result:= (encoded <> '');
+end;
+
+function TXQValueBinary.toBooleanEffective: boolean;
+begin
+  raise EXQEvaluationException.create('FORG0006', 'Cannot convert '+toXQuery() + ' to boolean.');
+  result := false;
+end;
+
+function TXQValueBinary.toString: string;
+begin
+  Result:=encoded;
+end;
+
+function TXQValueBinary.toDateTime: TDateTime;
+begin
+  raise EXQEvaluationException.create('FORG0006', 'Cannot convert '+toXQuery() + ' to datetime.');
+  result := 0;
+end;
+
+function TXQValueBinary.toFloatChecked(scontext: TXQStaticContext): xqfloat;
+begin
+  raise EXQEvaluationException.create('FORG0006', 'Cannot convert '+toXQuery() + ' to float.');
+  result := 0;
+end;
+
+function TXQValueBinary.hashCode: uint32;
+begin
+  Result:=TXQDefaultTypeInfo.hash(pchar(encoded), length(encoded));
+end;
+
+function TXQValueBinary.toRawBinary: string;
+begin
+  if instanceOf(baseSchema.hexBinary) then result := encoded.decodeHex
+  else if instanceOf(baseSchema.base64Binary) then begin
+    if encoded = '' then exit('');
+    result := base64.DecodeStringBase64(encoded)
+  end else begin assert(false); result := ''; end;
+end;
+
+class function TXQValueBinary.compare(a, b: TXQValue): TXQCompareResult;
+var sa, sb, temp: string;
+    at, bt: (tBase64, tHex, tUntyped, tOther);
+begin
+  sa := '';
+  sb := '';
+  if a.typeAnnotation <> b.typeAnnotation then begin
+    if a.instanceOf(baseSchema.base64Binary) then at := tBase64
+    else if a.instanceOf(baseSchema.hexBinary) then at := tHex
+    else if a.instanceOf(baseSchema.untypedAtomic) then at := tUntyped
+    else at := tOther;
+    if b.instanceOf(baseSchema.base64Binary) then bt := tBase64
+    else if b.instanceOf(baseSchema.hexBinary) then bt := tHex
+    else if b.instanceOf(baseSchema.untypedAtomic) then bt := tUntyped
+    else bt := tOther;
+
+    result := xqcrEqual;
+    if (at = tUntyped) or (bt = tUntyped) then begin
+      try
+        if at = tUntyped then temp := a.toString
+        else temp := b.toString;
+        if (at = tBase64) or (bt = tBase64) then temp := base64.DecodeStringBase64(temp)
+        else begin
+          if length(temp) and 1 = 1 then exit(xqcrIncomparable);
+          temp := temp.DecodeHex;
+        end;
+        if at = tUntyped then sa := temp
+        else sb := temp;
+      except
+        on e: Exception do  {StreamError for base64, exception for hex}
+          exit(xqcrIncomparable);
+      end;
+    end else if ((at = tHex) and (bt = tHex)) or ((at = tBase64) and (bt = tBase64)) then begin
+     //okay
+    end else begin
+      //if strictTypeChecking then raiseXPTY0004TypeError(a, 'binary like ' + b.toXQuery);
+      exit(xqcrIncomparable);
+    end;
+  end;
+  if sa = '' then sa := (a as TXQValueBinary).toRawBinary;
+  if sb = '' then sb := (b as TXQValueBinary).toRawBinary;
+  result := TXQCompareResult.compare(sa, sb);
+  //todo: less-than/greater-than should raise exception unless 3.1 mode is enabled
+end;
+function TXQValueBinary.clone: IXQValue;
+begin
+  Result:=TXQValueBinary.create(typeAnnotation, encoded);
+end;
+
+
+
+
+
 
 
 constructor TXQValueQName.create(atypeAnnotation: TXSType; const aurl, aprefix, alocal: string);
@@ -1195,6 +1626,11 @@ function TXQValueQName.toBooleanEffective: boolean;
 begin
   raise EXQEvaluationException.Create('FORG0006', 'A QName cannot be used a boolean');
   result := false;
+end;
+
+function TXQValueQName.hashCode: uint32;
+begin
+  Result:=TXQDefaultTypeInfo.hash(pchar(url), length(url)) xor TXQDefaultTypeInfo.hash(pchar(local), length(local));
 end;
 
 procedure TXQValueQName.adaptiveSerialize(var serializer: TXQSerializer);
@@ -1317,6 +1753,16 @@ function TXQValueDateTime.getInternalDateTimeData: PXQValueDateTimeData;
 begin
   result := @value;
 end;
+
+{$push}{$RangeChecks off}{$OverflowChecks off}
+function TXQValueDateTime.hashCode: uint32;
+begin
+ with value do
+ result :=   ((((year shl 4) or month) shl 5) or day)
+         xor ((((hour shl 6) or (min + timezone) ) shl 6) or seconds)
+         xor timezone;
+end;
+{$pop}
 
 procedure TXQValueDateTime.setDateTime(const dateTime: TDateTime);
 var
@@ -1532,16 +1978,17 @@ begin
   duration.microsecs := dt;
 end;
 
-procedure TXQValueDateTime.truncateRange;
+procedure TXQValueDateTime.truncateRange();
 begin
   case (ftypeAnnotation as TXSDateTimeType).truncation of
     xqdttDate:      begin value.year := 1989; value.month := 12; value.day := 30; end;
     xqdttTime:      begin value.hour := 0; value.min := 0; value.seconds := 0; value.microsecs := 0; end;
     xqdttYearMonth: begin value.year := 0; value.month := 0;   end;
+    xqdttNone:;
   end;
 end;
 
-class function TXQValueDateTime.compare(const a, b: TXQValueDateTime; implicitTimezone: integer): integer;
+class function TXQValueDateTime.compare(const a, b: TXQValueDateTime; implicitTimezone: integer): TXQCompareResult;
 const formatIds: string = 'ymdhns';
 const componentFiller: array[1..6] of integer = (1972, 1, 1, 0, 0, 0);
 var
@@ -1551,7 +1998,7 @@ var
 
   overlap: Integer;
 begin
-  result := 0;
+  result := xqcrEqual;
   adf := lowercase((a.typeAnnotation as TXSDateTimeType).fixedDateTimePattern);
   bdf := lowercase((b.typeAnnotation as TXSDateTimeType).fixedDateTimePattern);
   av := a.value;
@@ -1568,12 +2015,12 @@ begin
       bv.day:=1;
     end;}
   end;
-  if overlap = 0 then exit(-2); //not comparable
+  if overlap = 0 then exit(xqcrIncomparable); //not comparable
 
   //carefully here, the timezone difference might change every date component, even the year
   if av.timezone = high(Integer) then av.timezone := implicitTimezone;
   if bv.timezone = high(Integer) then bv.timezone := implicitTimezone;
-  result := compareValue(av.toMicroSecondStamp(), bv.toMicroSecondStamp());
+  result := TXQCompareResult.compare(av.toMicroSecondStamp(), bv.toMicroSecondStamp());
 end;
 
 
@@ -1621,12 +2068,12 @@ begin
   case getSequenceCount of
     0: exit(false);
     1: exit(seq[0].toBooleanEffective);
-    else begin
+    else
       case seq[0].kind of
         pvkNode, pvkObject, pvkArray: exit(true);
+        else raise EXQEvaluationException.Create('FORG0006', 'A sequence starting with an atomic value cannot be used as boolean');
       end;
-      raise EXQEvaluationException.Create('FORG0006', 'A sequence starting with an atomic value cannot be used as boolean');
-    end;
+
   end;
 end;
 
@@ -1681,6 +2128,22 @@ function TXQValueSequence.toNode: TTreeNode;
 begin
   if seq.Count >= 1 then result := seq[0].toNode
   else result := nil;
+end;
+
+function TXQValueSequence.hashCode: uint32;
+var
+  pv: PIXQValue;
+begin
+  //it is only supposed to calculate hashs of atomic values
+  case getSequenceCount of
+    0: result := 0;
+    1: result := seq[0].hashCode;
+    else begin
+      result := 0;
+      for pv in GetEnumeratorPtrUnsafe do
+        result := result xor pv^.hashCode;
+    end;
+  end;
 end;
 
 function TXQValueSequence.toArray: TXQVArray;
@@ -1921,13 +2384,21 @@ begin
   ignore(scontext);
   if scontext.strictTypeChecking and (nodeTypeAnnotation(node) = baseSchema.string_) then raiseXPTY0004TypeError(self, 'float/double');
   str := toString;
-  result := myStrToFloat(str);
+  result := xqfloat.parse(str);
   if IsNan(result) and (str <> 'NaN') then raiseFORG0001InvalidConversion(self, 'float/double')
 end;
 
 function TXQValueNode.toNode: TTreeNode;
 begin
   result := node;
+end;
+
+function TXQValueNode.hashCode: uint32;
+var
+  temp: String;
+begin
+  temp := toString;
+  result := TXQDefaultTypeInfo.hash(pchar(temp), length(temp));
 end;
 
 function TXQValueNode.clone: IXQValue;
@@ -1940,7 +2411,10 @@ begin
   if node <> nil then begin
     case node.typ of
       tetAttribute: if serializer.standard then serializer.error('SENR0001', 'Attribute', self)
-                    else adaptiveSerialize(serializer);
+                    else case serializer.nodeFormat of
+                      tnsText: serializer.appendJSONString(toString);
+                      else serializer.appendJSONString(node.getNodeName()+'="'+(node as TTreeAttribute).realvalue+'"');
+                    end
       else
         case serializer.nodeFormat of
           tnsText: serializer.appendJSONString(toString);
@@ -2000,148 +2474,56 @@ begin
   end;
 end;
 
-
-
-
-
-{ TXQValuePropertyEnumerator }
-
-function TXQValuePropertyEnumerator.GetCurrent: TXQProperty;
+class function TXQValueNode.nodeTypeAnnotationForAtomic(tn: TTreeNode): TXSType;
 begin
-  result := prop;
+  case tn.typ of
+    tetOpen, tetDocument: result := baseSchema.untypedAtomic; //todo: handle i:type="xs:integer" attribute
+    tetText: result := baseSchema.untypedAtomic;
+    tetAttribute: if (tn as TTreeAttribute).isNamespaceNode then result := baseSchema.anyURI else result := baseSchema.untypedAtomic;
+    tetComment, tetProcessingInstruction: result := baseSchema.string_;
+    else raise EXQEvaluationException.Create('pxp:INTERNAL', 'Impossible node type');
+  end;
 end;
 
-function TXQValuePropertyEnumerator.MoveNext: Boolean;
-begin
-  if visitedProperties = nil then begin
-    inc(idx);
-    result := idx < vars.count;
-    exit;
-  end;
 
-  inc(idx);
-  while true do begin
-    while (idx < vars.count) and (visitedProperties.IndexOf(vars.getName(idx)) >= 0) do
-      inc(idx);
-    if idx < vars.count then break;
-    tempobj := tempobj.prototype as TXQValueObject;
-    if tempobj = nil then exit(false);
-    idx := 0;
-    vars := tempobj.values;
-  end;
-//  if tempobj = nil then exit(false);
-  result := true;
-  visitedProperties.Add(vars.getName(idx));
-end;
 
-function TXQValuePropertyEnumerator.GetEnumerator: TXQValuePropertyEnumerator;
+
+
+
+
+function TXQValueGenericPropertyEnumerator.GetEnumerator: TXQValueGenericPropertyEnumerator;
 begin
   result := self;
 end;
 
-constructor TXQValuePropertyEnumerator.create(obj: TXQValueObject);
-begin
-  prop := TXQProperty.Create;
-  prop.enum := self;
-  vars := obj.values;
-  tempobj := obj;
-  if tempobj.prototype <> nil then begin
-    visitedProperties := TStringList.Create; //todo: get a hashmap
-    visitedProperties.Sorted:=true;
-  end;
-  idx := -1;
-end;
 
-destructor TXQValuePropertyEnumerator.destroy;
-begin
-  prop.Free;
-  visitedProperties.Free;
-  inherited destroy;
-end;
-
-
-
-
-{ TXQValueObject }
-
-constructor TXQValueObject.create();
-begin
-  inherited create(baseJSONiqSchema.object_);
-  values:= TXQVariableChangeLog.create();
-end;
-
-constructor TXQValueObject.createTakingVariableLog(log: TXQVariableChangeLog);
-begin
-  values := log;
-end;
-
-destructor TXQValueObject.Destroy;
-begin
-  values.Free;
-  prototype := nil;
-  inherited Destroy;
-end;
-
-class function TXQValueObject.classKind: TXQValueKind;
+class function TXQValueMapLike.classKind: TXQValueKind;
 begin
   Result:=pvkObject;
 end;
 
-function TXQValueObject.Size: SizeInt;
-var
-  temp: TStringList;
+function TXQValueMapLike.toBooleanEffective: boolean;
 begin
-  if prototype = nil then result := values.count
-  else begin
-    temp := TStringList.Create;
-    enumerateKeys(temp);
-    result := temp.Count;
-    temp.free;
-  end;
+  Result:=true;
+  if not globalCurrentQueryInfo.AllowJSONiqOperations then
+    raise EXQEvaluationException.create('FORG0006', 'Object cannot be used as boolean', nil, self);
 end;
 
-procedure TXQValueObject.setMutable(const name: string; const v: IXQValue);
-(*var point: integer;
-  temp: String;
-  old: TXQValue;
-  i: Integer;
-  base: String;     *)
+function TXQValueMapLike.toString: string;
 begin
-  values.add(name, v);
-(*
-  point := pos('.', name);
-  if Point = 0 then values.add(name, v)
-  else begin
-    temp := name;
-    base := strSplitGet('.', temp);
-    i := values.indexOf(base);
-    if i < 0 then begin
-      if not hasProperty(base, @old) then raise EXQEvaluationException.Create('pxp:OBJECT', 'Need object property '+temp+' to assign to '+name);
-      values.add(base, old.clone);
-      i := values.count-1;
-    end;
-    if not (values.get(i) is TXQValueObject) then raise EXQEvaluationException.Create('pxp:OBJECT', 'Need object property '+temp+' to assign to '+name);
-    (values.get(i) as TXQValueObject).setMutable(temp, v);
-  end;*)
+  Result:=inherited toString;
+  if not globalCurrentQueryInfo.AllowJSONiqOperations then
+    raise EXQEvaluationException.create('FOTY0014', 'Object cannot be used as string', nil, self);
 end;
 
-function TXQValueObject.setImmutable(const name: string; const v: IXQValue): TXQValueObject;
+function TXQValueMapLike.toJoinedString(const sep: string): string;
 begin
-  result := cloneLinked;
-  result.setMutable(name, v);
+  if not globalCurrentQueryInfo.AllowJSONiqOperations then
+    raise EXQEvaluationException.create('FOTY0013', 'Object cannot be used as string', nil, self); //0013 because it is implicitly calling fn:data
+  Result:=inherited toJoinedString(sep);
 end;
 
-procedure TXQValueObject.setMutable(const name: string; const s: string);
-begin
-  setMutable(name,xqvalue(s));
-end;
-
-function TXQValueObject.setImmutable(const name: string; const s: string): TXQValueObject;
-begin
-  result := setImmutable(name,xqvalue(s));
-end;
-
-function TXQValueObject.setImmutable(const props: PString; len: SizeInt; const v: IXQValue): TXQValueObject;
+function TXQValueMapLike.setImmutable(const props: PString; len: SizeInt; const v: IXQValue): TXQValueMapLike;
 var
   oldValue: TXQValue;
   newValue: IXQValue;
@@ -2151,212 +2533,604 @@ begin
 
   if not hasProperty(props^, @oldValue) then
     raise EXQEvaluationException.Create('pxp:OBJECT', 'Property '+props^+' not found, when assigning to '+strJoin(props, len, '.'));
-  if objInheritsFrom(oldValue, TXQValueObject) then newValue := TXQValueObject(oldValue).setImmutable(props + 1, len - 1, v)
-  else if objInheritsFrom(oldValue, TXQValueJSONArray) then newValue := TXQValueJSONArray(oldValue).setImmutable(props + 1, len - 1, v)
-  else raise EXQEvaluationException.Create('pxp:OBJECT', 'Need object or array property '+props^+' to assign to '+strJoin(props, len, '.'));
+  if oldValue.kind in [pvkArray, pvkObject] then
+    newValue := oldValue.setImmutable(props + 1, len - 1, v)
+  else
+   raise EXQEvaluationException.Create('pxp:OBJECT', 'Need object or array property '+props^+' to assign to '+strJoin(props, len, '.'));
 
-  result := cloneLinked;
-  result.values.add(props^, newValue);
+  result := setImmutable(props^, newValue);
 end;
 
-procedure TXQValueObject.enumerateKeys(sl: TStringList);
-var
-  obj: TXQValueObject;
-  i: Integer;
-  oldcount: Integer;
+
+
+class function TXQValueMapLike.newinstance: tobject;
+var hackmethod: TMethod;
 begin
-  //this does not add keys to sl that are already contained in sl. (so you can combine keys of multiple objects)
-  obj := self;
-  oldcount := sl.count;
-  while obj <> nil do begin
-    for i := obj.values.count - 1 downto 0 do
-      if sl.IndexOf(obj.values.getName(i)) < 0 then
-        sl.Insert(oldcount, obj.values.getName(i)); //TODO: optimize
-    obj := obj.prototype as TXQValueObject;
+  hackMethod.Data := self;
+  hackMethod.Code := @TObject.newinstance;
+  result := TNewinstanceFunc(hackMethod)();
+end;
+
+procedure TXQValueMapLike.FreeInstance;
+begin
+  Freemem(pointer(self));
+end;
+
+
+
+
+
+
+
+constructor TXQValueStringMap.create();
+begin
+  inherited create(baseJSONiqSchema.object_);
+  mapdata.init;
+end;
+
+destructor TXQValueStringMap.Destroy;
+begin
+  mapdata.done;
+  mapdata := default(TXQHashmapStrOwningXQValue);
+  inherited Destroy;
+end;
+
+
+function TXQValueStringMap.Size: SizeInt;
+begin
+  Result:=mapdata.Size;
+end;
+
+function TXQValueStringMap.getPropertyKeyKind: TXQMapPropertyKeyKind;
+begin
+  Result:=xqmpkkStringKeys;
+end;
+
+function TXQValueStringMap.hasProperty(const name: string; value: PXQValue): boolean;
+var
+  p: TXQHashmapStrOwningXQValue.TKeyValuePairOption;
+begin
+  p := mapdata.findKeyValuePair(name);
+  result := p.isAssigned;
+  if result and assigned(value) then value^ := p.value;
+end;
+
+function TXQValueStringMap.hasProperty(const name: ixqvalue; value: PXQValue): boolean;
+begin
+  Result:=hasProperty(name.toString, value);
+end;
+
+function TXQValueStringMap.getProperty(const name: IXQValue): IXQValue;
+begin
+  Result:=getProperty(name.toString);
+end;
+
+function TXQValueStringMap.getProperty(const name: string): IXQValue;
+var
+  p: TXQHashmapStrOwningXQValue.TKeyValuePairOption;
+begin
+  p := mapdata.findKeyValuePair(name);
+  if p.isAssigned then result := p.value
+  else result := xqvalue();
+end;
+
+
+constructor TXQValueStringMap.TXQValueStringPropertyEnumeratorForStringMap.create(map: TXQValueStringMap);
+begin
+  enumerator := map.mapdata.GetEnumerator;
+end;
+
+function TXQValueStringMap.TXQValueStringPropertyEnumeratorForStringMap.MoveNext: Boolean;
+begin
+  result := enumerator.moveNext;
+  if result then fcurrent := enumerator.current;
+end;
+
+constructor TXQValueStringMap.TXQValuePropertyValueEnumeratorForStringMap.create(map: TXQValueStringMap);
+begin
+  enumerator := map.mapdata.GetEnumerator;
+end;
+
+function TXQValueStringMap.TXQValuePropertyValueEnumeratorForStringMap.MoveNext: Boolean;
+begin
+  result := enumerator.moveNext;
+  if result then fcurrent := enumerator.current.value;
+end;
+
+constructor TXQValueStringMap.TXQValueStandardPropertyEnumeratorForStringMap.create(map: TXQValueStringMap);
+begin
+  enumerator := map.mapdata.GetEnumerator;
+  fcurrent.entity := @tempEntity;
+end;
+
+function TXQValueStringMap.TXQValueStandardPropertyEnumeratorForStringMap.MoveNext: Boolean;
+begin
+  result := enumerator.moveNext;
+  if result then begin
+    tempEntity.key := TXQValueString.create(enumerator.current.key);
+    tempEntity.value := enumerator.current.value;
   end;
 end;
 
-function TXQValueObject.enumerateValues: IXQValue;
+
+function TXQValueStringMap.getEnumeratorPropertiesUnsafe: TXQValueStandardPropertyEnumerator;
+begin
+  Result := TXQValueStandardPropertyEnumeratorForStringMap.create(self);
+end;
+
+function TXQValueStringMap.getEnumeratorPropertyValuesUnsafe: TXQValuePropertyValueEnumerator;
+begin
+  Result:=TXQValuePropertyValueEnumeratorForStringMap.create(self);
+end;
+
+function TXQValueStringMap.getEnumeratorStringPropertiesUnsafe: TXQValueStringPropertyEnumerator;
+begin
+  Result:=TXQValueStringPropertyEnumeratorForStringMap.create(self);
+end;
+
+
+procedure TXQValueStringMap.setMutable(const name: string; const v: IXQValue);
+begin
+  mapdata.include(name, v.toValue);
+end;
+
+function TXQValueStringMap.setImmutable(const name: string; const v: IXQValue): TXQValueMapLike;
+const SMALL_SIZE_FULL_COPY = 7;
 var
-  prop: TXQProperty;
-  tempSeq: TXQValueSequence;
+  Resmap: TXQValueStringMap;
+  resmapupdate: TXQValueStringMapPendingUpdate;
 begin
-  tempSeq := TXQValueSequence.create(values.count);
-  for prop in getPropertyEnumerator do
-    tempSeq.add(prop.Value);
-  result := tempSeq;
-  xqvalueSeqSqueeze(result);
-end;
-
-
-function TXQValueObject.toBooleanEffective: boolean;
-begin
-  result := true;
-end;
-
-function TXQValueObject.hasProperty(const name: string; value: PXQValue): boolean;
-var
-  i: Integer;
-begin
-  i := values.indexOf(name);
-  if i >= 0 then begin
-    if value <> nil then value^ := values.get(i).toValue;
-    exit(true);
-  end;
-  result := prototype <> nil;
-  if not result then exit;
-  result := (prototype as TXQValueObject).hasProperty(name, value);
-end;
-
-function TXQValueObject.clone: IXQValue;
-var
-  i: Integer;
-begin
-  if prototype = nil then result := TXQValueObject.create()
-  else result := prototype.clone(); //removes the prototype link (necessary for example)
-  for i:=0 to values.count-1 do
-    (result as TXQValueObject).values.add(values.getName(i), values.get(i));
-end;
-
-function TXQValueObject.cloneLinked: TXQValueObject;
-begin
-  result := TXQValueObject.create();
-  result.prototype := self;
-end;
-
-procedure TXQValueObject.jsonSerialize(var serializer: TXQSerializer);
-var
-  prop: TXQProperty;
-  first: Boolean;
-  nameCheck: ^TXQHashmapStrStr;
-begin
-  if serializer.allowDuplicateNames then nameCheck := nil
-  else new(nameCheck,init);
-  first := true;
-  try
-    with serializer do begin
-      for prop in getPropertyEnumerator do begin
-        if not first then appendJSONObjectComma
-        else begin
-          first := false;
-          appendJSONObjectStart;
-        end;
-        if assigned(nameCheck) then begin
-          if nameCheck.contains(prop.name) then
-            raiseXQEvaluationError('SERE0022', 'Duplicate key names when serializing.', self);
-          nameCheck.include(prop.Name, '');
-        end;
-        appendJSONObjectKeyColon(prop.Name);
-        prop.Value.jsonSerialize(serializer);
-      end;
-      if not first then appendJSONObjectEnd
-      else appendJSONEmptyObject;
-    end;
-  finally
-    if assigned(nameCheck) then nameCheck^.done;
+  if (Size <= SMALL_SIZE_FULL_COPY) or hasProperty(name, nil) then begin
+    resmap := TXQValueStringMap.create;
+    resmap.mapdata.assign(mapdata);
+    resmap.setMutable(name, v);
+    result := resmap
+  end else begin
+    resmapupdate := TXQValueStringMapPendingUpdate.create(self);
+    resmapupdate.mapdata.include(name, v.toValue);
+    result := resmapupdate
   end;
 end;
 
-procedure TXQValueObject.xmlSerialize(var serializer: TXQSerializer);
+procedure TXQValueStringMap.setMutable(const name: string; const s: string);
+begin
+  setMutable(name, xqvalue(s));
+end;
+
+
+procedure TXQValueStringMap.enumeratePropertyKeys(var keyset: TXQHashsetStr);
+var p: TXQHashmapStrOwningXQValue.TKeyValuePairOption;
+begin
+  for p in mapdata do
+    keyset.include(p.key);
+end;
+
+function TXQValueStringMap.enumeratePropertyValues: IXQValue;
+var p: TXQHashmapStrOwningXQValue.TKeyValuePairOption;
+  tempseq: TXQValueSequence;
+begin
+  tempseq := TXQValueSequence.create(mapdata.Count);
+  for p in mapdata do
+    tempseq.add(p.value);
+  result := tempseq;
+end;
+
+
+function TXQValueStringMap.clone: IXQValue;
 var
-  first: Boolean;
-  prop: TXQProperty;
-  tempName: String;
+  resmap: TXQValueStringMap;
 begin
-  first := true;
-  with serializer do begin
-    for prop in getPropertyEnumerator do begin
-      if first then begin
-        appendXMLElementStartTag(objectTag);
-        first := false;
-      end;
-      tempName := prop.name;
-      if TXSSchema.isValidNCName(tempName) then
-        appendXMLElementStartTag(tempName)
-      else begin
-        appendXMLElementStartOpen('_');
-        appendXMLElementAttribute('key', tempName);
-        appendXMLElementStartClose();
-        tempName := '_';
-      end;
-      prop.Value.xmlSerialize(serializer);
-      appendXMLElementEndTag(tempName);
-    end;
-    if first then appendXMLEmptyElement(objectTag) //no properties
-    else appendXMLElementEndTag(objectTag);
-  end;
+  resmap := TXQValueStringMap.create;
+  resmap.mapdata.assign(mapdata);
+  Result:=resmap
 end;
 
-procedure TXQValueObject.adaptiveSerialize(var serializer: TXQSerializer);
-var
-  prop: TXQProperty;
-  first: Boolean;
+
+
+
+
+
+
+
+
+constructor TXQValueStringMapPendingUpdate.create();
 begin
-  first := true;
-  with serializer do begin
-    append('map');
-    for prop in getPropertyEnumerator do begin
-      if not first then appendJSONObjectComma
-      else begin
-        first := false;
-        appendJSONObjectStart;
-      end;
-      appendXQueryString(prop.Name);
-      append(':');
-      prop.Value.adaptiveSerialize(serializer);
-    end;
-    if not first then appendJSONObjectEnd
-    else appendJSONEmptyObject;
-  end;
+  inherited;
 end;
 
-function TXQValueObject.stringifyNodes: IXQValue;
-var obj: TXQValueObject;
-  i: Integer;
+constructor TXQValueStringMapPendingUpdate.create(p: TXQValueStringMap);
 begin
-  if prototype <> nil then obj := prototype.stringifyNodes as TXQValueObject
-  else obj := TXQValueObject.create();
-  for i:=0 to values.count-1 do
-    obj.values.add(values.getName(i), values.get(i).stringifyNodes);
-  result := obj;
+  inherited create;
+  prototype := p
 end;
 
-function TXQValueObject.hasNodes: boolean;
+destructor TXQValueStringMapPendingUpdate.Destroy;
 begin
-  if values.hasNodes then result := true
-  else if prototype <> nil then result := prototype.hasNodes
-  else result := false;
+  prototype := nil;
+  inherited Destroy;
 end;
 
-class procedure TXQValueObject.prepareInternetRequest(const obj: IXQValue; out method, url, post: string; internet: TInternetAccess);
-var h: IXQValue;
-  value: String;
-  name: RawByteString;
+function TXQValueStringMapPendingUpdate.Size: SizeInt;
 begin
-  url := obj.getProperty('url').toString;
-  method := obj.getProperty('method').toString;
-  post := obj.getProperty('post').toString;
-  for h in obj.getProperty('headers') do begin
-    value := h.toString;
-    name := strSplitGet(':', value);
-    internet.additionalHeaders.Values[trim(name)] := trim(value);
-  end;
+  result := inherited size;
+  if prototype <> nil then result += prototype.Size;
 end;
 
-function TXQValueObject.getProperty(const name: string): IXQValue;
+function TXQValueStringMapPendingUpdate.hasProperty(const name: string; value: PXQValue): boolean;
+begin
+  Result:=inherited hasProperty(name, value);
+  if not result and assigned(prototype) then result := prototype.hasProperty(name, value);
+end;
+
+function TXQValueStringMapPendingUpdate.getProperty(const name: string): IXQValue;
 var
   temp: TXQValue;
 begin
-  temp := nil;
-  hasProperty(name, @temp);
-  if temp = nil then exit(xqvalue());
-  result := temp;
+  if hasProperty(name, @temp) then result := temp
+  else result := xqvalue()
 end;
 
-function TXQValueObject.getPropertyEnumerator: TXQValuePropertyEnumerator;
+function TXQValueStringMapPendingUpdate.getEnumerators: TXQHashmapRawEnumerators;
 begin
-  result := TXQValuePropertyEnumerator.Create(self);
+  if prototype <> nil then begin
+    result[0] := (prototype.toValue as txqvaluestringmap).mapdata.getEnumerator;
+    result[1] := mapdata.getEnumerator;
+  end else begin
+    result[0] := mapdata.getEnumerator;
+    result[1] := default(TXQHashmapStrOwningXQValue.TKeyPairEnumerator);
+  end;
 end;
+
+class function TXQValueStringMapPendingUpdate.moveNextEnumerators(var enums: TXQHashmapRawEnumerators): boolean;
+begin
+  result :=  enums[0].moveNext;
+  if (not result) and (enums[1].map <> nil) then begin
+    enums[0] := enums[1];
+    enums[1].map := nil;
+    result := enums[0].moveNext;
+  end;
+end;
+
+constructor TXQValueStringMapPendingUpdate.TXQValueStringPropertyEnumeratorForStringMapPendingUpdate.create(
+  map: TXQValueStringMapPendingUpdate);
+begin
+  enumerators := map.getEnumerators;
+end;
+
+function TXQValueStringMapPendingUpdate.TXQValueStringPropertyEnumeratorForStringMapPendingUpdate.MoveNext: Boolean;
+begin
+  result := moveNextEnumerators(enumerators);
+  if result then
+    fcurrent := enumerators[0].current;
+end;
+
+constructor TXQValueStringMapPendingUpdate.TXQValuePropertyValueEnumeratorForStringMapPendingUpdate.create(
+  map: TXQValueStringMapPendingUpdate);
+begin
+  enumerators := map.getEnumerators;
+end;
+
+function TXQValueStringMapPendingUpdate.TXQValuePropertyValueEnumeratorForStringMapPendingUpdate.MoveNext: Boolean;
+begin
+  result := moveNextEnumerators(enumerators);
+  if result then
+    fcurrent := enumerators[0].current.value;
+end;
+
+constructor TXQValueStringMapPendingUpdate.TXQValueStandardPropertyEnumeratorForStringMapPendingUpdate.create(
+  map: TXQValueStringMapPendingUpdate);
+begin
+  enumerators := map.getEnumerators;
+  fcurrent.entity := @tempEntity;
+end;
+
+function TXQValueStringMapPendingUpdate.TXQValueStandardPropertyEnumeratorForStringMapPendingUpdate.MoveNext: Boolean;
+begin
+  result := moveNextEnumerators(enumerators);
+  if result then begin
+    tempEntity.key := TXQValueString.create(enumerators[0].current.key);
+    tempEntity.value := enumerators[0].current.value;
+  end;
+end;
+
+
+function TXQValueStringMapPendingUpdate.getEnumeratorPropertiesUnsafe: TXQValueStandardPropertyEnumerator;
+begin
+  Result:=TXQValueStandardPropertyEnumeratorForStringMapPendingUpdate.create(self);
+end;
+
+function TXQValueStringMapPendingUpdate.getEnumeratorPropertyValuesUnsafe: TXQValuePropertyValueEnumerator;
+begin
+  Result:=TXQValuePropertyValueEnumeratorForStringMapPendingUpdate.create(self);
+end;
+
+function TXQValueStringMapPendingUpdate.getEnumeratorStringPropertiesUnsafe: TXQValueStringPropertyEnumerator;
+begin
+  Result:=TXQValueStringPropertyEnumeratorForStringMapPendingUpdate.create(self);
+end;
+
+procedure TXQValueStringMapPendingUpdate.setMutable(const name: string; const v: IXQValue);
+  procedure internalClone;
+  var temp: TXQHashmapStrOwningXQValue;
+  begin
+    temp.init;
+    temp.assign((prototype.toValue as TXQValueStringMap).mapdata);
+    temp.includeAll(mapdata);
+    mapdata.assign(temp);
+    temp.done;
+    prototype := nil
+  end;
+
+begin
+{var
+  pair: TXQHashmapStrOwningXQValue.TKeyValuePairOption;
+begin
+  pair := mapdata.findKeyValuePair(name);
+  if pair.isAssigned then
+    mapdata.include(name, v.toValue) //pair.value := v;
+  else if (prototype  nil) or not (prototype.hasProperty(name, nil)) then include}
+  if assigned(prototype) and prototype.hasProperty(name, nil) then
+    internalClone;
+  mapdata.include(name, v.toValue)
+end;
+
+procedure TXQValueStringMapPendingUpdate.setMutable(const name: string; const s: string);
+begin
+  setMutable(name, xqvalue(s))
+end;
+
+function TXQValueStringMapPendingUpdate.setImmutable(const name: string; const v: IXQValue): TXQValueMapLike;
+const SMALL_UPDATE_COUNT = 7;
+var
+  resmap: TXQValueStringMap;
+begin
+  if prototype = nil then
+    result := inherited
+  else begin
+    if (mapdata.Count <= SMALL_UPDATE_COUNT) and not prototype.hasProperty(name, nil) then begin
+      resmap := TXQValueStringMapPendingUpdate.create(prototype.toValue as TXQValueStringMap);
+      resmap.mapdata.assign(mapdata);
+    end else begin
+      resmap := txqvaluestringmap.create();
+      resmap.mapdata.assign((prototype as txqvaluestringmap).mapdata);
+      resmap.mapdata.includeAll(mapdata);
+    end;
+    resmap.mapdata.include(name, v.toValue);
+    result := resmap
+  end;
+end;
+
+procedure TXQValueStringMapPendingUpdate.enumeratePropertyKeys(var keyset: TXQHashsetStr);
+begin
+  if prototype <> nil then prototype.enumeratePropertyKeys(keyset);
+  inherited enumeratePropertyKeys(keyset);
+end;
+
+function TXQValueStringMapPendingUpdate.enumeratePropertyValues: IXQValue;
+var
+  seq: TXQValueSequence = nil;
+  p: TXQHashmapStrOwningXQValue.TKeyValuePairOption;
+begin
+  if prototype <> nil then begin
+    result := prototype.enumeratePropertyValues;
+    if result is TXQValueSequence then seq := result as TXQValueSequence;
+  end else result := nil;
+  for p in mapdata do
+    xqvalueSeqConstruct(result, seq, p.value);
+end;
+
+function TXQValueStringMapPendingUpdate.clone: IXQValue;
+var
+  resmap: TXQValueStringMapPendingUpdate;
+begin
+  resmap := TXQValueStringMapPendingUpdate.create;
+  resmap.prototype := prototype;
+  resmap.mapdata.assign(mapdata);
+  Result:=resmap
+end;
+
+
+
+
+constructor TXQValueStandardMap.create();
+begin
+  inherited create(baseJSONiqSchema.object_);
+  mapdata.init();
+end;
+
+constructor TXQValueStandardMap.create(const othermapdata: TXQHashmapXQValue);
+begin
+  inherited create(baseJSONiqSchema.object_);
+  mapdata.init;
+  mapdata.assign(othermapdata);
+end;
+
+destructor TXQValueStandardMap.Destroy;
+begin
+  mapdata.done;
+  inherited Destroy;
+end;
+
+function TXQValueStandardMap.Size: SizeInt;
+begin
+  Result:=mapdata.Count;
+end;
+
+function TXQValueStandardMap.getPropertyKeyKind: TXQMapPropertyKeyKind;
+begin
+  Result:=xqmpkkStandardKeys;
+end;
+
+function TXQValueStandardMap.findKeyValuePair(const key: IXQValue): TXQHashmapXQValue.TKeyValuePairOption;
+  function getAtomized: TXQHashmapXQValue.TKeyValuePairOption;
+  begin
+    result := mapdata.findKeyValuePair(xqvalueAtomize(key))
+  end;
+begin
+  if TXQValueOwnershipTracker.isAtomicKeyValue(key) then
+    result := mapdata.findKeyValuePair(key)
+   else
+    result := getAtomized
+end;
+
+function TXQValueStandardMap.hasProperty(const name: string; value: PXQValue): boolean;
+begin
+  result := hasProperty(xqvalue(name), value);
+end;
+
+
+function TXQValueStandardMap.getProperty(const name: string): IXQValue;
+begin
+  result := getProperty(xqvalue(name));
+end;
+
+function TXQValueStandardMap.hasProperty(const key: IXQValue; value: PXQValue): boolean;
+var
+  p: TXQHashmapXQValue.TKeyValuePairOption;
+begin
+  p := findKeyValuePair(key);
+  result := p.isAssigned;
+  if result and assigned(value) then value^ := p.value;
+end;
+
+function TXQValueStandardMap.getProperty(const key: IXQValue): IXQValue;
+var
+  p: TXQHashmapXQValue.TKeyValuePairOption;
+begin
+  p := findKeyValuePair(key);
+  if p.isAssigned then result := p.value
+  else result := xqvalue();
+end;
+
+constructor TXQValueStandardMap.TXQValueStringPropertyEnumeratorForStandardMap.create(map: TXQValueStandardMap);
+begin
+  enumerator := map.mapdata.getEnumerator;
+  fcurrent.entity := @tempEntity;
+end;
+
+function TXQValueStandardMap.TXQValueStringPropertyEnumeratorForStandardMap.MoveNext: Boolean;
+begin
+  result := enumerator.moveNext;
+  if result then begin
+    tempEntity.Key := enumerator.current.key.toString;
+    tempEntity.Value := enumerator.current.value;
+  end;
+end;
+
+constructor TXQValueStandardMap.TXQValueStandardPropertyEnumeratorForStandardMap.create(map: TXQValueStandardMap);
+begin
+  enumerator := map.mapdata.getEnumerator;
+end;
+
+function TXQValueStandardMap.TXQValueStandardPropertyEnumeratorForStandardMap.MoveNext: Boolean;
+begin
+  result := enumerator.moveNext;
+  if result then
+    fcurrent := enumerator.current;
+end;
+
+constructor TXQValueStandardMap.TXQValuePropertyValueEnumeratorForStandardMap.create(map: TXQValueStandardMap);
+begin
+  enumerator := map.mapdata.getEnumerator;
+end;
+
+function TXQValueStandardMap.TXQValuePropertyValueEnumeratorForStandardMap.MoveNext: Boolean;
+begin
+  result := enumerator.moveNext;
+  if result then
+    fcurrent := enumerator.current.value;
+end;
+
+
+function TXQValueStandardMap.getEnumeratorPropertiesUnsafe: TXQValueStandardPropertyEnumerator;
+begin
+  Result:=TXQValueStandardPropertyEnumeratorForStandardMap.create(self);
+end;
+
+function TXQValueStandardMap.getEnumeratorPropertyValuesUnsafe: TXQValuePropertyValueEnumerator;
+begin
+  Result:=TXQValuePropertyValueEnumeratorForStandardMap.Create(self)
+end;
+
+function TXQValueStandardMap.getEnumeratorStringPropertiesUnsafe: TXQValueStringPropertyEnumerator;
+begin
+  Result:=TXQValueStringPropertyEnumeratorForStandardMap.create(self);
+end;
+
+
+procedure TXQValueStandardMap.setMutable(const name: string; const v: IXQValue);
+begin
+  mapdata.include(xqvalue(name), v.toValue);
+end;
+
+procedure TXQValueStandardMap.setMutable(const name: string; const s: string);
+begin
+  mapdata.include(xqvalue(name), TXQValueString.create(s));
+end;
+
+procedure TXQValueStandardMap.setMutable(const key: IXQValue; const v: IXQValue);
+  procedure setAtomized;
+  var temp: IXQValue;
+  begin
+    temp := xqvalueAtomize(key);
+    if temp.getSequenceCount <> 1 then raiseXPTY0004TypeError(key, 'map key');
+    mapdata.include(temp, v.toValue);
+  end;
+
+begin
+  if TXQValueOwnershipTracker.isAtomicKeyValue(key) then
+    mapdata.include(key, v.toValue)
+   else
+    setAtomized;
+end;
+
+function TXQValueStandardMap.setImmutable(const name, value: IXQValue): TXQValueMapLike;
+var
+  resmap: TXQValueStandardMap;
+begin
+  resmap := TXQValueStandardMap.create(mapdata);
+  resmap.setMutable(name, value);
+  result := resmap;
+end;
+
+function TXQValueStandardMap.setImmutable(const name: string; const v: IXQValue): TXQValueMapLike;
+begin
+  result := setImmutable(xqvalue(name), v);
+end;
+
+function TXQValueStandardMap.enumeratePropertyKeys: IXQValue;
+var p: TXQHashmapXQValue.TKeyValuePairOption;
+  list: TXQVList;
+begin
+  list := TXQVList.create(size);
+  for p in mapdata do
+    list.add(p.key);
+  xqvalueSeqSqueezed(result, list);
+end;
+
+procedure TXQValueStandardMap.enumeratePropertyKeys(var keyset: TXQHashsetStr);
+var p: TXQHashmapXQValue.TKeyValuePairOption;
+begin
+  for p in mapdata do
+    keyset.include(p.key.toString);
+end;
+
+function TXQValueStandardMap.enumeratePropertyValues: IXQValue;
+var p: TXQHashmapXQValue.TKeyValuePairOption;
+  list: TXQVList;
+begin
+  list := TXQVList.create(size);
+  for p in mapdata do
+    list.add(p.value);
+  xqvalueSeqSqueezed(result, list);
+end;
+
+function TXQValueStandardMap.clone: IXQValue;
+begin
+  Result:=TXQValueStandardMap.create(mapdata);
+end;
+
+
 
 
 { TXQValueJSONArray }
@@ -2406,6 +3180,8 @@ end;
 function TXQValueJSONArray.toBooleanEffective: boolean;
 begin
   result := true;
+  if not globalCurrentQueryInfo.AllowJSONiqOperations then
+    raise EXQEvaluationException.create('FORG0006', 'Array cannot be used as boolean', nil, self);
 end;
 
 function TXQValueJSONArray.toString: string;
@@ -2442,11 +3218,13 @@ begin
   result := seqr;
 end;
 
-function TXQValueJSONArray.setImmutable(const props: PString; len: SizeInt; const v: IXQValue): TXQValueJSONArray;
+function TXQValueJSONArray.setImmutable(const props: PString; len: SizeInt; const v: IXQValue): TXQValue;
 var
   newValue: IXQValue;
   i: Integer;
   idx: Integer;
+  resultArray: TXQValueJSONArray;
+  resseq: TXQVList;
 begin
   idx := StrToInt(props^);
   if idx < 0 then raise EXQEvaluationException.create('pxp:ARRAY', 'Cannot assign to negative array index');
@@ -2455,20 +3233,19 @@ begin
     newValue := v
   else if (idx > seq.Count) then
     raise EXQEvaluationException.Create('pxp:Array', 'Element index'+props^+' not found, when assigning to '+strJoin(props, len, '.'))
-  else if seq[idx-1] is TXQValueObject then
-    newValue := (seq[idx-1] as TXQValueObject).setImmutable(props + 1, len - 1, v)
-  else if seq[idx-1] is TXQValueJSONArray then
-    newValue := (seq[idx-1] as TXQValueJSONArray).setImmutable(props + 1, len - 1, v)
+  else if seq[idx-1].kind in [pvkArray, pvkObject] then
+    newValue := seq[idx-1].toValue.setImmutable(props + 1, len - 1, v)
   else raise EXQEvaluationException.Create('pxp:ARRAY', 'Need array or object '+props^+' to assign to '+strJoin(props, len, '.'));
 
-
-  result := TXQValueJSONArray.create(seq.Count);
-  if idx = 0 then result.seq.add(newValue);
+  resultArray := TXQValueJSONArray.create(seq.Count);
+  resseq := resultArray.seq;
+  if idx = 0 then resseq.add(newValue);
   idx -= 1;
   for i := 0 to seq.Count - 1 do
-    if i <> idx  then result.seq.add(seq[i])
-    else result.seq.add(newValue);
-  if idx >= seq.Count then result.seq.add(newValue); //e.g. $a(1000) := ..
+    if i <> idx  then resseq.add(seq[i])
+    else resseq.add(newValue);
+  if idx >= seq.Count then resseq.add(newValue); //e.g. $a(1000) := ..
+  result := resultArray;
 end;
 
 procedure TXQValueJSONArray.jsonSerialize(var serializer: TXQSerializer);
@@ -2576,6 +3353,11 @@ begin
   result:='null';
 end;
 
+function TXQValueJSONNull.hashCode: uint32;
+begin
+  result := 0;
+end;
+
 procedure TXQValueJSONNull.jsonSerialize(var serializer: TXQSerializer);
 begin
   serializer.append('null');
@@ -2671,7 +3453,8 @@ var
   i: Integer;
 {$endif}
 begin
-  if count <> length(parameters) then raise EXQEvaluationException.create('err:XPTY0004', 'Mismatched argument count for function '+name+': '+inttostr(count) + ' <> ' + inttostr(length(parameters)));
+  if count <> length(parameters) then
+    raise EXQEvaluationException.create('err:XPTY0004', 'Mismatched argument count for function '+name+': got '+inttostr(count) + ' <> expected ' + inttostr(length(parameters)));
   {$IFDEF TRACK_STACK_VARIABLE_NAMES}
   if length(parameters) = 0 then exit;
   stack := inContext.temporaryVariables;
