@@ -75,7 +75,7 @@ var
     end;
     parents.free;
     if tp.getLastTree.outerXML() <> o then
-      raise Exception.Create('Parsing result invalid: '+tp.getLastTree.outerXML()+ ' != '+o);
+      raise Exception.Create('Parsing result invalid: '+tp.getLastTree.outerXML()+ ' != '+o + LineEnding + 'DefaultEncoding: ' + IntToStr(DefaultSystemCodePage));
   end;
 
 begin
@@ -124,6 +124,21 @@ begin
   t('<table>', '<html><head/><body><table/></body></html>');
   t('<table><tr><td>1</td></tr></table>', '<html><head/><body><table><tbody><tr><td>1</td></tr></tbody></table></body></html>');
   t('<table><tr><td>1</td><td>1b</td></tr><tr><td>2</td><td>2b</td></tr></table>', '<html><head/><body><table><tbody><tr><td>1</td><td>1b</td></tr><tr><td>2</td><td>2b</td></tr></tbody></table></body></html>');
+
+  tp.parsingModel := pmUnstrictXML;
+  tp.repairMissingStartTags := false;
+  tp.repairMissingEndTags := false;
+  //valid xml
+  t('<?xml version="1.0"?><!DOCTYPE xyz><a/>', '<a/>');
+  t('<?xml version="1.0"?><!DOCTYPE xyz SYSTEM "foo"><a/>', '<a/>');
+  t('<?xml version="1.0"?><!DOCTYPE abc [<?abc >>>?>]><a/>', '<a/>');
+  t('<?xml version="1.0"?><!DOCTYPE abc PUBLIC "y" "t" [<?abc >>>?><!---->]><a/>', '<a/>');
+
+  //invalid to repair
+  t('<!doctype xml [<!ENTITY abc>]><a>', '<a/>');
+  t('<!doctype xml [<!ENTITY>><a>', '<a/>');
+  t('<!doctype xml [<!ENTITY foo bar><!NOTATION ass PUBLIC "->>>--">]><a>', '<a/>');
+
 
   tp.parsingModel := pmStrict;
   t('<ex:b xmlns:ex="http://www.example.com/ns?p=&apos;23&apos;&amp;amp;=y">93.7</ex:b>', '<ex:b xmlns:ex="http://www.example.com/ns?p=&apos;23&apos;&amp;amp;=y">93.7</ex:b>');

@@ -165,6 +165,22 @@ begin
   t('collation-key("a0c00") ne collation-key("a00c0")', 'true');
   //t('collation-key("a0001") lt collation-key("a1")', 'true');
 
+  t('let $rng := random-number-generator("abc") return ($rng?number, $rng?next()?number, $rng?permute(1 to 3))', '0.3553078841145228 0.16825667264030408 2 3 1');
+
+  t('hexBinary("aa") lt hexBinary("ff") ', 'true');
+  t('hexBinary("aa") < hexBinary("ff") ', 'true');
+
+
+
+
+  t('serialize([1,2,3e0], map {"method": "json" })', '[1,2,3]');
+  t('serialize([1,2,3e0], map {"method": "json", "indent": true() })', '[1, 2, 3]');
+  t('serialize([1,2,3e0], map {"method": "adaptive", "indent": true() })', '[1,2,3.0e0]');
+
+  t('serialize([1,2,"äxyz"], map {"method": "json", "use-character-maps": map { "y": "foo" } })', '[1,2,"äxfooz"]');
+  t('serialize(["äxyz"""], map {"method": "json", "use-character-maps": map { "y": "foo" } })', '["äxfooz\""]');
+  t('serialize(["äxyz"""], map {"method": "json", "encoding": "us-ascii" })', '["\u00E4xyz\""]');
+
 
   writeln('XPath 3.1: ', count, ' completed');
   ps.free;

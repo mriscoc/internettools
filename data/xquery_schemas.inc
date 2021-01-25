@@ -145,12 +145,12 @@ begin
 
  if a = b then
    if a.derivedFrom(baseSchema.Integer) then exit(baseSchema.Decimal)
-   else if a.derivedFrom(baseSchema.numericPseudoType) then exit(a)
+   else if a.derivedFrom(baseSchema.numeric) then exit(a)
    else exit(failureType);
 
- if not a.derivedFrom(baseSchema.numericPseudoType) then
+ if not a.derivedFrom(baseSchema.numeric) then
    a := failureType;
- if not b.derivedFrom(baseSchema.numericPseudoType) then
+ if not b.derivedFrom(baseSchema.numeric) then
    b := failureType;
 
  if becomesType(baseSchema.Double) then
@@ -346,8 +346,15 @@ var
   i: Integer;
   temp: TXSCastingError;
 begin
-  if length(members) > 0 then result := xsceXPTY0004
-  else result := xsceFORG0001; //<- xs:error special case
+  if v.typeAnnotation.derivedFrom(self) then begin
+    //xs:numeric special case
+    result := xsceNoError;
+    if outv <> nil then outv^ := v.toValue;
+    exit;
+  end;
+  if length(members) = 0 then //xs:error special case
+    exit(xsceFORG0001);
+  result := xsceXPTY0004;
   for i := 0 to high(members) do begin
     temp := members[i].tryCreateValue(v, outv);
     if temp = xsceNoError then exit(xsceNoError);
@@ -684,10 +691,12 @@ end;
 
 function TXSStringType.tryCreateValueInternal(const v: string; outv: PXQValue): TXSCastingError;
 begin
-  if (lexicalSpaceRegex <> nil) then begin
+  if lexicalSpacePattern <> '' then begin
     EnterCriticalsection(lexicalSpaceRegexCS);
     try
-      if not (wregexprMatches(TWrappedRegExpr(lexicalSpaceRegex), v)) then exit(xsceFORG0001);
+      if lexicalSpaceRegex = nil then lexicalSpaceRegex := wregexprParse(lexicalSpacePattern, []);
+      if not (wregexprMatches(TWrappedRegExpr(lexicalSpaceRegex), v)) then //could move this out of the CS. flre should be  thread safe (but TRegExpr was not)
+        exit(xsceFORG0001);
     finally
       LeaveCriticalsection(lexicalSpaceRegexCS);
     end;
@@ -704,16 +713,14 @@ constructor TXSStringType.create(const aname: string; aparent: TXSType; asubtype
 begin
   inherited Create(aname, aparent, TXQValueString);
   subType:=asubtype;
-  if pattern <> '' then begin
-    lexicalSpaceRegex := wregexprParse(pattern, []);
-    InitCriticalSection(lexicalSpaceRegexCS);
-  end;
+  lexicalSpacePattern := pattern;
+  if lexicalSpacePattern <> '' then InitCriticalSection(lexicalSpaceRegexCS);
 end;
 
 destructor TXSStringType.Destroy;
 begin
-  if lexicalSpaceRegex <> nil then begin
-    wregexprFree(TWrappedRegExpr(lexicalSpaceRegex));
+  if lexicalSpacePattern <> '' then begin
+    if lexicalSpaceRegex<>nil then wregexprFree(TWrappedRegExpr(lexicalSpaceRegex));
     DoneCriticalsection(lexicalSpaceRegexCS);
   end;
   inherited Destroy;
@@ -985,20 +992,83 @@ begin
 end;
 
 procedure TXSSchema.cacheDescendants;
+var graph: array[0..64] of record
+  count: integer;
+  children: array[0..23] of integer;
+end;
+  function initDescendants(t: TXSType): Int64;
+  var
+    i: Integer;
+    c: TXSType;
+  begin
+    if t.descendantsIds > 0 then exit(t.descendantsIds);
+    result := int64(1) shl t.id;
+    with graph[t.id] do begin
+      for i := 0 to count - 1 do begin
+        c := TXSType(typeList.Objects[children[i]]);
+        result := result or initDescendants(c);
+      end;
+    end;
+    t.descendantsIds := result;
+  end;
+
 var
-  i, j: Integer;
+  i,j: Integer;
+  parent, curType: TXSType;
 begin
   assert(typeList.Count < 64);
   assert((hiddenTypeList = nil) or (hiddenTypeList.count = 0));
   for i := 0 to typeList.Count - 1 do begin
-    TXSType(typeList.Objects[i]).id := -1;
+    TXSType(typeList.Objects[i]).id := i;
     TXSType(typeList.Objects[i]).descendantsIds := 0;
-    for j := 0 to typeList.Count - 1 do
-      if TXSType(typeList.Objects[j]).derivedFrom(TXSType(typeList.Objects[i])) then
-        TXSType(typeList.Objects[i]).descendantsIds := TXSType(typeList.Objects[i]).descendantsIds or (int64(1) shl j);
+    graph[i].count := 0;
+  end;
+  //convert schema parent relationships to tree
+  for i := 0 to typeList.Count - 1 do begin
+    curType := TXSType(typeList.Objects[i]);
+    parent := curType.base;
+    if parent <> nil then
+      with graph[parent.id] do begin
+        children[count] := i;
+        count += 1;
+        assert(count < 24);
+      end;
+  end;
+  //separately handle union types
+  for i := 1 to 2 do begin
+    if i = 1 then curType := numeric else curType := untypedOrNodeUnion;
+    with TXSUnionType(curType), graph[curType.id] do begin
+      for j := 0 to high(members) do
+        children[count + j] := members[j].id;
+      count += length(members);
+      assert(count < 24);
+    end;
   end;
   for i := 0 to typeList.Count - 1 do
-    TXSType(typeList.Objects[i]).id := i;
+    initDescendants(TXSType(typeList.Objects[i]));
+
+  {writeln('children:');
+
+  for i := 0 to typeList.Count - 1 do begin
+    writeln;
+    writeln(TXSType(typeList.Objects[i]).name, ' ',TXSType(typeList.Objects[i]).id, ' ',i);
+    with graph[i] do
+      for j := 0 to count - 1 do begin
+        curType := TXSType(typeList.Objects[children[j]]);
+        write(curType.name, ' ');
+      end;
+  end;
+
+  writeln('descendants:');
+
+  for i := 0 to typeList.Count - 1 do begin
+    writeln;
+    writeln(TXSType(typeList.Objects[i]).name, ' ',TXSType(typeList.Objects[i]).id, ' ',i);
+    for j := 0 to typeList.Count - 1 do
+      if TXSType(typeList.Objects[j]).derivedFrom(TXSType(typeList.Objects[i])) then
+        write(TXSType(typeList.Objects[j]).name,  '  ');
+  end;}
+
 end;
 
 
@@ -1191,8 +1261,8 @@ begin
   ENTITIES := TXSListType.Create('ENTITIES', anySimpleType, ENTITY);
 
   //--time like--
-  yearMonthDuration := primitiveBaseType(TXSDateTimeType.Create('yearMonthDuration', duration, '[-]P[Y+"Y"][m+M]$', xqdttTime));
-  dayTimeDuration := primitiveBaseType(TXSDateTimeType.Create('dayTimeDuration', duration, '[-]P[d+D][T[h+H][n+M][s+[.z+]S]]$', xqdttYearMonth));
+  yearMonthDuration := TXSDateTimeType.Create('yearMonthDuration', duration, '[-]P[Y+"Y"][m+M]$', xqdttTime);
+  dayTimeDuration := TXSDateTimeType.Create('dayTimeDuration', duration, '[-]P[d+D][T[h+H][n+M][s+[.z+]S]]$', xqdttYearMonth);
   dateTimeStamp := TXSDateTimeType.Create('dateTimeStamp', dateTime, TXSDateTimeType(dateTime).fixedDateTimePattern);
   TXSSimpleType(dateTimeStamp).addConstrainingFacet(TXSConstrainingFacetOrdinal.create(xsfExplicitTimezone, ord(xsfetRequired), true));
 
@@ -1210,8 +1280,9 @@ begin
   error.schema := self;
   typeList.AddObject('error', error);
 
-  numericPseudoType  := TXSUnionType.Create('numeric', anyAtomicType, TXQValueDecimal, [decimal, float, double, integer]);
-  untypedOrNodeUnion := TXSUnionType.Create(#255'node', anyAtomicType, TXQValueString, [untypedAtomic, untyped, node]);
+  numeric := TXSUnionType.Create('numeric', anyAtomicType, TXQValueDecimal, [double, decimal, float, integer]);
+
+  untypedOrNodeUnion := TXSUnionType.Create(#255'node', anyType, TXQValueString, [untypedAtomic, untyped, node]);
   typeList.sorted := true;
 end;
 
@@ -1247,5 +1318,126 @@ begin
   array_ := TXSSimpleType.Create('array()', jsonItem, TXQValueJSONArray);
   object_ := TXSSimpleType.Create('object()', jsonItem, TXQValueObject);
 //  jsonItem, array_, object_: TXSType;
+end;
+
+
+
+
+
+
+
+
+
+
+
+
+
+procedure TXQGlobalTypes.init;
+begin
+  none := nil;
+  empty := TXQTermSequenceType.create(); empty.kind := tikNone;
+  atomic := TXQTermSequenceType.create(baseSchema.anyAtomicType);  atomicOrEmpty := orEmpty(atomic); atomicStar := star(atomic);
+  item := TXQTermSequenceType.create(tikAny); itemStar := star(item); itemOrEmpty := orEmpty(item); itemPlus := star(item); itemPlus.allowNone := false;
+
+  boolean := TXQTermSequenceType.create(baseSchema.boolean); booleanOrEmpty := orEmpty(boolean);
+
+  integer := TXQTermSequenceType.create(baseSchema.integer); integerOrEmpty := orEmpty(integer); integerStar := star(integer);
+  decimal := TXQTermSequenceType.create(baseSchema.decimal); decimalOrEmpty := orEmpty(decimal);
+  double := TXQTermSequenceType.create(baseSchema.double); doubleOrEmpty := orEmpty(double);
+  numeric := TXQTermSequenceType.create(baseSchema.numeric); numericOrEmpty := orEmpty(numeric);
+
+
+
+  stringt := TXQTermSequenceType.create(baseSchema.string_); stringOrEmpty := orEmpty(stringt); stringStar := star(stringt);
+  untypedAtomic := TXQTermSequenceType.create(baseSchema.untypedAtomic);
+  anyURI := TXQTermSequenceType.create(baseSchema.anyURI); anyURIOrEmpty := orEmpty(anyURI); anyURIStar := star(anyURI);
+  hexBinary := TXQTermSequenceType.create(baseSchema.hexBinary); hexBinaryOrEmpty := orEmpty(hexBinary);
+  base64Binary := TXQTermSequenceType.create(baseSchema.base64Binary); base64BinaryOrEmpty := orEmpty(base64Binary);
+  anyBinary := TXQTermSequenceType.create(tikUnion); anyBinary.push(hexBinary.clone); anyBinary.push(base64Binary.clone);
+  NOTATIONOrEmpty := TXQTermSequenceType.create(baseSchema.NOTATION, true);
+  NCNameOrEmpty := TXQTermSequenceType.create(baseSchema.NCName, true);
+  QName := TXQTermSequenceType.create(baseSchema.QName); QNameOrEmpty := orEmpty(QName);
+  language := TXQTermSequenceType.create(baseSchema.language);
+
+  time := TXQTermSequenceType.create(baseSchema.time); timeOrEmpty := orEmpty(time);
+  date := TXQTermSequenceType.create(baseSchema.date); dateOrEmpty := orEmpty(date);
+  dateTime := TXQTermSequenceType.create(baseSchema.dateTime); dateTimeOrEmpty := orEmpty(dateTime);
+  durationOrEmpty := TXQTermSequenceType.create(baseSchema.duration, true);
+  dayTimeDuration := TXQTermSequenceType.create(baseSchema.dayTimeDuration); dayTimeDurationOrEmpty := orEmpty(dayTimeDuration);
+  yearMonthDuration := TXQTermSequenceType.create(baseSchema.yearMonthDuration); yearMonthDurationOrEmpty := orEmpty(yearMonthDuration);
+  gYearMonthOrEmpty := TXQTermSequenceType.create(baseSchema.gYearMonth, true);
+  gYearOrEmpty := TXQTermSequenceType.create(baseSchema.gYear, true);
+  gMonthDayOrEmpty := TXQTermSequenceType.create(baseSchema.gMonthDay, true);
+  gMonthOrEmpty := TXQTermSequenceType.create(baseSchema.gMonth, true);
+  gDayOrEmpty := TXQTermSequenceType.create(baseSchema.gDay, true);
+
+
+
+  map := TXQTermSequenceType.create(baseJSONiqSchema.object_); mapStar := star(map);
+  arrayt := TXQTermSequenceType.create(baseJSONiqSchema.array_); arrayOrEmpty := orEmpty(arrayt); arrayStar := star(arrayt);
+  null := TXQTermSequenceType.create(baseJSONiqSchema.jsNull);
+  jsonItemOrEmpty := TXQTermSequenceType.create(baseJSONiqSchema.jsonItem, true);  jsonItemStar := star(jsonItemOrEmpty);
+
+  functiont := TXQTermSequenceType.create(tikFunctionTest); functiontOrEmpty := orEmpty(functiont);
+  functionItemAtomicStar := f([item, atomicStar]); functionAtomicItemStarItemStar := f([atomic,itemStar,itemStar]); functionItemStarAtomicStar := f([itemStar,atomicStar]);
+  functionItemStarItemItemStar := f([itemStar,item,itemStar]); functionItemItemStarItemStar := f([item,itemStar,itemStar]); functionItemItemItemStar := f([item,item,itemStar]);
+  functionItemStarItemStar := f([itemStar,itemStar]); functionItemStarBoolean := f([itemStar, boolean]); functionItemStarItemStarItemStar := f([itemStar,itemStar,itemStar]);
+
+  node := TXQTermSequenceType.create(tikElementTest); node.nodeMatching.typ := tneaDirectChild; node.nodeMatching.matching := [qmElement, qmText, qmComment, qmProcessingInstruction, qmAttribute, qmDocument];
+  nodeOrEmpty := orEmpty(node); nodeStar := star(node);
+  element := TXQTermSequenceType.create(tikElementTest); element.nodeMatching.typ := tneaDirectChild; element.nodeMatching.matching := [qmElement];
+  elementStar := star(element);
+  documentNodeOrEmpty := TXQTermSequenceType.create(tikElementTest);
+  with documentNodeOrEmpty do begin
+    nodeMatching.typ := tneaDirectChild;
+    nodeMatching.matching := [qmDocument];
+    allowNone := true;
+  end;
+  documentElementNodeOrEmpty := TXQTermSequenceType.create(tikElementTest);
+  with documentElementNodeOrEmpty do begin
+    nodeMatching.typ := tneaDirectChild;
+    nodeMatching.matching := [qmDocument, qmCheckOnSingleChild];
+    allowNone := true;
+  end;
+  elementSerializationParams := TXQTermSequenceType.create(tikElementTest);
+  with elementSerializationParams do begin
+    nodeMatching.typ := tneaDirectChild;
+    nodeMatching.matching := [qmElement,qmValue,qmCheckNamespaceURL];
+    nodeMatching.value := 'serialization-parameters';
+    nodeMatching.valueHash := nodeNameHash(nodeMatching.value);
+    nodeMatching.namespaceURLOrPrefix := 'http://www.w3.org/2010/xslt-xquery-serialization'
+  end;
+  elementSerializationParamsOrEmpty := orEmpty(elementSerializationParams);
+end;
+
+procedure TXQGlobalTypes.free;
+var
+  i: Integer;
+begin
+  for i := low(cachedTypes) to high(cachedTypes) do begin
+    cachedTypes[i].free;
+  end;
+end;
+
+function TXQGlobalTypes.orEmpty(t: TXQTermSequenceType): TXQTermSequenceType;
+begin
+  result := TXQTermSequenceType(t.clone);
+  result.allowNone := true;
+end;
+
+function TXQGlobalTypes.star(t: TXQTermSequenceType): TXQTermSequenceType;
+begin
+  result := TXQTermSequenceType(t.clone);
+  result.allowNone := true;
+  result.allowMultiple := true;
+end;
+
+function TXQGlobalTypes.f(args: array of TXQTermSequenceType): TXQTermSequenceType;
+var
+  i: Integer;
+begin
+  result := TXQTermSequenceType.create(tikFunctionTest);
+  SetLength(result.arguments, length(args));
+  for i := 0 to high(args) do result.arguments[i] := TXQTermSequenceType(args[i].clone);
 end;
 

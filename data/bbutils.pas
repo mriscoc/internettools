@@ -156,19 +156,6 @@ type
   TFloatArray = array of float;
 
   TCharSet = set of ansichar;
-{$ifdef FPC_HAS_CPSTRING}
-  TBBStringHelper = Type Helper(TStringHelper) for AnsiString
-      function EncodeHex: String; inline;
-      function DecodeHex: String; inline;
-      function RemoveFromLeft(chopoff: SizeInt): String;
-      {
-      function AfterOrEmpty(const sep: String): String; inline;
-      function AfterLastOrEmpty(const sep: String): String; inline;
-      function BeforeOrEmpty(const sep: String): String; inline;
-      function BeforeLastOrEmpty(const sep: String): String; inline;
-      }
-  end;
-{$endif}
 
 //-----------------------Pointer functions------------------------
 type TProcedureOfObject=procedure () of object;
@@ -429,6 +416,7 @@ function strConvertFromUtf8(str: RawByteString; toe: TSystemCodePage): RawByteSt
 function strConvert(const str: RawByteString; from, toCP: TSystemCodePage): RawByteString;
 function strChangeEncoding(const str: RawByteString; from, toe: TSystemCodePage): RawByteString; {$ifdef HASINLINE} inline; deprecated 'Use strConvert';{$endif}
 function strDecodeUTF16Character(var source: PUnicodeChar): integer;
+procedure utf16EncodeSurrogatePair(codepoint: integer; out surrogate1, surrogate2: word);
 procedure strUnicode2AnsiMoveProc(source:punicodechar;var dest:RawByteString;cp : TSystemCodePage;len:SizeInt); //**<converts utf16 to other unicode pages and latin1. The signature matches the function of fpc's widestringmanager, so this function replaces cwstring. len is in chars.
 procedure strAnsi2UnicodeMoveProc(source:pchar;cp : TSystemCodePage;var dest:unicodestring;len:SizeInt);        //**<converts unicode pages and latin1 to utf16. The signature matches the function of fpc's widestringmanager, so this function replaces cwstring. len is in bytes
 {$IFDEF fpc}
@@ -531,6 +519,26 @@ end;
  //** Str iterator. Preliminary. Interface might change at any time
 function strIterator(const s: RawByteString): TStrIterator;
 
+type TUTF8StringCodePointBlockEnumerator = record
+private
+  FCurrentByteLength: integer;
+  function getCurrentCodepoint: integer;
+public
+  p, pend: pchar;
+  procedure init(const s: string);
+  property currentPos: pchar read p;
+  property current: integer read getCurrentCodepoint;
+  property currentByteLength: integer read FcurrentByteLength;
+  function MoveNext: Boolean;
+  function GetEnumerator: TUTF8StringCodePointBlockEnumerator;
+public
+  markedPos: pchar;
+  procedure mark; inline;
+  procedure markNext; inline;
+  function markedByteLength: SizeInt; inline;
+end;
+
+
 //** Str builder. Preliminary. Interface might change at any time
 type TStrBuilder = object
 protected
@@ -559,10 +567,45 @@ public
   procedure chop(removedCount: SizeInt);
 end;
 
+
+
+
+
+
+{$ifdef FPC_HAS_CPSTRING}
+  TBBStringHelper = Type Helper(TStringHelper) for AnsiString
+    function beginsWith(const s: string): boolean; inline;
+    function beginsWithI(const s: string): boolean; inline;
+    function endsWith(const s: string): boolean; inline;
+    function endsWithI(const s: string): boolean; inline;
+    function containsI(const s: string): boolean; inline;
+
+    function EncodeHex: String; inline;
+    function DecodeHex: String; inline;
+    function RemoveFromLeft(chopoff: SizeInt): String;
+      {
+      function AfterOrEmpty(const sep: String): String; inline;
+      function AfterLastOrEmpty(const sep: String): String; inline;
+      function BeforeOrEmpty(const sep: String): String; inline;
+      function BeforeLastOrEmpty(const sep: String): String; inline;
+      }
+
+    function lengthInUtf8CodePoints: sizeint;
+
+    function enumerateUtf8CodePoints: TStrIterator;
+  end;
+{$endif}
+
+
 type
   generic TBaseArrayList<TElement> = object
     type PElement = ^TElement;
          TArrayBuffer = array of TElement;
+    type TBasePreEnumerator = object
+    public
+      fcurrent, fend: PElement;
+      function MoveNext: Boolean;
+    end;
   private
     function getCapacity: SizeInt; inline;
   protected
@@ -570,6 +613,7 @@ type
     FCount: SizeInt;
     procedure setCount(NewCount: SizeInt);
     procedure checkIndex(AIndex : SizeInt); inline;
+    procedure initEnumerator(out result: TBasePreEnumerator);
   public
     procedure init;
     procedure addAll(other: TBaseArrayList);
@@ -585,12 +629,10 @@ type
   end;
 
   generic TCopyingArrayList<TElement> = object(specialize TBaseArrayList<TElement>)
-    type TEnumerator = record
+    type TEnumerator = object(TBasePreEnumerator)
     private
       function GetCurrent: TElement;
     public
-      fcurrent, fend: PElement;
-      function MoveNext: Boolean;
       property current: TElement read GetCurrent;
     end;
     protected
@@ -599,7 +641,7 @@ type
       function first: TElement;
       function last: TElement;
     public
-      function GetEnumerator: TEnumerator;
+      function GetEnumerator: TEnumerator; inline;
       property Items[Index: SizeInt]: TElement read get write put; default;
   end;
   generic TCopyingPtrArrayList<TElement> = object(specialize TCopyingArrayList<TElement>)
@@ -610,12 +652,20 @@ type
   TStringArrayList = specialize TCopyingArrayList<String>;
 
   generic TRecordArrayList<TElement> = object(specialize TBaseArrayList<TElement>)
+    type TEnumerator = object(TBasePreEnumerator)
+    private
+      function GetCurrent: PElement;
+    public
+      property current: PElement read GetCurrent;
+    end;
     protected
+      function addDefault: PElement;
       function get(Index: SizeInt): PElement; inline;
       procedure put(Index: SizeInt; Item: PElement); inline;
       function first: PElement;
       function last: PElement;
     public
+      function GetEnumerator: TEnumerator; inline;
       property Items[Index: SizeInt]: PElement read get write put; default;
   end;
 
@@ -854,16 +904,8 @@ TThreadedCall = class(TThread)
   constructor create(aproc: TProcedureOfObject;isfinished: TNotifyEvent);
 end;
 
-function TCopyingArrayList.TEnumerator.GetCurrent: TElement;
-begin
-  result := fcurrent^;
-end;
 
-function TCopyingArrayList.TEnumerator.MoveNext: Boolean;
-begin
-  inc(fcurrent);
-  result := fcurrent < fend;
-end;
+
 
 
 
@@ -1008,6 +1050,74 @@ begin
   result.pos := 1;
 end;
 
+
+function TUTF8StringCodePointBlockEnumerator.getCurrentCodepoint: integer;
+var
+  temp: PChar;
+begin
+  temp := p;
+  result := strDecodeUTF8Character(temp, pend)
+end;
+
+
+procedure TUTF8StringCodePointBlockEnumerator.init(const s: string);
+begin
+  p := pchar(s);
+  pend := p + length(s);
+  FCurrentByteLength := 0;
+  mark;
+end;
+
+function TUTF8StringCodePointBlockEnumerator.MoveNext: Boolean;
+var
+  b: Byte;
+begin
+  p := p + FCurrentByteLength;
+  result := p < pend;
+  if result then begin
+    b := pbyte(p)^;
+    case b of
+      $00..$7F: FCurrentByteLength := 1;
+      $C2..$DF: begin
+        FCurrentByteLength := 2;
+        if (p + 1 >= pend) or ((pbyte(p + 1)^ and $C0) <> $80 ) then FCurrentByteLength := 1;
+      end;
+      $E0..$EF: begin
+        FCurrentByteLength := 3;
+        if (p + 2 >= pend) or ((pbyte(p + 1)^ and $C0) <> $80 ) or ((pbyte(p + 2)^ and $C0) <> $80 ) then FCurrentByteLength := 1;
+      end;
+      $F0..$F4: begin
+        FCurrentByteLength := 4;
+        if (p + 2 >= pend) or ((pbyte(p + 1)^ and $C0) <> $80 ) or ((pbyte(p + 2)^ and $C0) <> $80 ) or ((pbyte(p + 3)^ and $C0) <> $80 ) then
+          FCurrentByteLength:= 1;
+      end;
+      else FCurrentByteLength := 1;
+    end;
+  end else FCurrentByteLength := 0;
+end;
+
+function TUTF8StringCodePointBlockEnumerator.GetEnumerator: TUTF8StringCodePointBlockEnumerator;
+begin
+  result := self;
+  result.FCurrentByteLength:=0;
+end;
+
+procedure TUTF8StringCodePointBlockEnumerator.mark;
+begin
+  markedPos := p;
+end;
+
+procedure TUTF8StringCodePointBlockEnumerator.markNext;
+begin
+  markedPos := p + FCurrentByteLength;
+end;
+
+function TUTF8StringCodePointBlockEnumerator.markedByteLength: SizeInt;
+begin
+  result := p - markedPos;
+end;
+
+
 procedure TStrBuilder.appendWithEncodingConversion(const s: RawByteString);
 var temp: RawByteString;
 begin
@@ -1081,7 +1191,7 @@ var
 begin
   if next + delta > bufferend then begin
     oldlen := count;
-    SetLength(buffer^, max(2*length(buffer^), oldlen + delta));
+    SetLength(buffer^, max(min(2*length(buffer^), oldlen + 32*1024*1024), oldlen + delta));
     next := pchar(buffer^) + oldlen;
     bufferend := pchar(buffer^) + length(buffer^);
   end;
@@ -1199,11 +1309,23 @@ end;
 
 
 
+function TBaseArrayList.TBasePreEnumerator.MoveNext: Boolean;
+begin
+  inc(fcurrent);
+  result := fcurrent < fend;
+end;
 
-
-
-
-
+procedure TBaseArrayList.initEnumerator(out result: TBasePreEnumerator);
+begin
+  if fbuffer <> nil then begin
+    result.FCurrent := @FBuffer[0];
+    result.fend := result.fcurrent + fcount;
+    dec(result.fcurrent);
+  end else begin
+    result.fcurrent := nil;
+    result.fend := nil;
+  end
+end;
 
 
 function TBaseArrayList.getCapacity: SizeInt;
@@ -1297,6 +1419,17 @@ begin
   result := fbuffer;
 end;
 
+function TRecordArrayList.TEnumerator.GetCurrent: PElement;
+begin
+  result := fcurrent;
+end;
+
+function TRecordArrayList.addDefault: PElement;
+begin
+  add(default(TElement));
+  result := last
+end;
+
 function TRecordArrayList.get(Index: SizeInt): PElement;
 begin
   //checkIndex(index);
@@ -1317,6 +1450,16 @@ end;
 function TRecordArrayList.last: PElement;
 begin
   result := @FBuffer[fcount - 1];
+end;
+
+function TRecordArrayList.GetEnumerator: TEnumerator;
+begin
+  initEnumerator(result);
+end;
+
+function TCopyingArrayList.TEnumerator.GetCurrent: TElement;
+begin
+  result := fcurrent^;
 end;
 
 function TCopyingArrayList.get(Index: SizeInt): TElement;
@@ -1341,19 +1484,10 @@ begin
   result := FBuffer[fcount - 1];
 end;
 
-function TCopyingArrayList.GetEnumerator: TEnumerator;
+function TCopyingArrayList.GetEnumerator: TElement;
 begin
-  if fbuffer <> nil then begin
-    result.FCurrent := @FBuffer[0];
-    result.fend := result.fcurrent + fcount;
-    dec(result.fcurrent);
-  end else begin
-    result.fcurrent := nil;
-    result.fend := nil;
-  end
+  initEnumerator(result);
 end;
-
-
 
 
 {$endif}
@@ -2598,6 +2732,12 @@ begin
   end;
 end;
 
+procedure utf16EncodeSurrogatePair(codepoint: integer; out surrogate1, surrogate2: word);
+begin
+  dec(codepoint, $10000);
+  surrogate1 := Word($D800) or (codepoint shr 10);
+  surrogate2 := Word($DC00) or (codepoint and $03ff);
+end;
 
 
 
@@ -2639,6 +2779,7 @@ begin
   widestringmanager.Ansi2UnicodeMoveProc := @myAnsi2UnicodeMoveProc;
   {$endif}
 end;
+
 
 procedure strUnicode2AnsiMoveProc(source:punicodechar;var dest:RawByteString;cp : TSystemCodePage;len:SizeInt);
 var
@@ -3428,13 +3569,21 @@ begin
 end;
 
 function strLoadFromFile(filename: string): string;
+var buffer: array[1..4096] of byte;
 var f:TFileStream;
+  readLen: LongInt;
 begin
   f:=TFileStream.Create(strRemoveFileURLPrefix(filename),fmOpenRead or fmShareDenyWrite);
   result := '';
   SetLength(result,f.Size);
   if f.size>0 then
     f.Read(Result[1],length(result));
+  //additionally read data from that have no size (e.g. <(echo foobar) pipes )
+  while true do begin
+    readLen := f.Read({%H-}buffer[low(buffer)], length(buffer));
+    if readLen <= 0 then break;
+    result := result + strFromPchar(@buffer[low(buffer)], readLen);
+  end;
   f.Free;
 end;
 
@@ -5282,6 +5431,31 @@ end;
 
 {$ifdef FPC_HAS_CPSTRING}
 
+function TBBStringHelper.beginsWith(const s: string): boolean;
+begin
+  result := strbeginswith(self, s);
+end;
+
+function TBBStringHelper.beginsWithI(const s: string): boolean;
+begin
+  result := stribeginswith(self, s);
+end;
+
+function TBBStringHelper.endsWith(const s: string): boolean;
+begin
+  result := strendswith(self, s);
+end;
+
+function TBBStringHelper.endsWithI(const s: string): boolean;
+begin
+  result := striendswith(self, s);
+end;
+
+function TBBStringHelper.containsI(const s: string): boolean;
+begin
+  result := striContains(self, s);
+end;
+
 function TBBStringHelper.EncodeHex: String;
 begin
   result := strEncodeHex(self);
@@ -5297,6 +5471,18 @@ begin
   result := self;
   delete(result, 1, chopoff);
 end;
+
+function TBBStringHelper.lengthInUtf8CodePoints: sizeint;
+begin
+  result := strLengthUtf8(self);
+end;
+
+function TBBStringHelper.enumerateUtf8CodePoints: TStrIterator;
+begin
+  result := strIterator(self);
+end;
+
+
 {
 
 function TBBStringHelper.AfterOrEmpty(const sep: String): String;

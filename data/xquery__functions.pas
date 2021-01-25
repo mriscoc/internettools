@@ -25,6 +25,7 @@ in https://www.w3.org/TR/xpath-functions/ and http://www.w3.org/TR/xpath-functio
 unit xquery__functions;
 
 {$include ../internettoolsconfig.inc}
+{$ModeSwitch autoderef}
 
 interface
 
@@ -38,7 +39,9 @@ procedure finalizeFunctions;
 
 implementation
 
-uses xquery, xquery.internals.protectionbreakers, xquery.internals.common, xquery.namespaces, bigdecimalmath, math, simplehtmltreeparser, bbutils, internetaccess, strutils, base64, xquery__regex, bbutilsbeta,
+uses xquery, xquery.internals.protectionbreakers, xquery.internals.common, xquery.namespaces, bigdecimalmath, math,
+  simplehtmltreeparser, simplehtmlparser,
+  bbutils, internetaccess, strutils, base64, xquery__regex, bbutilsbeta, xquery.internals.rng,
 
   {$IFDEF USE_BBFLRE_UNICODE}PUCU,bbnormalizeunicode{$ENDIF} //get FLRE from https://github.com/BeRo1985/flre or https://github.com/benibela/flre/
   {$IFDEF USE_BBFULL_UNICODE}bbunicodeinfo{$ENDIF}
@@ -1323,10 +1326,23 @@ procedure urlEncodingFromValue(value: IXQValue; cmp: TStringComparisonFunc; urlE
     end;
   end;
 
+  procedure addObject(const v: IXQValue);
+  var
+    p: TXQProperty;
+  begin
+    for p in v.getPropertyEnumerator do begin
+      if p.Value.kind <> pvkObject then
+        addPair(p.Name, p.Value.toString)
+       else begin
+         arrayAdd(specialNames, p.Name);
+         setlength(specialValues, length(specialValues) + 1);
+         specialValues[high(specialValues)] := p.Value;
+       end;
+    end;
+  end;
+
 var temp: IXQValue;
   v: PIXQValue;
-  tempobj: TXQValueObject;
-  i: Integer;
   sname: string;
   svalue: string;
 begin
@@ -1335,23 +1351,14 @@ begin
   specialNames := nil;
   specialValues := nil;
   for v in value.GetEnumeratorPtrUnsafe do
-    if v^ is TXQValueObject then begin
-      if (v^ as TXQValueObject).prototype = nil then temp := v^
-      else temp := v^.clone;
-      tempobj := temp as TXQValueObject;
-      for i:=0 to tempobj.values.count-1 do begin
-        if tempobj.values.Values[i].kind <> pvkObject then
-          addPair(tempobj.values.Names[i], tempobj.values.Values[i].toString)
-         else begin
-           arrayAdd(specialNames, tempobj.values.Names[i]);
-           setlength(specialValues, length(specialValues) + 1);
-           specialValues[high(specialValues)] := tempobj.values.Values[i];
-         end;
-      end;
-    end else if v^.kind = pvkNode then begin
-      if nodeToFormData(v^.toNode, cmp, true, sname, svalue) then
-        addPair(sname, svalue);
-    end else add(v^.toString)
+    case v^.kind of
+      pvkObject: addObject(v^);
+      pvkNode:
+        if nodeToFormData(v^.toNode, cmp, true, sname, svalue) then
+          addPair(sname, svalue)
+       else add(v^.toString);
+     else add(v^.toString)
+   end;
 end;
 
 procedure addSpecialValue(const staticContext: TXQStaticContext; var mime: TMIMEMultipartData; n: string; v: TXQValueObject; defaultValue: string = '');
@@ -1660,7 +1667,7 @@ var
     for i := 0 to high(specialNames) do begin
       j := mime.getFormDataIndex(specialNames[i]);
       temps := '';
-      if j >= 0 then temps := mime.data[j].data;;
+      if j >= 0 then temps := mime.data[j].data;
       addSpecialValue(context.staticContext, mime, specialNames[i], specialValues[i] as TXQValueObject, temps);
       if j >= 0 then begin
         mime.data[j] := mime.data[high(mime.data)];
@@ -2317,28 +2324,56 @@ begin
 
 end;
 
-function xqFunctionNormalizeUnicode({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
+type TUnicodeNormalizationForm = (unfNFC, unfNFD, unfNFKC, unfNFKD,
+                                  //do nothing (three variants for error handling)
+                                  unfNone, unfEmpty, unfUnknown);
+function unicodeNormalizationForm(const s: string): TUnicodeNormalizationForm;
+begin
+  case s of
+    'NFC':  result := unfNFC;
+    'NFD':  result := unfNFD;
+    'NFKC': result := unfNFKC;
+    'NFKD': result := unfNFKD;
+    //'FULLY-NORMALIZED': ??
+    'none': result := unfNone;
+    '': result := unfEmpty;
+    else result := unfUnknown;
+  end;
+end;
+
+function normalizeString(str: string; method: TUnicodeNormalizationForm): UTF8String;
 var
-  method: String;
   p: pchar;
 begin
-  if args[0].toString = '' then exit(xqvalue(''));
+  p := pchar(str);
+  case method of
+    unfNFC:  p := utf8proc_NFC(p);
+    unfNFD:  p := utf8proc_NFD(p);
+    unfNFKC: p := utf8proc_NFKC(p);
+    unfNFKD: p := utf8proc_NFKD(p);
+    //'FULLY-NORMALIZED': ??
+    else exit(str);
+  end;
+
+  result := UTF8String(p);
+  Freemem(p);
+end;
+
+function xqFunctionNormalizeUnicode({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
+var
+  method, str: String;
+  form: TUnicodeNormalizationForm;
+begin
+  str := args[0].toString;
+  if str = '' then exit(xqvalue(''));
   method := 'NFC';
   if argc = 2 then method := trim(UpperCase(args[1].toString));
 
-  p := pchar(args[0].toString);
-  case method of
-    'NFC':  p := utf8proc_NFC(p);
-    'NFD':  p := utf8proc_NFD(p);
-    'NFKC': p := utf8proc_NFKC(p);
-    'NFKD': p := utf8proc_NFKD(p);
-    //'FULLY-NORMALIZED': ??
-    '': exit(args[0]);
-    else raise EXQEvaluationException.Create('FOCH0003', 'Unknown normalization method: '+method);
+  form := unicodeNormalizationForm(method);
+  case form of
+    unfNone, unfUnknown: raise EXQEvaluationException.Create('FOCH0003', 'Unknown normalization method: '+method);
   end;
-
-  result :=xqvalue(UTF8String(p));
-  Freemem(p);
+  result := xqvalue(normalizeString(args[0].toString, form))
 end;
 
 
@@ -2461,7 +2496,7 @@ end;
 function xqFunctionGet_Property({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 begin
   requiredArgCount(argc, 2);
-  if not (args[0] is TXQValueObject) then raise EXQEvaluationException.Create('pxp:OBJECT', 'Expected object');
+  if args[0].kind <> pvkObject then raise EXQEvaluationException.Create('pxp:OBJECT', 'Expected object');
   result := args[0].getProperty(args[1].toString);
 end;
 
@@ -2996,9 +3031,6 @@ end;
 function xqFunctionDoc(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 var
   url: String;
-  node: TTreeDocument;
-  data: String;
-  contenttype: string;
 begin
   if args[0].isUndefined  then exit(xqvalue);
   url := args[0].toString;
@@ -3012,21 +3044,7 @@ begin
   url := context.staticContext.resolveDocURI(url);
   if strBeginsWith(url, ':') then raise EXQEvaluationException.create('FODC0005', 'Invalid url: '+ url);
 
-  node := context.staticContext.needTemporaryNodes.documentCache[url];
-  if node = nil then begin
-    data := context.staticContext.retrieveFromURI(url, contenttype, 'FODC0002');
-
-    try
-      node := context.parseDoc(data, url, contenttype);
-    except
-      on e: ETreeParseException do raise EXQEvaluationException.Create('FODC0002', 'Failed to parse document: '+url + LineEnding+e.Message);
-    end;
-
-    context.staticContext.temporaryNodes.documentCache[url] := node;
-  end;
-  if node = nil then raise EXQEvaluationException.Create('FODC0002', 'Failed to parse document: '+url);
-
-  result := xqvalue(node);
+  result := xqvalue(context.parseCachedDocFromUrl(url));
 end;
 
 function xqFunctionDoc_Available(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
@@ -3547,7 +3565,7 @@ end;
 var tempf: xqfloat;
  tempi: int64;
  temps: string;
- tempb: boolean;
+ tempb, isSeqOfYearDurations: boolean;
  temps2: String;
  collation: TXQCollation;
  tempf2: xqfloat;
@@ -3582,10 +3600,20 @@ begin
     pvkDateTime: begin
       result := seq.get(1);
       baseType := (result.typeAnnotation as TXSSimpleType).primitive;
+      isSeqOfYearDurations := false;
+      if baseType = baseSchema.duration then //xs:duration cannot be compared, only its descendants
+        if result.typeAnnotation.derivedFrom(baseSchema.yearMonthDuration) then isSeqOfYearDurations := true
+        else if not result.typeAnnotation.derivedFrom(baseSchema.dayTimeDuration) then raiseError;
+
       for pv in enumerable do begin
         if (context.staticContext.compareAtomic(result, pv^, nil) < 0) <> asmin then
           result := pv^;
-        if (pv^.typeAnnotation as TXSSimpleType).primitive <> baseType then raiseError;
+        if ((pv^.typeAnnotation as TXSSimpleType).primitive <> baseType) then
+          raiseError;
+        if baseType = baseSchema.duration then
+          if   (isSeqOfYearDurations and not pv^.typeAnnotation.derivedFrom(baseSchema.yearMonthDuration))
+            or (not isSeqOfYearDurations and not pv^.typeAnnotation.derivedFrom(baseSchema.dayTimeDuration)) then
+             raiseError
       end;
       exit;
     end;
@@ -4234,103 +4262,318 @@ begin
   result := xqFunctionParse_Common(context, argc, args, 'html');
 end;
 
-type TSerializationParams = record
-  isAbsentMarker: string;
-
-  method, version, encoding: string;
-  htmlVersion, doctypePublic, doctypeSystem: string;
-  omitXmlDeclaration: boolean;
-  standalone: string;
-  itemSeparator: string;
-  indent: TXQSerializerInsertWhitespace;
-  procedure setDefault;
-  procedure setFromNode(paramNode: TTreeNode);
-  procedure setFromMap(const v: IXQValue);
-  procedure setFromXQValue(const v: IXQValue);
+function splitEQName(context: TXQEvaluationContext; const eqname: string; out namespaceURL, localpart: string; kind: TXQDefaultNamespaceKind = xqdnkUnknown): boolean;
+var
+  namespace: TNamespace;
+begin
+  namespaceURL := '';
+  localpart := xmlStrWhitespaceCollapse(eqname);
+  result := true;
+  if strBeginsWith(localpart, 'Q{') then begin //EQName!
+    namespaceURL := strSplitGet('}', localpart);
+    delete(namespaceURL, 1, 2); //Q{ no more
+  end else if pos(':', localpart) > 0 then begin
+    context.splitRawQName(namespace, localpart, kind);
+    namespaceURL := namespaceGetURL(namespace);
+    result := namespaceURL <> '';
+  end else if kind <> xqdnkUnknown then begin
+    namespaceURL := namespaceGetURL(context.findNamespace('', kind));
+  end;
 end;
 
-procedure TSerializationParams.setDefault;
+
+type
+TTrackOwnedXQHashsetStr = record
+  class procedure addRef(o: PXQHashsetStr); static; inline;
+  class procedure release(o: PXQHashsetStr); static; inline;
+end;
+TXQHashsetQName = object(specialize TXQHashmapStrOwning<PXQHashsetStr, TTrackOwnedXQHashsetStr>)
+  function contains(namespace: TNamespace; const local: string): boolean;
+  procedure include(namespace: TNamespace; const local: string);
+  function contains(const namespace,local: string): boolean;
+  procedure include(const namespace,local: string);
+  function includeAll(const v: IXQValue): boolean;
+  function includeAll(const context: TXQEvaluationContext; const s: string): boolean;
+end;
+PXQHashsetQName = ^TXQHashsetQName;
+class procedure TTrackOwnedXQHashsetStr.addRef(o: PXQHashsetStr);
+begin
+  //empty
+end;
+class procedure TTrackOwnedXQHashsetStr.release(o: PXQHashsetStr);
+begin
+  dispose(o, done);
+end;
+function TXQHashsetQName.contains(namespace: TNamespace; const local: string): boolean;
+begin
+  result := contains(namespaceGetURL(namespace), local);
+end;
+procedure TXQHashsetQName.include(namespace: TNamespace; const local: string);
+begin
+  include(namespaceGetURL(namespace), local);
+end;
+function TXQHashsetQName.contains(const namespace, local: string): boolean;
+var
+  s: PXQHashsetStr;
+begin
+  s := getOrDefault(namespace);
+  result := assigned(s) and s.contains(local);
+end;
+procedure TXQHashsetQName.include(const namespace, local: string);
+var
+  ent: PHashMapEntity;
+begin
+  ent := findEntity(namespace, true);
+  if ent.Value = nil then new(PXQHashsetStr(ent.Value), init);
+  PXQHashsetStr(ent.Value)^.include(local);
+end;
+
+function TXQHashsetQName.includeAll(const v: IXQValue): boolean;
+var
+  qname: TXQValueQName;
+  pw: PIXQValue;
+begin
+  for pw in v.GetEnumeratorPtrUnsafe do begin
+    if v.kind <> pvkQName then exit(false);
+    qname := v.toValue as TXQValueQName;
+    include(qname.url, qname.local);
+  end;
+  result := true;
+end;
+
+function TXQHashsetQName.includeAll(const context: TXQEvaluationContext; const s: string): boolean;
+var
+  t, namespaceUrl, name: String;
+begin
+  for t in strTrimAndNormalize(s, WHITE_SPACE).Split(' ') do begin
+    splitEQName(context, t, namespaceUrl, name, xqdnkElementType);
+    include(namespaceUrl, name);
+  end;
+  result := true;
+end;
+
+
+type
+TSerializationMethod = (xqsmXML, xqsmXHTML, xqsmHTML, xqsmText, xqsmJSON, xqsmAdaptive);
+TSerializationParams = record
+  isAbsentMarker: string;
+  method: TSerializationMethod;
+  encoding: string;
+  encodingCP: TSystemCodePage;
+  indent: TXQSerializerInsertWhitespace;
+  itemSeparator: string;
+  normalizationForm: TUnicodeNormalizationForm;
+  characterMaps: ^TXQHashmapStrStr;
+
+  //xml only
+  version: string;
+  htmlVersion, doctypePublic, doctypeSystem: string;
+  omitXmlDeclaration: boolean;
+  standalone: TXMLDeclarationStandalone;
+  cdataSectionElements, suppressIndentation: PXQHashsetQName;
+
+
+  //json only
+  jsonNodeOutputMethod: string;
+  allowDuplicateNames: boolean;
+
+  procedure done;
+
+  procedure setDefault(isFromMap: boolean);
+  procedure setFromNode(const context: TXQEvaluationContext; paramNode: TTreeNode; isStatic: boolean);
+  procedure setFromMap(const context: TXQEvaluationContext;const v: IXQValue);
+  procedure setFromXQValue(const context: TXQEvaluationContext; const v: IXQValue);
+
+  procedure setMethod(const s: string);
+  procedure setStandalone(s: string; fromMap: boolean);
+  procedure setStandalone(s: boolean);
+  procedure setNormalizationForm(const s: string);
+  function hasNormalizationForm: boolean;
+  procedure setEncoding(const s: string);
+  function needQNameList(var list: PXQHashsetQName): PXQHashsetQName;
+end;
+
+
+procedure TSerializationParams.done;
+begin
+  if assigned(characterMaps) then Dispose(characterMaps,done);
+  if assigned(cdataSectionElements) then Dispose(cdataSectionElements,done);
+  if assigned(suppressIndentation) then Dispose(suppressIndentation,done);
+end;
+
+procedure TSerializationParams.setDefault(isFromMap: boolean);
 begin
   isAbsentMarker := #0;
-  method := 'xml';
-  version := '1.1';
+  method := xqsmXML;
+  if isFromMap then version := '1.0' else version := isAbsentMarker;
   encoding := 'UTF-8';
-  htmlVersion := '5.0';
+  encodingCP := CP_UTF8;
+  htmlVersion := isAbsentMarker;
   doctypePublic := isAbsentMarker;
   doctypeSystem := isAbsentMarker;
   omitXmlDeclaration := true;
-  standalone := 'omit';
+  standalone := xdsOmit;
   itemSeparator := isAbsentMarker;
-  indent := xqsiwConservative;
+  if isFromMap then indent := xqsiwNever
+  else indent := xqsiwConservative;
+  jsonNodeOutputMethod := 'xml';
+  normalizationForm := unfUnknown;
+  characterMaps := nil;
+  allowDuplicateNames := true;
+  cdataSectionElements := nil;
+  suppressIndentation := nil;
 end;
 
-procedure TSerializationParams.setFromNode(paramNode: TTreeNode);
-  function tobool(const s:string): boolean;
+function toSerializationBool(const s:string; fromMap: boolean): boolean;
+begin
+  case trim(s) of
+    'true', 'yes', '1': result := true;
+    'false', 'no', '0': result := false;
+    else raiseXQEvaluationException(IfThen(fromMap, 'SEPM0016', 'SEPM0017'), 'Expected boolean, got '+s);
+  end;
+end;
+
+
+procedure TSerializationParams.setFromNode(const context: TXQEvaluationContext;paramNode: TTreeNode; isStatic: boolean);
+  procedure error;
   begin
-    case s of
-      'yes': result := true;
-      'no': result := false;
-      else raise EXQEvaluationException.create('SEPM0016', 'Expected boolean, got '+s);
+    raise EXQEvaluationException.create(IfThen(isStatic, 'XQST0109', 'SEPM0017'), 'Invalid serialization parameter: '+paramNode.outerXML());
+  end;
+  procedure error(code: string);
+  begin
+    raise EXQEvaluationException.create(code, 'Invalid serialization parameter: '+paramNode.outerXML());
+  end;
+
+const XMLNamespace_Output = 'http://www.w3.org/2010/xslt-xquery-serialization';
+
+  procedure checkNoAttributes(node: ttreenode; allowValue: boolean = false);
+  var att: TTreeAttribute;
+  begin
+    for att in node.getEnumeratorAttributes do
+      if ((att.value <> 'value') or not allowValue) and not att.isNamespaceNode then
+        error;
+  end;
+
+  procedure setCharacterMaps();
+  var mapNode: TTreeNode;
+      att: TTreeAttribute;
+      mapString, character: String;
+  begin
+    if characterMaps = nil then new(characterMaps,init);
+    if paramNode.hasAttribute('value') then error;
+    mapNode := paramNode.getFirstChild();
+    for mapnode in paramNode.getEnumeratorChildren do begin
+      case mapnode.typ of
+        tetOpen: begin
+          if mapnode.namespace = nil then error;
+          if not equalNamespaces(namespaceGetURL(mapNode.namespace), XMLNamespace_Output) then continue;
+          if mapNode.value <> 'character-map' then error;
+          mapString := '';
+          character := '';
+          for att in mapnode.getEnumeratorAttributes do
+            case att.value of
+              'map-string': mapString := att.realvalue;
+              'character': character := att.realvalue ;
+              else if not att.isNamespaceNode then error;
+            end;
+          if character.lengthInUtf8CodePoints <> 1 then error;
+          if characterMaps.contains(character) then error('SEPM0018');
+          characterMaps.include(character, mapString);
+        end;
+      end;
     end;
   end;
 
+  function toSerializationBool(const s:string): boolean; overload;
+  begin
+    result := toSerializationBool(s, false);
+  end;
 
-
-const XMLNamespace_Output = 'http://www.w3.org/2010/xslt-xquery-serialization';
+var duplicateValueCheck: TXQHashsetStr;
 begin
+  if paramNode = nil then exit;
+  if isStatic and (paramNode.typ = tetDocument) then paramNode := paramnode.getFirstChild();
   if paramNode = nil then exit;
   if not equalNamespaces(namespaceGetURL(paramNode.namespace), XMLNamespace_Output)
      or (paramNode.value <> 'serialization-parameters')
-     or (paramNode.typ <> tetOpen) then exit;
-   paramNode := paramNode.getFirstChild();
-   while paramNode <> nil do begin
-     if (paramNode.typ = tetOpen) and equalNamespaces(namespaceGetURL(paramNode.namespace), XMLNamespace_Output) then
+     or (paramNode.typ <> tetOpen) then error('XPTY0004');
+   checkNoAttributes(paramNode);
+   duplicateValueCheck.init;
+   for paramNode in paramNode.getEnumeratorChildren do begin
+     if paramnode.typ <> tetOpen then continue;
+     if paramnode.namespace = nil then error;
+     if duplicateValueCheck.contains(paramNode.getNodeName()) then
+       error('SEPM0019');
+     duplicateValueCheck.include(paramNode.getNodeName());
+     if equalNamespaces(namespaceGetURL(paramNode.namespace), XMLNamespace_Output) then begin
+       checkNoAttributes(paramNode, true);
        case paramNode.value of
-         //'allow-duplicate-names': todo 3.1
+         'allow-duplicate-names': allowDuplicateNames := toSerializationBool(paramNode.getAttribute('value'));
          'byte-order-mark': ; //todo
-         'cdata-section-elements': ;//todo
+         'cdata-section-elements': needQNameList(cdataSectionElements).includeAll(context, paramNode.getAttribute('value'));
          'doctype-public': doctypePublic := paramNode.getAttribute('value');
          'doctype-system': doctypeSystem := paramNode.getAttribute('value');
-         'encoding':       encoding := paramNode.getAttribute('value');
+         'encoding':       setEncoding(paramNode.getAttribute('value'));
          'escape-uri-attributes': ;//todo
          'html-version':   htmlVersion := paramNode.getAttribute('value');
          'include-content-type': ;//todo
-         'indent': if tobool(paramNode.getAttribute('value')) then indent := xqsiwIndent
+         'indent': if toSerializationBool(paramNode.getAttribute('value')) then indent := xqsiwIndent
                    else indent := xqsiwNever;
          'item-separator': itemSeparator := paramNode.getAttribute('value');
-         //'json-node-output-method': todo 3.1
+         'json-node-output-method': jsonNodeOutputMethod := paramNode.getAttribute('value');
          'media-type': ;//todo
-         'method':         method := paramNode.getAttribute('value');
-         'normalization-form': ;//todo
-         'omit-xml-declaration': omitXmlDeclaration := tobool(paramNode.getAttribute('value'));
-         'standalone':     standalone := paramNode.getAttribute('value');
-         'suppress-indentation': ;//todo
+         'method':         setMethod(paramNode.getAttribute('value'));
+         'normalization-form': setNormalizationForm(paramNode.getAttribute('value'));
+         'omit-xml-declaration': omitXmlDeclaration := toSerializationBool(paramNode.getAttribute('value'));
+         'standalone': setStandalone(paramNode.getAttribute('value'), false);
+         'suppress-indentation': needQNameList(suppressIndentation).includeAll(context, paramNode.getAttribute('value'));
          'undeclare-prefixes': ;//todo
-         'use-character-maps': ;//todo
+         'use-character-maps': setCharacterMaps;
          'version':        version := paramNode.getAttribute('value');
-         else raise EXQEvaluationException.create('SEPM0017', 'Invalid serialization parameter: '+paramNode.value);
+         else error();
        end;
-     paramNode:= paramNode.getNextSibling();
+     end;
    end;
+   duplicateValueCheck.done;
 end;
 
-procedure TSerializationParams.setFromMap(const v: IXQValue);
+procedure TSerializationParams.setFromMap(const context: TXQEvaluationContext; const v: IXQValue);
 var
-  pp: TXQProperty;
-  procedure raiseInvalidParameter;
+  pp, characterp: TXQProperty;
+  staticOptions: boolean = false;
+  procedure raiseInvalidParameter(typeError: boolean = true);
   begin
-    raiseXPTY0004TypeError(v, 'Invalid parameter for '+ pp.Name);
+    raiseXQEvaluationError(ifthen(typeError, 'XPTY0004', 'SEPM0016'), 'Invalid parameter for '+ pp.Name, pp.Value);
+  end;
+
+  function toSerializationBool(const s:string): boolean; overload;
+  begin
+    result := toSerializationBool(s, true);
   end;
 
   function valueBool: Boolean;
   begin
-    if pp.Value.kind = pvkBoolean then result := pp.value.toBoolean
-    else begin raiseInvalidParameter; result := false; end
+    if pp.Value.kind = pvkBoolean then exit(pp.value.toBoolean);
+    if staticOptions and (pp.Value.kind = pvkString) then begin
+      exit(toSerializationBool(pp.value.toString));
+    end;
+
+    result := false;
+    raiseInvalidParameter();
   end;
   function valueString(): string;
   begin
     if pp.Value.kind = pvkString then result := pp.value.toString
     else begin raiseInvalidParameter; result := ''; end
+  end;
+  procedure setQNameList(var list: PXQHashsetQName);
+  var
+    ok: Boolean;
+  begin
+    needQNameList(list);
+    if not staticOptions then ok := list.includeAll(pp.Value)
+    else ok := list.includeAll(context, pp.Value.toString);
+    if not ok then raiseInvalidParameter();
   end;
 
 begin
@@ -4344,158 +4587,677 @@ begin
       end;
     end;
     case pp.Name of
-      'allow-duplicate-names': valueBool(); //todo
+      'allow-duplicate-names': allowDuplicateNames := valueBool();
       'byte-order-mark': valueBool(); //todo
-      'cdata-section-elements': ; //todo
+      'cdata-section-elements': setQNameList(cdataSectionElements);
       'doctype-public': begin doctypePublic := valueString(); if doctypePublic = '' then doctypePublic := isAbsentMarker; end;
       'doctype-system': begin doctypeSystem := valueString(); if doctypeSystem = '' then doctypeSystem := isAbsentMarker; end;
-      'encoding': encoding := valueString();
+      'encoding': setEncoding(valueString());
       'escape-uri-attributes': valueBool(); //todo
-      'html-version': if pp.value.kind in [pvkInt64, pvkBigDecimal] then htmlVersion := inttostr(pp.value.toInt64) else raiseInvalidParameter;
+      'html-version':
+        if pp.value.kind in [pvkInt64, pvkBigDecimal] then htmlVersion := inttostr(pp.value.toInt64)
+        else if staticOptions and (pp.Value.kind = pvkString) then htmlVersion := pp.Value.toString
+        else raiseInvalidParameter;
       'include-content-type': valueBool(); //todo
       'indent': if valueBool() then indent := xqsiwIndent
                 else indent := xqsiwNever;
       'item-separator': itemSeparator := valueString();
-      'json-node-output-method': ; //todo
+      'json-node-output-method': jsonNodeOutputMethod := valueString();
       'media-type': valueString(); //todo
-      'method': method := valueString();
-      'normalization-form': valueString(); //todo
+      'method': setMethod(valueString());
+      'normalization-form': setNormalizationForm(valueString());
       'omit-xml-declaration': omitXmlDeclaration := valueBool();
-      'standalone': if valueBool() then standalone := 'yes' else standalone := 'no';
-      'suppress-indentation': ;
+      'standalone': if staticOptions and (pp.Value.toString = 'omit') then standalone := xdsOmit
+                    else setStandalone(valueBool());
+      'suppress-indentation': setQNameList(suppressIndentation);
       'undeclare-prefixes': valueBool(); //todo
-      'use-character-maps': ; //todo
+      'use-character-maps': begin
+        if characterMaps = nil then new(characterMaps,init);
+        if pp.value.kind <> pvkObject then raiseXPTY0004TypeError(pp.value, 'Map for serialization param use-character-maps.');
+        for characterp in pp.value.getPropertyEnumerator do
+          characterMaps.include(characterp.Name, characterp.Value.toString);
+      end;
       'version': version := valueString();
+      #0'static-options': begin
+        staticOptions := true;
+        allowDuplicateNames := false;
+        omitXmlDeclaration := false;
+      end;
+      'parameter-document': if staticOptions then
+        setFromNode(context, pp.Value.toNode, true);
+      else if staticOptions then raiseXQEvaluationException('XQST0109', 'Unknown serialization option.');
     end;
   end;
 end;
 
-procedure TSerializationParams.setFromXQValue(const v: IXQValue);
+procedure TSerializationParams.setFromXQValue(const context: TXQEvaluationContext;const v: IXQValue);
 begin
   case v.kind of
-    pvkObject: setFromMap(v);
-    pvkNode: setFromNode(v.toNode);
-    else if v.getSequenceCount > 0 then raiseXPTY0004TypeError(v, 'serialize params must be map() or node');
+    pvkObject: begin
+      setDefault(true);
+      setFromMap(context, v);
+    end;
+    pvkNode: begin
+      setDefault(false);
+      setFromNode(context, v.toNode, false);
+    end
+    else if v.getSequenceCount > 0 then raiseXPTY0004TypeError(v, 'serialize params must be map() or node')
+    else setDefault(true);
   end;
 end;
 
+procedure TSerializationParams.setMethod(const s: string);
+begin
+  case s of
+    'xml': method := xqsmXML;
+    'html': method := xqsmHTML;
+    'xhtml': method := xqsmXHTML;
+    'text': method := xqsmText;
+    'json': method := xqsmJSON;
+    'adaptive': method := xqsmAdaptive;
+  end;
+end;
 
-function xqFunctionSerialize({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
+procedure TSerializationParams.setStandalone(s: string; fromMap: boolean);
+begin
+  s := trim(s);
+  if s = 'omit' then standalone := xdsOmit
+  else setStandalone(toSerializationBool(s, fromMap));
+end;
+
+procedure TSerializationParams.setStandalone(s: boolean);
+begin
+  if s then standalone := xdsYes
+  else standalone := xdsNo;
+end;
+
+procedure TSerializationParams.setNormalizationForm(const s: string);
+begin
+  normalizationForm := unicodeNormalizationForm(s);
+  case normalizationForm of
+    unfEmpty, unfUnknown: raise EXQEvaluationException.Create('SESU0011', 'Unknown normalization method: '+s);
+  end;
+end;
+
+function TSerializationParams.hasNormalizationForm: boolean;
+begin
+  result := not (normalizationForm in [unfNone, unfUnknown, unfEmpty])
+end;
+
+procedure TSerializationParams.setEncoding(const s: string);
+begin
+  encoding := s;
+  encodingCP := strEncodingFromName(s);
+  if encodingCP = $FFFF then raiseXQEvaluationException('SESU0007', 'Unknown encoding: '+s);
+end;
+
+function TSerializationParams.needQNameList(var list: PXQHashsetQName): PXQHashsetQName;
+begin
+  if list = nil then new(list,init);
+  result := list;
+end;
+
+type TSpecialStringHandler = object
+  serializer: ^TXQSerializer;
+  params: ^TSerializationParams;
+  htmlNodes, isUnicodeEncoding: boolean;
+  function normalizeString(p: pchar; len: sizeint): string; overload;
+  function normalizeString(const s: string): string; inline; overload;
+  procedure appendJSONStringWithoutQuotes(const s: string);
+  procedure appendXMLHTMLCharacterMappedText(const s: string; attrib: boolean);
+  function appendXMLHTMLText(const n: TTreeNode): boolean;
+  function appendXMLHTMLAttribute(const n: TTreeAttribute): boolean;
+  procedure init;
+end;
+procedure TSpecialStringHandler.init;
+begin
+  //calling this procedure silences an object never used warning
+end;
+
+function TSpecialStringHandler.normalizeString(p: pchar; len: sizeint): string;
+begin
+  result := xquery__functions.normalizeString(strFromPchar(p, len), params^.normalizationForm)
+end;
+
+function TSpecialStringHandler.normalizeString(const s: string): string;
+begin
+  result := normalizeString(pchar(s), length(s));
+end;
+
+procedure TSpecialStringHandler.appendJSONStringWithoutQuotes(const s: string);
+var needNormalization, needEscaping: Boolean;
+var enumerator: TUTF8StringCodePointBlockEnumerator;
+  entity: TXQHashmapStrStr.PHashMapEntity;
+  hadNext: Boolean;
+begin
+  if params^.characterMaps = nil then begin
+    serializer^.appendJSONStringWithoutQuotes(normalizeString(s));
+  end else begin
+    needNormalization := params^.hasNormalizationForm;
+    needEscaping := false;
+    enumerator.init(s);
+    repeat
+      hadNext := enumerator.MoveNext;
+      entity := params^.characterMaps.findEntity(enumerator.currentPos, enumerator.currentByteLength);
+      if (not hadNext) or (entity <> nil) then begin
+        if needNormalization or needEscaping then serializer^.appendJSONStringWithoutQuotes(normalizeString(enumerator.markedPos, enumerator.markedByteLength))
+        else serializer^.append(enumerator.markedPos, enumerator.markedByteLength);
+        needEscaping := false;
+        enumerator.markNext;
+        if entity <> nil then
+          serializer^.append(string(entity^.Value));
+      end else case enumerator.currentPos^ of
+        #0..#31, '"', '\', '/': needEscaping := true;
+      end;
+    until not hadNext;
+  end;
+end;
+
+procedure TSpecialStringHandler.appendXMLHTMLCharacterMappedText(const s: string; attrib: boolean);
+var needNormalization, needEscaping: Boolean;
+var entity: TXQHashmapStrStr.PHashMapEntity;
+    enumerator: TUTF8StringCodePointBlockEnumerator;
+    hadNext: Boolean;
+    temp: String;
+begin
+  needNormalization := params.hasNormalizationForm;
+  needEscaping := false;
+  enumerator.init(s);
+  repeat
+    hadNext := enumerator.MoveNext;
+    entity := params^.characterMaps.findEntity(enumerator.currentPos, enumerator.currentByteLength);
+    if (not hadNext) or (entity <> nil) then begin
+      if needNormalization or needEscaping then begin
+        temp := normalizeString(enumerator.markedPos, enumerator.markedByteLength);
+        if attrib then begin
+          if htmlNodes then serializer^.appendHTMLAttrib(temp)
+          else serializer^.appendXMLAttrib(temp)
+        end else
+          if htmlNodes then serializer^.appendHTMLText(temp)
+          else serializer^.appendXMLText(temp)
+      end else begin
+        serializer^.append(enumerator.markedPos, enumerator.markedByteLength);
+      end;
+      needEscaping := false;
+
+      enumerator.markNext;
+      if entity <> nil then
+        serializer^.append(string(entity^.Value));
+    end else case enumerator.currentPos^ of
+      '<', '>', '&': needEscaping := true;
+      '''', '"': needEscaping := needEscaping or attrib;
+      #0..#$1F: needEscaping := true;
+      #$C2: needEscaping := needEscaping or (  (enumerator.currentByteLength = 2) and ((enumerator.currentPos + 1)^ in [#$80..#$9F]));
+      #$E2: needEscaping := needEscaping or ( (enumerator.currentByteLength = 3) and ((enumerator.currentPos + 1)^ = #$80) and ((enumerator.currentPos + 2)^ = #$A8));
+    end;
+  until not hadNext;
+end;
+
+function TSpecialStringHandler.appendXMLHTMLText(const n: TTreeNode): boolean;
+  procedure appendXMLCDATATextASCII(const s: string);
+  var enumerator: TUTF8StringCodePointBlockEnumerator;
+    hadNext: Boolean;
+  begin
+    enumerator.init(s);
+    repeat
+      hadNext := enumerator.MoveNext;
+      if enumerator.currentByteLength <> 1 then begin
+        serializer.appendXMLCDATAText(enumerator.markedPos, enumerator.markedByteLength);
+        if enumerator.currentByteLength > 0 then
+          serializer.appendHexEntity(enumerator.current);
+        enumerator.markNext;
+      end;
+    until not hadNext;
+  end;
+
+  procedure appendCDATA(const s: string);
+  begin
+    if isUnicodeEncoding then serializer.appendXMLCDATAText(s)
+    else appendXMLCDATATextASCII(s);
+  end;
+  procedure appendNormalizedCDATA(const s: string);
+  begin
+    appendCDATA(normalizeString(s));
+  end;
+
 var
-  v: PIXQValue;
-  arg: IXQValue;
-  params: TSerializationParams;
-  strres: String;
-  wasNodeOrFirst: Boolean;
+  parent: TTreeNode;
+begin
+  if assigned(params.cdataSectionElements) then begin
+    parent := n.getParent();
+    if assigned(parent) and params.cdataSectionElements.contains(parent.namespace, parent.value) then begin
+      if params^.hasNormalizationForm then appendNormalizedCDATA(n.value)
+      else appendCDATA(n.value);
+      exit(true);
+    end;
+  end;
+  if assigned(params^.characterMaps) then begin
+    appendXMLHTMLCharacterMappedText(n.value, false);
+    exit(true);
+  end;
+  result := false;
+end;
+
+function TSpecialStringHandler.appendXMLHTMLAttribute(const n: TTreeAttribute): boolean;
+begin
+  serializer.append(' ');
+  serializer.append(n.getNodeName());
+  serializer.append('="');
+  appendXMLHTMLCharacterMappedText(n.realvalue, true);
+  serializer.append('"');
+  result := true;
+end;
+
+function isUnicodeEncoding(e: TSystemCodePage): boolean;
+begin
+  e := strActualEncoding(e);
+  case e of
+    CP_UTF8, CP_UTF16, CP_UTF16BE, CP_UTF32, CP_UTF32BE: result := true;
+    else result := false;
+  end;
+end;
+
+procedure serializeNodes(base: TTreeNode; var builder: TXQSerializer; nodeSelf: boolean; html: boolean);
+var known: TNamespaceList;
+
+  function htmlElementIsImplicitCDATA(const name: string): boolean;
+  begin
+    result := simplehtmlparser.htmlElementIsCDATA(pchar(name), length(name));
+  end;
+
+  function requireNamespace(n: TNamespace): string;
+  begin //that function is useless the namespace should always be in known. But just for safety...
+    if (n = nil) or (n.getURL = XMLNamespaceUrl_XML) or (n.getURL = XMLNamespaceUrl_XMLNS) or (known.hasNamespace(n)) then exit('');
+    known.add(n);
+    result := ' ' + n.serialize;
+  end;
+
+  procedure inner(n: TTreeNode); forward;
+
+  procedure outer(n: TTreeNode);
+  var attrib: TTreeAttribute;
+      oldnamespacecount: integer;
+      i: Integer;
+      temp: TNamespace;
+  begin
+    with n do with builder do
+    case typ of
+      tetText: begin
+        if assigned(builder.onInterceptAppendXMLHTMLText) and builder.onInterceptAppendXMLHTMLText(n) then begin
+          //empty
+        end else if not html then append(xmlStrEscape(value)) //using appendXMLText fails (lacking automatic encoding conversion?)
+        else if (getParent() <> nil) and htmlElementIsImplicitCDATA(getParent().value) then append(value)
+        else appendHTMLText(value);
+      end;
+      tetClose:
+        if (namespace = nil) or (namespace.getPrefix = '') then appendXMLElementEndTag(value)
+        else appendXMLElementEndTag(getNodeName());
+      tetComment: begin
+        append('<!--');
+        append(value);
+        append('-->');
+      end;
+      tetProcessingInstruction:
+        if attributes <> nil then appendXMLProcessingInstruction(value, getAttribute(''))
+        else appendXMLProcessingInstruction(value, '');
+      tetOpen: begin
+        oldnamespacecount:=known.Count;
+        append('<');
+        append(getNodeName());
+
+        {
+        writeln(stderr,'--');
+         if attributes <> nil then
+          for attrib in attributes do
+            if attrib.isNamespaceNode then
+             writeln(stderr, value+': '+attrib.toNamespace.serialize);
+        }
+        if oldnamespacecount = 0 then n.getAllNamespaces(known)
+        else n.getOwnNamespaces(known);
+        for i:=oldnamespacecount to known.Count - 1 do
+          if (known.items[i].getURL <> '') or
+             (known.hasNamespacePrefixBefore(known.items[i].getPrefix, oldnamespacecount)
+                and (isNamespaceUsed(known.items[i])
+                     or ((known.items[i].getPrefix = '') and (isNamespaceUsed(nil))))) then begin
+                       append(' ');
+                       append(known.items[i].serialize);
+                     end;
+
+        if namespace <> nil then append(requireNamespace(namespace))
+        else if known.hasNamespacePrefix('', temp) then
+          if temp.getURL <> '' then begin
+            known.add(TNamespace.Make('', ''));
+            append(' xmlns=""');
+          end;
+        if attributes <> nil then
+          for attrib in getEnumeratorAttributes do
+            append(requireNamespace(attrib.namespace));
+
+
+        if attributes <> nil then
+          for attrib in getEnumeratorAttributes do
+            if not attrib.isNamespaceNode then begin
+              if assigned(builder.onInterceptAppendXMLHTMLAttribute) and builder.onInterceptAppendXMLHTMLAttribute(attrib) then begin
+                //empty
+              end else if html then appendHTMLElementAttribute(attrib.getNodeName(), attrib.realvalue)
+              else appendXMLElementAttribute(attrib.getNodeName(), attrib.realvalue);
+            end;
+
+        if (n.next = reverse) and (not html or (TTreeParser.htmlElementIsChildless(value))) then begin
+          if html then append('>')
+          else append('/>');
+          if builder.insertWhitespace = xqsiwIndent then append(LineEnding);
+          while known.count > oldnamespacecount do
+            known.Delete(known.count-1);
+          exit();
+        end;
+        append('>');
+        if builder.insertWhitespace = xqsiwIndent then append(LineEnding);
+        inner(n);
+        append('</'); append(n.getNodeName()); append('>');
+        if builder.insertWhitespace = xqsiwIndent then append(LineEnding);
+        while known.count > oldnamespacecount do
+          known.Delete(known.count-1);
+      end;
+      tetDocument: inner(n);
+      else; //should not happen
+    end;
+  end;
+
+  procedure inner(n: TTreeNode);
+  var sub: TTreeNode;
+  begin
+    if not (n.typ in TreeNodesWithChildren) then exit;
+    sub := n.next;
+    while sub <> n.reverse do begin
+      outer(sub);
+      if not (sub.typ in TreeNodesWithChildren) then sub:=sub.next
+      else if sub.reverse = nil then raise ETreeParseException.Create('Failed to serialize, no closing tag for '+sub.value)
+      else sub := sub.reverse.next;
+    end;
+  end;
+begin
+  known := TNamespaceList.Create;
+  if nodeSelf then outer(base)
+  else inner(base);
+  known.free;
+end;
+
+
+function serializeJSON(const params: TSerializationParams; const v: IXQValue): IXQValue;
+var serializer: TXQSerializer;
+  temp, temp2: string;
+  interceptor: TSpecialStringHandler;
+  cp: Integer;
+begin
+  serializer.init(@temp);
+  serializer.standard := true;
+
+  serializer.allowDuplicateNames := params.allowDuplicateNames;
+  serializer.insertWhitespace := params.indent;
+  case params.jsonNodeOutputMethod of
+    'xml': serializer.nodeFormat := tnsXML;
+    'xhtml': serializer.nodeFormat := tnsXML;
+    'html': serializer.nodeFormat := tnsHTML;
+    'text': serializer.nodeFormat := tnsText;
+    else serializer.error('SEPM0016', v.toValue);
+  end;
+
+  if params.hasNormalizationForm or (params.characterMaps <> nil) then begin
+    interceptor.init;
+    interceptor.params := @params;
+    interceptor.serializer := @serializer;
+    serializer.onInterceptAppendJSONString := @interceptor.appendJSONStringWithoutQuotes;
+  end;
+
+  v.jsonSerialize(serializer);
+  serializer.final;
+
+  if not isUnicodeEncoding(params.encodingCP) then begin
+    serializer.init(@temp2);
+    for cp in temp.enumerateUtf8CodePoints do begin
+      if cp <= $7F then serializer.append(chr(cp))
+      else serializer.appendJSONStringUnicodeEscape(cp);
+    end;
+    serializer.final;
+    temp := temp2;
+  end;
+
+  result := xqvalue(temp);
+end;
+
+function serializeAdaptive(const params: TSerializationParams; const v: IXQValue): IXQValue;
+var serializer: TXQSerializer;
+  temp, itemSeparator: string;
+  w: PIXQValue;
+  first: Boolean;
+begin
+  serializer.init(@temp);
+  serializer.standard := true;
+
+  serializer.nodeFormat:=tnsXML;
+  serializer.insertWhitespace := params.indent;
+  serializer.insertWhitespace := xqsiwNever;
+  itemSeparator := params.itemSeparator;
+  if itemSeparator = params.isAbsentMarker then itemSeparator := #10;
+
+  first := true;
+  for w in v.GetEnumeratorPtrUnsafe do begin
+    if not first then serializer.append(itemSeparator);
+    w^.adaptiveSerialize(serializer);
+    first := false;
+  end;
+  serializer.final;
+  result := xqvalue(temp);
+end;
+
+const XMLNamespaceUrl_XHTML = 'http://www.w3.org/1999/xhtml';
+
+function serializeXMLHTMLText(var params: TSerializationParams; const v: IXQValue): IXQValue;
+var serializer: TXQSerializer;
+
+var firstElement: TTreeNode = nil;
+
+  function findRootNodeCount(const v: IXQValue): integer;
+  var
+    w, m: PIXQValue;
+    n: TTreeNode;
+  begin
+    result := 0;
+    for w in v.GetEnumeratorPtrUnsafe do begin
+      case w^.kind of
+        pvkNode: n := w^.toNode;
+        pvkArray: begin
+          for m in w^.GetEnumeratorMembersPtrUnsafe do begin
+            result := findRootNodeCount(m^);
+            if result > 1 then exit;
+          end;
+          continue;
+        end
+        else continue;
+      end;
+      if n.typ = tetDocument then n := n.getFirstChild();
+      if n.typ <> tetAttribute then begin
+        while (n <> nil) do begin
+          case n.typ of
+            tetText: if n.value.Trim() <> '' then inc(result);
+            tetOpen: begin
+              inc(result);
+              if firstElement = nil then firstElement := n;
+              if result > 1 then exit();
+            end;
+          end;
+          n := n.getNextSibling();
+        end;
+      end;
+    end;
+  end;
+
+var
   hasItemSeparator: Boolean;
-  n: TTreeNode;
-  firstElement: TTreeNode;
+  wasNodeOrFirst: Boolean;
+
+  procedure addItemStart;
+  begin
+    if hasItemSeparator then begin
+      if not wasNodeOrFirst then serializer.append(params.itemSeparator);
+      wasNodeOrFirst := false;
+    end;
+  end;
 
   procedure addAtomicString(const s: string);
   begin
+    addItemStart;
     if not hasItemSeparator then begin
-      if not wasNodeOrFirst then strres += ' ';
+      if not wasNodeOrFirst then serializer.append(' ');
       wasNodeOrFirst := false;
     end;
-    strres += s;
+    serializer.append(s);
   end;
 
-begin
-  //this is incomplete, but the options that it handles should be handled completely (except for some invalid value checking)
-  arg := args[0];
-  params.setDefault;
-  if argc = 2 then params.setFromXQValue(args[1]);
-  firstElement := nil;
-  for v in arg.GetEnumeratorPtrUnsafe do with params do begin
-    n := v^.toNode;
-    if n = nil then continue;
-    if n.typ = tetDocument then n := n.getFirstChild();
-    if n.typ = tetAttribute then break; //fail later
-    while (n <> nil) and (firstElement = nil) do begin
-      if n.typ = tetOpen then firstElement := n
-      else n := n.getNextSibling();
+  procedure add(const v: IXQValue);
+  var
+    w, m: PIXQValue;
+    n: TTreeNode;
+  begin
+    for w in v.GetEnumeratorPtrUnsafe do begin
+      case w^.kind of
+        pvkNode: begin
+          addItemStart;
+          //this might be incomplete
+          n := w^.toNode;
+          if n.typ in [tetAttribute] then raiseXQEvaluationException('SENR0001', 'Cannot serialize attribute');
+          case params.method of
+            xqsmXML: serializeNodes(n, serializer, true, false);
+           // 'xhtml':;
+            xqsmHTML: serializeNodes(n, serializer, true, true);
+            xqsmText: serializer.append(w^.toString);
+          end;
+          if not hasItemSeparator then wasNodeOrFirst := true;
+        end;
+        pvkArray: for m in v.GetEnumeratorMembersPtrUnsafe do
+          add(m^);
+        pvkNull: addAtomicString('');
+        pvkObject, pvkFunction: raiseXQEvaluationError('SENR0001', 'Cannot serialize with XML/HTML/Text method', w^);
+        else addAtomicString(w^.toString);
+      end;
     end;
-    if firstElement <> nil then break;
   end;
 
-  strres := '';
+var temp: string;
+  hasDoctypeSystem: Boolean;
+  interceptor: TSpecialStringHandler;
+begin
+  serializer.init(@temp);
+  serializer.standard := true;
+
+  with params do
+    if method in [xqsmHTML, xqsmXHTML] then begin
+      if (htmlVersion = isAbsentMarker) then htmlVersion := version;
+      if (htmlVersion = isAbsentMarker) then htmlVersion := '5.0';
+      if (method = xqsmHTML) and assigned(cdataSectionElements) then begin
+        cdataSectionElements.exclude('');
+        if htmlVersion >= '5.0' then cdataSectionElements.exclude(XMLNamespaceUrl_XHTML);
+      end;
+    end;
+
+  if params.hasNormalizationForm or (params.characterMaps <> nil) or assigned(params.cdataSectionElements) then begin
+    interceptor.init;
+    interceptor.params := @params;
+    interceptor.serializer := @serializer;
+    interceptor.htmlNodes := params.method = xqsmHTML;
+    interceptor.isUnicodeEncoding := isUnicodeEncoding(params.encodingCP);
+    if params.hasNormalizationForm or (params.characterMaps <> nil) then
+      serializer.onInterceptAppendXMLHTMLAttribute := @interceptor.appendXMLHTMLAttribute;
+    serializer.onInterceptAppendXMLHTMLText := @interceptor.appendXMLHTMLText;
+  end;
 
   with params do begin
+    hasItemSeparator := params.itemSeparator <> params.isAbsentMarker;
+    hasDoctypeSystem := params.doctypeSystem <> params.isAbsentMarker;
+    standalone := params.standalone;
+    if findRootNodeCount(v) > 1 then begin
+      if hasDoctypeSystem then hasDoctypeSystem := false;
+      if standalone <> xdsOmit then standalone := xdsOmit;
+    end;
+
+
     case params.method of
-      'xml', 'xhtml', 'html': begin
+      xqsmXML, xqsmXHTML, xqsmHTML: begin
         //initialize missing default parameters
-        if (method = 'html') then begin
-          if (htmlVersion = isAbsentMarker) then htmlVersion := version;
-          if (htmlVersion = isAbsentMarker) then htmlVersion := '5.0';
-        end else if version = isAbsentMarker then version := '1.1';
+        if (method <> xqsmHTML) then begin
+          if omitXmlDeclaration then
+            if (standalone <> xdsOmit) or ( (version <> '1.0') and (version <> isAbsentMarker) and hasDoctypeSystem ) then
+              raiseXQEvaluationException('SEPM0009', 'Invalid serialization parameter');
+
+          if version = isAbsentMarker then version := '1.1';
+        end;
 
         //headers
-        if (method <> 'html') and not omitXmlDeclaration then begin
-          strres += '<?xml version="'+version+'" encoding="'+encoding+'"';
-          if standalone <> 'omit' then strres += ' standalone="'+standalone+'"';
-          strres += '?>';
+        if (method <> xqsmHTML) then begin
+          if not omitXmlDeclaration then
+            serializer.appendXMLHeader(version, encoding, standalone);
         end;
-        if (htmlVersion = '5.0') and (doctypeSystem = isAbsentMarker)
+        if (htmlVersion = '5.0') and (not hasDoctypeSystem)
            and (firstElement <> nil) and striEqual(firstElement.value, 'html')  {todo and only whitespace before firstelement}
-           and ( (method = 'xhtml') or ( (method = 'html') and (doctypePublic = isAbsentMarker) )) then begin
-           if method = 'html' then strres += '<!DOCTYPE html>'
-           else strres += '<!DOCTYPE '+firstElement.value+'>'
-        end else if doctypeSystem <> isAbsentMarker then begin
-          if method = 'html' then strres += '<!DOCTYPE html '
-          else begin
-            if firstElement = nil then raise EXQEvaluationException.create('SEPM0016', 'No element given');
-            strres += '<!DOCTYPE '+firstElement.value + ' ';
-          end;
-          if doctypePublic <> isAbsentMarker then strres += 'PUBLIC "' + doctypePublic + '" '
-          else strres += 'SYSTEM ';
-          strres += '"'+doctypeSystem+'">';
-        end else if (method = 'html') and (doctypePublic <> isAbsentMarker) then
-          strres += '<!DOCTYPE html PUBLIC "'+doctypePublic+'">';
+           and ( (method = xqsmXHTML) or ( (method = xqsmHTML) and (doctypePublic = isAbsentMarker) )) then begin
+           if method = xqsmHTML then serializer.append('<!DOCTYPE html>')
+           else serializer.append('<!DOCTYPE '+firstElement.value+'>')
+        end else if hasDoctypeSystem then begin
+          if method = xqsmHTML then serializer.append('<!DOCTYPE html ')
+          else if firstElement <> nil then
+            serializer.append('<!DOCTYPE '+firstElement.value + ' ');
+          if doctypePublic <> isAbsentMarker then serializer.append('PUBLIC "' + doctypePublic + '" ')
+          else serializer.append('SYSTEM ');
+          serializer.append('"'+doctypeSystem+'">');
+        end else if (method = xqsmHTML) and (doctypePublic <> isAbsentMarker) then
+          serializer.append('<!DOCTYPE html PUBLIC "'+doctypePublic+'">');
 
-        if method = 'xhtml' then method := 'xml';
+        if method = xqsmXHTML then method := xqsmXML;
       end;
-      'text': begin
+      xqsmText: begin
         //encoding: string;
       end;
+      //xqsmJSON, xqsmAdaptive: ;
     end;
   end;
 
-  hasItemSeparator := params.itemSeparator <> params.isAbsentMarker;
   wasNodeOrFirst := true;
-  for v in arg.GetEnumeratorPtrUnsafe do with params do begin
-    if hasItemSeparator then begin
-      if not wasNodeOrFirst then strres += params.itemSeparator;
-      wasNodeOrFirst := false;
-    end;
-    case v^.kind of
-      pvkNode: begin
-        //this might be incomplete
-        n := v^.toNode;
-        if n.typ in [tetAttribute] then raise EXQEvaluationException.create('SENR0001', 'Cannot serialize attribute');
-        case method of
-          'xml': strres += n.outerXML();
-         // 'xhtml':;
-          'html': strres += n.outerHTML();
-          'text': strres += v^.toString;
-        end;
-        if not hasItemSeparator then wasNodeOrFirst := true;
-      end;
-      pvkObject, pvkArray, pvkNull: raiseXPTY0004TypeError(v^, 'serialization');
-      pvkFunction: raise EXQEvaluationException.create('SENR0001', 'Cannot serialize function');
-      else addAtomicString(v^.toString);
-    end;
-  end;
-  result := xqvalue(strres);
+  add(v);
+
+  serializer.final;
+  result := xqvalue(temp);
 end;
 
-function xqFunctionSerialize_Json(argc: SizeInt; args: PIXQValue): IXQValue;
+function xqFunctionSerialize(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
+var
+  arg: IXQValue;
+  params: TSerializationParams;
+
+begin
+  params.characterMaps := nil;
+  //this is incomplete, but the options that it handles should be handled completely (except for some invalid value checking)
+  arg := args[0];
+  if argc = 2 then params.setFromXQValue(context, args[1])
+  else params.setDefault(false);
+
+  case params.method of
+    xqsmJSON: result := serializeJSON(params, arg);
+    xqsmAdaptive: result := serializeAdaptive(params, arg);
+    else result := serializeXMLHTMLText(params, arg);
+  end;
+
+  params.done
+end;
+
+function xqFunctionSerialize_Json(const context: TXQEvaluationContext;argc: SizeInt; args: PIXQValue): IXQValue;
 var serializer: TXQSerializer;
     res: string;
   procedure setParams;
   var p: TSerializationParams;
   begin
-    p.setDefault;
-    p.setFromXQValue(args[1]);
+    p.setDefault(false);
+    p.setFromXQValue(context, args[1]);
     serializer.insertWhitespace := p.indent;
   end;
 
@@ -4509,6 +5271,16 @@ begin
   result := xqvalue(res);
 end;
 
+
+function GlobalNodeSerializationCallbackImpl(node: TTreeNode; includeSelf, insertLineBreaks, html: boolean): string;
+var serializer: TXQSerializer;
+begin
+  serializer.init(@result);
+  if insertLineBreaks then serializer.insertWhitespace := xqsiwIndent
+  else serializer.insertWhitespace := xqsiwNever;
+  serializeNodes(node, serializer, includeSelf, html);
+  serializer.final;
+end;
 
 function xqFunctionUnparsed_Text(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 var
@@ -4574,6 +5346,102 @@ begin
   else node := args[0].toNode;
   result := xqvalue('autoid'+strFromPtr(node));
 end;
+
+type
+   TXQTermRNGMode = (xqtrngmNext, xqtrngmPermute);
+   TXQTermRNG = class(TXQTerm)
+      mode: TXQTermRNGMode;
+      state: TRandomNumberGenerator;
+      function evaluate(var context: TXQEvaluationContext): IXQValue; override;
+      function clone: TXQTerm; override;
+    end;
+
+function makeRandomNumberGenerator(const context: TXQEvaluationContext; const state: TRandomNumberGenerator): TXQValueObject;
+var newstate: TRandomNumberGenerator;
+  function makeFunction(mode: TXQTermRNGMode): TXQValueFunction;
+  var
+    rng: TXQTermRNG;
+  begin
+    rng := TXQTermRNG.Create;
+    rng.state := newstate;
+    rng.mode := mode;
+    result := TXQValueFunction.create();
+    result.ownsTerms := true;
+    result.body := rng;
+    result.context := context;
+    if mode = xqtrngmPermute then begin
+      setlength(result.parameters, 1);
+      result.parameters[0].variable := TXQTermVariable.create('arg');
+      result.parameters[0].seqtype := TXQTermSequenceType(globalTypes.itemStar.clone);
+      result.resulttype := TXQTermSequenceType(globalTypes.itemStar.clone);
+    end else begin
+      result.resulttype := TXQTermSequenceType.create(baseJSONiqSchema.object_);
+      result.resulttype.push(TXQTermSequenceType.create(baseSchema.string_));
+      result.resulttype.push(TXQTermSequenceType.create(tikAny));
+    end;
+  end;
+
+begin
+  newstate := state;
+  result := TXQValueObject.create();
+  result.setMutable('number', xqvalue(newstate.nextDouble));
+  result.setMutable('next', makeFunction(xqtrngmNext));
+  result.setMutable('permute', makeFunction(xqtrngmPermute));
+end;
+
+function xqFunctionRandom_Number_Generator(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
+var state: TRandomNumberGenerator;
+  temp: String;
+  seed: QWord;
+begin
+  if (argc = 0) or (args[0].isUndefined) then begin
+    seed := PQWord(@context.staticContext.sender.CurrentDateTime)^;
+    seed := seed xor PtrToUInt(context.staticContext);
+  end else begin
+    temp := args[0].toString;
+    seed := 0;
+    if length(temp) > 0 then move(temp[1], seed, min(length(temp), sizeof(seed)))
+    else seed := ord(args[0].kind);
+  end;
+  state.randomize(seed);
+  result := makeRandomNumberGenerator(context, state);
+end;
+
+
+function TXQTermRNG.evaluate(var context: TXQEvaluationContext): IXQValue;
+  function permute(const v: IXQValue): TXQValue;
+  var
+    n, i: Integer;
+    pos: array of integer = nil;
+    resseq: TXQValueSequence;
+  begin
+    n := v.getSequenceCount;
+    if n = 1 then exit(v.toValue);
+    resseq := TXQValueSequence.create(n);
+    result := resseq;
+    SetLength(pos, n);
+    for i := 1 to n do pos[i - 1] := i;
+    state.shuffle(pos);
+    for i in pos do
+      resseq.seq.addInArray(v.get(i));
+  end;
+
+begin
+  case mode of
+    xqtrngmNext: result := makeRandomNumberGenerator(context, state);
+    xqtrngmPermute: result := permute(context.temporaryVariables.topptr(0)^);
+    else result := nil;
+  end;
+end;
+
+function TXQTermRNG.clone: TXQTerm;
+begin
+  Result:=inherited clone;
+  TXQTermRng(result).state := state;
+  TXQTermRng(result).mode := mode;
+end;
+
+
 
 //returns 1000^(i+1) as English numeral using the Conway-Wechsler system. The result always ends with 'illion'
 function strConwayWechsler(i: integer): string;
@@ -5131,22 +5999,6 @@ begin
   result := week - firstweek + 1;
 end;
 
-function splitEQName(context: TXQEvaluationContext; const eqname: string; out namespaceURL, localpart: string): boolean;
-var
-  namespace: TNamespace;
-begin
-  namespaceURL := '';
-  localpart := xmlStrWhitespaceCollapse(eqname);
-  result := true;
-  if strBeginsWith(localpart, 'Q{') then begin //EQName!
-    namespaceURL := strSplitGet('}', localpart);
-    delete(namespaceURL, 1, 2); //Q{ no more
-  end else if pos(':', localpart) > 0 then begin
-    context.splitRawQName(namespace, localpart, xqdnkUnknown);
-    namespaceURL := namespaceGetURL(namespace);
-    result := namespaceURL <> '';
-  end;
-end;
 
 
 function xqFunctionFormat_DateTimeC(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue; allowDate, allowTime: boolean): IXQValue;
@@ -5851,15 +6703,28 @@ var
   stacksize: Integer;
   f: TXQValueFunction;
 begin
-  f := args[0] as TXQValueFunction;
-  if length(f.parameters) <> args[1].Size then raise EXQEvaluationException.create('FOAP0001', 'Invalid size');
-  stack := context.temporaryVariables;
-  stacksize := stack.Count;
-  for pv in args[1].GetEnumeratorMembersPtrUnsafe do
-    stack.push(pv^);
-  f.contextOverrideParameterNames(context, length(f.parameters));
-  result := f.evaluate(context, nil);
-  stack.popTo(stacksize);
+  case args[0].kind of
+    pvkFunction: begin
+      f := args[0] as TXQValueFunction;
+      if length(f.parameters) <> args[1].Size then raise EXQEvaluationException.create('FOAP0001', 'Invalid size');
+      stack := context.temporaryVariables;
+      stacksize := stack.Count;
+      for pv in args[1].GetEnumeratorMembersPtrUnsafe do
+        stack.push(pv^);
+      f.contextOverrideParameterNames(context, length(f.parameters));
+      result := f.evaluate(context, nil);
+      stack.popTo(stacksize);
+    end;
+    pvkObject: begin
+      if 1 <> args[1].Size then raise EXQEvaluationException.create('FOAP0001', 'Invalid size');
+      result := args[0].getProperty(args[1].toString);
+    end;
+    pvkArray: begin
+      if 1 <> args[1].Size then raise EXQEvaluationException.create('FOAP0001', 'Invalid size');
+      result := args[0].get(args[1].toInt64);
+    end;
+    else raiseXQEvaluationException('pxp:INTERNAL', '2020031814');
+  end;
 end;
 
 function xqFunctionContains_Token(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
@@ -6903,15 +7768,18 @@ end;
 
 
 
-var fn3, fn3_1, fn, pxp, pxpold, op, x, fnarray, fnmap: TXQNativeModule;
-const
-      PARSING_MODEL3 = [xqpmXPath3_0, xqpmXQuery3_0, xqpmXPath3_1, xqpmXQuery3_1];
-      PARSING_MODEL3_1 = [xqpmXPath3_1, xqpmXQuery3_1];
-
+var fn3, fn3_1, fn, pxp, pxpold, op, op3_1, x, fnarray, fnmap: TXQNativeModule;
 
 
 procedure initializeFunctions;
+var
+  templt: TXQOperatorInfo;
+  dependencyNodeCollation, dependencyNone, dependencyAll: TXQContextDependencies;
+  lastfn: TXQAbstractFunctionInfo;
 begin
+  dependencyNodeCollation := [xqcdContextCollation, xqcdContextOther];
+  dependencyNone := [];
+  dependencyAll := [low(TXQContextDependencies)..high(TXQContextDependencies)];
   { Modules can be submodules of other. We have the following relations
 
                 fn3_1: standard xpath/xquery 3.1 functions
@@ -6931,6 +7799,11 @@ begin
     /
    x: my (new and old) extensions
 
+
+   Binary operator lookup is different
+   The first module that contains the operator is used.
+   This is only used for binary comparisons operators in 3.1
+
   }
   fn3_1 := TXQNativeModule.Create(XMLNamespace_XPathFunctions, []);
   fn3_1.acceptedModels := PARSING_MODEL3_1;
@@ -6944,6 +7817,9 @@ begin
   pxp := TXQNativeModule.Create(XMLNamespace_MyExtensionsMerged, [fn,pxpold]);
   TXQueryEngine.registerNativeModule(pxp);
   op := TXQNativeModule.Create(XMLNamespace_MyExtensionOperators);
+  op3_1 := TXQNativeModule.Create(XMLNamespace_MyExtensionOperators, [op]);
+  op3_1.acceptedModels := PARSING_MODEL3_1;
+  TXQueryEngine.registerNativeModule(op3_1);
   TXQueryEngine.registerNativeModule(op);
 
   //my functions
@@ -6968,23 +7844,30 @@ begin
   pxpold.registerFunction('garbage-collect',0,0,@xqFunctionGarbage_Collect, []);
   pxpold.registerFunction('eval',1,2,@xqFunctionEval, []);
   pxpold.registerFunction('css',1,1,@xqFunctionCSS, []);
-  pxpold.registerFunction('get',1,2,@xqFunctionGet, ['($name as xs:string) as item()*','($name as xs:string, $def as item()*) as item()*'], [xqcdContextVariables]);
+  with globalTypes do begin
+  pxpold.registerFunction('get',@xqFunctionGet, [xqcdContextVariables]).setVersionsShared([stringt, itemStar], [stringt, itemStar,itemStar]);
   pxpold.registerFunction('is-nth',3,3,@xqFunctionIs_Nth, []);
   pxpold.registerFunction('type-of',1,1,@xqFunctionType_of, []);
   pxpold.registerFunction('get-property',2,2,@xqFunctionGet_Property, []);
   pxpold.registerFunction('object',0,1,@xqFunctionObject,[]); //deprecated
   pxpold.registerFunction('join',1,2,@xqFunctionJoin,[]);
-  pxpold.registerFunction('binary-to-string',1,2,@xqFunctionBinary_To_String,['($data as xs:hexBinary|xs:base64Binary) as xs:string', '($data as xs:hexBinary|xs:base64Binary, $encoding as xs:string) as xs:string']);
-  pxpold.registerFunction('string-to-hexBinary',1,2,@xqFunctionString_To_hexBinary,['($data as xs:string) as xs:hexBinary', '($data as xs:string, $encoding as xs:string) as xs:hexBinary']);
-  pxpold.registerFunction('string-to-base64Binary',1,2,@xqFunctionString_To_base64Binary,['($data as xs:string) as xs:base64Binary', '($data as xs:string, $encoding as xs:string) as xs:base64Binary']);
+  pxpold.registerFunction('binary-to-string',@xqFunctionBinary_To_String).setVersionsShared([anyBinary, stringt],  [anyBinary, stringt, stringt]);
+  pxpold.registerFunction('string-to-hexBinary',@xqFunctionString_To_hexBinary).setVersionsShared([stringt, hexBinary],  [stringt, stringt, hexBinary]);
+  pxpold.registerFunction('string-to-base64Binary',@xqFunctionString_To_base64Binary).setVersionsShared([stringt, base64Binary],  [stringt, stringt, base64Binary]);
 
-  pxpold.registerFunction('uri-encode', @xqFunctionEncode_For_Uri, ['($uri-part as xs:string?) as xs:string']); //same as fn:encode-for-uri, but with an easier name
-  pxpold.registerFunction('uri-decode', @xqFunctionDecode_Uri, ['($uri-part as xs:string?) as xs:string']);
-  pxpold.registerFunction('uri-combine', @xqFunctionUri_combine, ['($uri1 as item()*, $uri2 as item()*) as xs:string']); //will probably be removed in future version
-  pxpold.registerFunction('form-combine', @xqFunctionForm_combine, ['($uri1 as object(), $uri2 as item()*) as object()']); //will probably be removed in future version
-  pxpold.registerFunction('request-combine', @xqFunctionForm_combine, ['($uri1 as item(), $uri2 as item()*) as object()']); //planed replacement for form-combine and uri-combine (but name is not final yet)
-  pxpold.registerFunction('request-decode', @xqFunctionRequest_decode, ['($request as item()) as object()']);
+  pxpold.registerFunction('uri-encode', @xqFunctionEncode_For_Uri).setVersionsShared([stringOrEmpty, stringt]); //same as fn:encode-for-uri, but with an easier name
+  pxpold.registerFunction('uri-decode', @xqFunctionDecode_Uri).setVersionsShared([stringOrEmpty, stringt]);
+  pxpold.registerFunction('uri-combine', @xqFunctionUri_combine, dependencyNodeCollation).setVersionsShared([itemStar, itemStar, stringt]); //will probably be removed in future version
+  pxpold.registerFunction('form-combine', @xqFunctionForm_combine, dependencyNodeCollation).setVersionsShared([map, itemStar, map]); //will probably be removed in future version
+  pxpold.registerFunction('request-combine', @xqFunctionForm_combine, dependencyNodeCollation).setVersionsShared([item, itemStar, map]); //planed replacement for form-combine and uri-combine (but name is not final yet)
+  pxpold.registerFunction('request-decode', @xqFunctionRequest_decode, dependencyNodeCollation).setVersionsShared([item, map]);
 
+  {transform
+[[itemStar, functiont, map, itemStar]]
+transform
+[[itemStar, functiont, itemStar]]
+transform
+[[functiont, itemStar]]}
   pxpold.registerInterpretedFunction('transform', '($root as item()*, $f as function(*), $options as object()) as item()*',
   'for $i in $root return $f($i)!(if (. instance of node() and ( . is $i or $options("always-recurse") ) ) then ('+
   '                typeswitch (.)'+
@@ -6995,193 +7878,202 @@ begin
   pxpold.registerInterpretedFunction('transform', '($root as item()*, $f as function(*)) as item()*', 'pxp:transform($root, $f, {})');
   pxpold.registerInterpretedFunction('transform', '($f as function(*)) as item()*', 'pxp:transform(., $f, {})');
 
-  pxp.registerFunction('serialize-json', @xqFunctionSerialize_Json, ['($arg as item()*) as xs:string', '($arg as item()*, $params as item()?) as xs:string']);
+  pxp.registerFunction('serialize-json', @xqFunctionSerialize_Json, [xqcdContextOther]).setVersionsShared([itemStar, stringt],  [itemStar, itemOrEmpty, stringt]);
 
 
   //standard functions
-  fn.registerFunction('exists',@xqFunctionExists,['($arg as item()*) as xs:boolean']);
-  fn.registerFunction('empty', @xqFunctionempty,['($arg as item()*) as xs:boolean']);
-  fn.registerFunction('nilled', @xqFunctionNilled,['($arg as node()?) as xs:boolean?']);
-  fn3.registerFunction('nilled', @xqFunctionNilled,['() as xs:boolean']);
-  fn.registerFunction('error',@xqFunctionError,['() as none', '($error as xs:QName) as none', '($error as xs:QName?, $description as xs:string) as none', '($error as xs:QName?, $description as xs:string, $error-object as item()*) as none']);
+  fn.registerFunction('exists',@xqFunctionExists).setVersionsShared([itemStar, boolean]);
+  fn.registerFunction('empty', @xqFunctionempty).setVersionsShared([itemStar, boolean]);
+  fn.registerFunction('nilled', @xqFunctionNilled, dependencyNodeCollation).setVersionsShared([nodeOrEmpty, booleanOrEmpty]);
+  fn3.registerFunction('nilled', @xqFunctionNilled, dependencyNodeCollation+[xqcdFocusItem]).setVersionsShared([boolean]);
+  lastfn := fn.registerFunction('error',@xqFunctionError);
+  lastfn.setVersionsShared(4);
+  lastfn.setVersionsShared(0, [none]);
+  lastfn.setVersionsShared(1, [QName, none]);
+  lastfn.setVersionsShared(2, [QNameOrEmpty, stringt, none]);
+  lastfn.setVersionsShared(3, [QNameOrEmpty, stringt, itemStar, none]);
 
-  fn.registerFunction('abs',@xqFunctionAbs,['($arg as numeric?) as numeric?']);
-  fn.registerFunction('ceiling',@xqFunctionCeiling,['($arg as numeric?) as numeric?']);
-  fn.registerFunction('floor',@xqFunctionFloor,['($arg as numeric?) as numeric?']);
-  fn.registerFunction('round',@xqFunctionRound,['($arg as numeric?) as numeric?']);
-  fn3.registerFunction('round',@xqFunctionRound,['($arg as numeric?, $precision as xs:integer) as numeric?']);
-  fn.registerFunction('round-half-to-even',@xqFunctionRound_Half_To_Even,['($arg as numeric?) as numeric?', '($arg as numeric?, $precision as xs:integer) as numeric?']);
+  fn.registerFunction('abs',@xqFunctionAbs).setVersionsShared([numericOrEmpty, numericOrEmpty]);
+  fn.registerFunction('ceiling',@xqFunctionCeiling).setVersionsShared([numericOrEmpty, numericOrEmpty]);
+  fn.registerFunction('floor',@xqFunctionFloor).setVersionsShared([numericOrEmpty, numericOrEmpty]);
+  fn.registerFunction('round',@xqFunctionRound).setVersionsShared([numericOrEmpty, numericOrEmpty]);
+  fn3.registerFunction('round',@xqFunctionRound).setVersionsShared([numericOrEmpty, integer, numericOrEmpty]);
+  fn.registerFunction('round-half-to-even',@xqFunctionRound_Half_To_Even).setVersionsShared([numericOrEmpty, numericOrEmpty],  [numericOrEmpty, integer, numericOrEmpty]);
 
-  fn.registerFunction('codepoints-to-string',@xqFunctionCodepoints_to_string,['($arg as xs:integer*) as xs:string']);
-  fn.registerFunction('string-to-codepoints',@xqFunctionString_to_codepoints,['($arg as xs:string?) as xs:integer*']);
-  fn.registerFunction('string-join',@xqFunctionString_join,['($arg1 as xs:string*, $arg2 as xs:string) as xs:string']);
-  fn3.registerFunction('string-join',@xqFunctionString_join_Nosep,['($arg1 as xs:string*) as xs:string']);
-  fn3_1.registerFunction('string-join',@xqFunctionString_join,['($arg1 as xs:anyAtomicType*, $arg2 as xs:string) as xs:string']);
-  fn3_1.registerFunction('string-join',@xqFunctionString_join_Nosep,['($arg1 as xs:anyAtomicType*) as xs:string']);
-  fn.registerFunction('substring',@xqFunctionSubstring,['($sourceString as xs:string?, $startingLoc as xs:double) as xs:string', '($sourceString as xs:string?, $startingLoc as xs:double, $length as xs:double) as xs:string']);
-  fn.registerFunction('upper-case',@xqFunctionUpper_Case,['($arg as xs:string?) as xs:string']);
-  fn.registerFunction('lower-case',@xqFunctionLower_case,['($arg as xs:string?) as xs:string']);
-  fn.registerFunction('compare',@xqFunctionCompare,['($comparand1 as xs:string?, $comparand2 as xs:string?) as xs:integer?', '($comparand1 as xs:string?, $comparand2 as xs:string?, $collation as xs:string) as xs:integer?'], [xqcdContextCollation]);
-  fn.registerFunction('codepoint-equal',@xqFunctionCodePoint_Equal,['($comparand1 as xs:string?, $comparand2 as xs:string?) as xs:boolean?']);
-  fn.registerFunction('contains',@xqFunctionContains,['($arg1 as xs:string?, $arg2 as xs:string?) as xs:boolean', '($arg1 as xs:string?, $arg2 as xs:string?, $collation as xs:string) as xs:boolean'], [xqcdContextCollation]);
-  fn.registerFunction('starts-with',@xqFunctionStarts_with,['($arg1 as xs:string?, $arg2 as xs:string?) as xs:boolean', '($arg1 as xs:string?, $arg2 as xs:string?, $collation as xs:string) as xs:boolean'], [xqcdContextCollation]);
-  fn.registerFunction('ends-with',@xqFunctionEnds_with,['($arg1 as xs:string?, $arg2 as xs:string?) as xs:boolean', '($arg1 as xs:string?, $arg2 as xs:string?, $collation as xs:string) as xs:boolean'], [xqcdContextCollation]);
-  fn.registerFunction('substring-after',@xqFunctionSubstring_after,['($arg1 as xs:string?, $arg2 as xs:string?) as xs:string', '($arg1 as xs:string?, $arg2 as xs:string?, $collation as xs:string) as xs:string'], [xqcdContextCollation]);
-  fn.registerFunction('substring-before',@xqFunctionSubstring_before,['($arg1 as xs:string?, $arg2 as xs:string?) as xs:string', '($arg1 as xs:string?, $arg2 as xs:string?, $collation as xs:string) as xs:string'], [xqcdContextCollation]);
+  fn.registerFunction('codepoints-to-string',@xqFunctionCodepoints_to_string).setVersionsShared([integerStar, stringt]);
+  fn.registerFunction('string-to-codepoints',@xqFunctionString_to_codepoints).setVersionsShared([stringOrEmpty, integerStar]);
+  fn.registerFunction('string-join',@xqFunctionString_join).setVersionsShared([stringStar, stringt, stringt]);
+  fn3.registerFunction('string-join',@xqFunctionString_join_Nosep).setVersionsShared([stringStar, stringt]);
+  fn3_1.registerFunction('string-join',@xqFunctionString_join).setVersionsShared([atomicStar, stringt, stringt]);
+  fn3_1.registerFunction('string-join',@xqFunctionString_join_Nosep).setVersionsShared([atomicStar, stringt]);
+  fn.registerFunction('substring',@xqFunctionSubstring).setVersionsShared([stringOrEmpty, double, stringt],  [stringOrEmpty, double, double, stringt]);
+  fn.registerFunction('upper-case',@xqFunctionUpper_Case).setVersionsShared([stringOrEmpty, stringt]);
+  fn.registerFunction('lower-case',@xqFunctionLower_case).setVersionsShared([stringOrEmpty, stringt]);
+  fn.registerFunction('compare',@xqFunctionCompare, [xqcdContextCollation]).setVersionsShared([stringOrEmpty, stringOrEmpty, integerOrEmpty],  [stringOrEmpty, stringOrEmpty, stringt, integerOrEmpty]);
+  fn.registerFunction('codepoint-equal',@xqFunctionCodePoint_Equal).setVersionsShared([stringOrEmpty, stringOrEmpty, booleanOrEmpty]);
+  fn.registerFunction('contains',@xqFunctionContains, [xqcdContextCollation]).setVersionsShared([stringOrEmpty, stringOrEmpty, boolean],  [stringOrEmpty, stringOrEmpty, stringt, boolean]);
+  fn.registerFunction('starts-with',@xqFunctionStarts_with, [xqcdContextCollation]).setVersionsShared([stringOrEmpty, stringOrEmpty, boolean],  [stringOrEmpty, stringOrEmpty, stringt, boolean]);
+  fn.registerFunction('ends-with',@xqFunctionEnds_with, [xqcdContextCollation]).setVersionsShared([stringOrEmpty, stringOrEmpty, boolean],  [stringOrEmpty, stringOrEmpty, stringt, boolean]);
+  fn.registerFunction('substring-after',@xqFunctionSubstring_after, [xqcdContextCollation]).setVersionsShared([stringOrEmpty, stringOrEmpty, stringt],  [stringOrEmpty, stringOrEmpty, stringt, stringt]);
+  fn.registerFunction('substring-before',@xqFunctionSubstring_before, [xqcdContextCollation]).setVersionsShared([stringOrEmpty, stringOrEmpty, stringt],  [stringOrEmpty, stringOrEmpty, stringt, stringt]);
   fn.registerFunction('concat',2,-1,@xqFunctionConcat,[]);
-  fn.registerFunction('translate',@xqFunctionTranslate,['($arg as xs:string?, $mapString as xs:string, $transString as xs:string) as xs:string']);
-  fn.registerFunction('replace',@xqFunctionReplace,['($input as xs:string?, $pattern as xs:string, $replacement as xs:string) as xs:string', '($input as xs:string?, $pattern as xs:string, $replacement as xs:string, $flags as xs:string) as xs:string ']);
-  fn.registerFunction('matches',@xqFunctionMatches,['($input as xs:string?, $pattern as xs:string) as xs:boolean', '($input as xs:string?, $pattern as xs:string, $flags as xs:string) as xs:boolean']);
-  fn.registerFunction('tokenize',@xqFunctionTokenize,['($input as xs:string?, $pattern as xs:string) as xs:string*', '($input as xs:string?, $pattern as xs:string, $flags as xs:string) as xs:string*']);
+  fn.registerFunction('translate',@xqFunctionTranslate).setVersionsShared([stringOrEmpty, stringt, stringt, stringt]);
+  fn.registerFunction('replace',@xqFunctionReplace).setVersionsShared([stringOrEmpty, stringt, stringt, stringt],  [stringOrEmpty, stringt, stringt, stringt, stringt]);
+  fn.registerFunction('matches',@xqFunctionMatches).setVersionsShared([stringOrEmpty, stringt, boolean],  [stringOrEmpty, stringt, stringt, boolean]);
+  fn.registerFunction('tokenize',@xqFunctionTokenize).setVersionsShared([stringOrEmpty, stringt, stringStar],  [stringOrEmpty, stringt, stringt, stringStar]);
   fn3.registerFunction('analyze-string',@xqFunctionAnalyze_String,['( $input as xs:string?, $pattern 	 as xs:string) as element(fn:analyze-string-result)', '($input as xs:string?, $pattern as xs:string,$flags as xs:string) as element(fn:analyze-string-result)'],[]);
 
 
-  fn.registerFunction('boolean',@xqFunctionBoolean,['($arg as item()*) as xs:boolean']);
-  fn.registerFunction('true',@xqFunctionTrue,['() as xs:boolean']);
-  fn.registerFunction('false',@xqFunctionFalse,['() as xs:boolean']);
-  fn.registerFunction('not',@xqFunctionNot,['($arg as item()*) as xs:boolean']);
+  fn.registerFunction('boolean',@xqFunctionBoolean).setVersionsShared([itemStar, boolean]);;
+  fn.registerFunction('true',@xqFunctionTrue).setVersionsShared([boolean]);
+  fn.registerFunction('false',@xqFunctionFalse).setVersionsShared([boolean]);
+  fn.registerFunction('not',@xqFunctionNot).setVersionsShared([itemStar, boolean]);
 
 
-  fn.registerFunction('dateTime',@xqFunctionDateTime,['($arg1 as xs:date?, $arg2 as xs:time?) as xs:dateTime?']);
-  fn.registerFunction('year-from-dateTime',@xqFunctionYear_From_Datetime, ['($arg as xs:dateTime?) as xs:integer?']);
-  fn.registerFunction('month-from-dateTime',@xqFunctionMonth_From_Datetime, ['($arg as xs:dateTime?) as xs:integer?']);
-  fn.registerFunction('day-from-dateTime',@xqFunctionDay_From_Datetime, ['($arg as xs:dateTime?) as xs:integer?']);
-  fn.registerFunction('hours-from-dateTime',@xqFunctionHours_From_Datetime, ['($arg as xs:dateTime?) as xs:integer?']);
-  fn.registerFunction('minutes-from-dateTime',@xqFunctionMinutes_From_Datetime, ['($arg as xs:dateTime?) as xs:integer?']);
-  fn.registerFunction('seconds-from-dateTime',@xqFunctionSeconds_From_Datetime, ['($arg as xs:dateTime?) as xs:decimal?']);
+  fn.registerFunction('dateTime',@xqFunctionDateTime).setVersionsShared([dateOrEmpty, timeOrEmpty, dateTimeOrEmpty]);
+  fn.registerFunction('year-from-dateTime',@xqFunctionYear_From_Datetime).setVersionsShared([dateTimeOrEmpty, integerOrEmpty]);
+  fn.registerFunction('month-from-dateTime',@xqFunctionMonth_From_Datetime).setVersionsShared([dateTimeOrEmpty, integerOrEmpty]);
+  fn.registerFunction('day-from-dateTime',@xqFunctionDay_From_Datetime).setVersionsShared([dateTimeOrEmpty, integerOrEmpty]);
+  fn.registerFunction('hours-from-dateTime',@xqFunctionHours_From_Datetime).setVersionsShared([dateTimeOrEmpty, integerOrEmpty]);
+  fn.registerFunction('minutes-from-dateTime',@xqFunctionMinutes_From_Datetime).setVersionsShared([dateTimeOrEmpty, integerOrEmpty]);
+  fn.registerFunction('seconds-from-dateTime',@xqFunctionSeconds_From_Datetime).setVersionsShared([dateTimeOrEmpty, decimalOrEmpty]);
 
-  fn.registerFunction('years-from-duration',@xqFunctionYear_From_Duration, ['($arg as xs:duration?) as xs:integer?']);
-  fn.registerFunction('months-from-duration',@xqFunctionMonth_From_Duration, ['($arg as xs:duration?) as xs:integer?']);
-  fn.registerFunction('days-from-duration',@xqFunctionDay_From_Duration, ['($arg as xs:duration?) as xs:integer?']);
-  fn.registerFunction('hours-from-duration',@xqFunctionHours_From_Duration, ['($arg as xs:duration?) as xs:integer?']);
-  fn.registerFunction('minutes-from-duration',@xqFunctionMinutes_From_Duration, ['($arg as xs:duration?) as xs:integer?']);
-  fn.registerFunction('seconds-from-duration',@xqFunctionSeconds_From_Duration, ['($arg as xs:duration?) as xs:decimal?']);
+  fn.registerFunction('years-from-duration',@xqFunctionYear_From_Duration).setVersionsShared([durationOrEmpty, integerOrEmpty]);
+  fn.registerFunction('months-from-duration',@xqFunctionMonth_From_Duration).setVersionsShared([durationOrEmpty, integerOrEmpty]);
+  fn.registerFunction('days-from-duration',@xqFunctionDay_From_Duration).setVersionsShared([durationOrEmpty, integerOrEmpty]);
+  fn.registerFunction('hours-from-duration',@xqFunctionHours_From_Duration).setVersionsShared([durationOrEmpty, integerOrEmpty]);
+  fn.registerFunction('minutes-from-duration',@xqFunctionMinutes_From_Duration).setVersionsShared([durationOrEmpty, integerOrEmpty]);
+  fn.registerFunction('seconds-from-duration',@xqFunctionSeconds_From_Duration).setVersionsShared([durationOrEmpty, decimalOrEmpty]);
 
-  fn.registerFunction('year-from-date',@xqFunctionYear_From_Datetime, ['($arg as xs:date?) as xs:integer?']);
-  fn.registerFunction('month-from-date',@xqFunctionMonth_From_Datetime, ['($arg as xs:date?) as xs:integer?']);
-  fn.registerFunction('day-from-date',@xqFunctionDay_From_Datetime, ['($arg as xs:date?) as xs:integer?']);
-  fn.registerFunction('hours-from-time',@xqFunctionHours_From_Datetime, ['($arg as xs:time?) as xs:integer?']);
-  fn.registerFunction('minutes-from-time',@xqFunctionMinutes_From_Datetime, ['($arg as xs:time?) as xs:integer?']);
-  fn.registerFunction('seconds-from-time',@xqFunctionSeconds_From_Datetime, ['($arg as xs:time?) as xs:decimal?']);
-  fn.registerFunction('timezone-from-time',@xqFunctionTimezone_From_Datetime, ['($arg as xs:time?) as xs:dayTimeDuration?']);
-  fn.registerFunction('timezone-from-date',@xqFunctionTimezone_From_Datetime, ['($arg as xs:date?) as xs:dayTimeDuration?']);
-  fn.registerFunction('timezone-from-dateTime',@xqFunctionTimezone_From_Datetime, ['($arg as xs:dateTime?) as xs:dayTimeDuration?']);
-  fn.registerFunction('adjust-dateTime-to-timezone',@xqFunctionAdjustDateTimeToTimeZone, ['($arg as xs:dateTime?) as xs:dateTime?', '($arg as xs:dateTime?, $timezone as xs:dayTimeDuration?) as xs:dateTime?'], [xqcdContextTime]);
-  fn.registerFunction('adjust-date-to-timezone',@xqFunctionAdjustDateTimeToTimeZone, ['($arg as xs:date?) as xs:date?', '($arg as xs:date?, $timezone as xs:dayTimeDuration?) as xs:date?'], [xqcdContextTime]);
-  fn.registerFunction('adjust-time-to-timezone',@xqFunctionAdjustDateTimeToTimeZone, ['($arg as xs:time?) as xs:time?', '($arg as xs:time?, $timezone as xs:dayTimeDuration?) as xs:time?'], [xqcdContextTime]);
-  fn.registerFunction('implicit-timezone',@xqFunctionImplicit_Timezone, ['() as xs:dayTimeDuration'], [xqcdContextTime]);
-
-
-  fn.registerFunction('current-dateTime',@xqFunctionCurrent_Datetime,['() as xs:dateTime'], [xqcdContextTime]);
-  fn.registerFunction('current-date',@xqFunctionCurrent_Date,['() as xs:date'], [xqcdContextTime]);
-  fn.registerFunction('current-time',@xqFunctionCurrent_Time,['() as xs:time'], [xqcdContextTime]);
-
-  fn.registerFunction('trace',@xqFunctionTrace, ['($value as item()*, $label as xs:string) as item()*']);
-  fn.registerFunction('default-collation', @xqFunctionDefault_Collation, ['() as xs:string']);
-  fn.registerFunction('static-base-uri',@xqFunctionStatic_Base_Uri, ['() as xs:anyURI?']);
-  fn.registerFunction('base-uri',@xqFunctionBase_Uri, ['() as xs:anyURI?', '($arg as node()?) as xs:anyURI?']);
-  fn.registerFunction('document-uri',@xqFunctionDocument_Uri, ['($arg as node()?) as xs:anyURI?']);
-  fn3.registerFunction('document-uri',@xqFunctionDocument_Uri0, ['() as xs:anyURI?']);
-
-  fn.registerFunction('doc', @xqFunctionDoc, ['($uri as xs:string?) as document-node()?']);
-  fn.registerFunction('doc-available', @xqFunctionDoc_Available, ['($uri as xs:string?) as xs:boolean']);
-  fn.registerFunction('collection', @xqFunctionCollection, ['() as node()*', '($arg as xs:string?) as node()*']);
-  fn3.registerFunction('uri-collection', @xqFunctionUri_Collection, ['() as xs:anyURI*', '($arg as xs:string?) as xs:anyURI*']);
+  fn.registerFunction('year-from-date',@xqFunctionYear_From_Datetime).setVersionsShared([dateOrEmpty, integerOrEmpty]);
+  fn.registerFunction('month-from-date',@xqFunctionMonth_From_Datetime).setVersionsShared([dateOrEmpty, integerOrEmpty]);
+  fn.registerFunction('day-from-date',@xqFunctionDay_From_Datetime).setVersionsShared([dateOrEmpty, integerOrEmpty]);
+  fn.registerFunction('hours-from-time',@xqFunctionHours_From_Datetime).setVersionsShared([timeOrEmpty, integerOrEmpty]);
+  fn.registerFunction('minutes-from-time',@xqFunctionMinutes_From_Datetime).setVersionsShared([timeOrEmpty, integerOrEmpty]);
+  fn.registerFunction('seconds-from-time',@xqFunctionSeconds_From_Datetime).setVersionsShared([timeOrEmpty, decimalOrEmpty]);
+  fn.registerFunction('timezone-from-time',@xqFunctionTimezone_From_Datetime).setVersionsShared([timeOrEmpty, dayTimeDurationOrEmpty]);
+  fn.registerFunction('timezone-from-date',@xqFunctionTimezone_From_Datetime).setVersionsShared([dateOrEmpty, dayTimeDurationOrEmpty]);
+  fn.registerFunction('timezone-from-dateTime',@xqFunctionTimezone_From_Datetime).setVersionsShared([dateTimeOrEmpty, dayTimeDurationOrEmpty]);
+  fn.registerFunction('adjust-dateTime-to-timezone',@xqFunctionAdjustDateTimeToTimeZone, [xqcdContextTime]).setVersionsShared([dateTimeOrEmpty, dateTimeOrEmpty],  [dateTimeOrEmpty, dayTimeDurationOrEmpty, dateTimeOrEmpty]);
+  fn.registerFunction('adjust-date-to-timezone',@xqFunctionAdjustDateTimeToTimeZone, [xqcdContextTime]).setVersionsShared([dateOrEmpty, dateOrEmpty],  [dateOrEmpty, dayTimeDurationOrEmpty, dateOrEmpty]);
+  fn.registerFunction('adjust-time-to-timezone',@xqFunctionAdjustDateTimeToTimeZone, [xqcdContextTime]).setVersionsShared([timeOrEmpty, timeOrEmpty],  [timeOrEmpty, dayTimeDurationOrEmpty, timeOrEmpty]);
+  fn.registerFunction('implicit-timezone',@xqFunctionImplicit_Timezone, [xqcdContextTime]).setVersionsShared([dayTimeDuration]);
 
 
-  fn.registerFunction('root', @xqFunctionRoot, ['() as node()', '($arg as node()?) as node()?'], [xqcdFocusItem]);
-  fn.registerFunction('lang', @xqFunctionLang, ['($testlang as xs:string?) as xs:boolean', '($testlang as xs:string?, $node as node()) as xs:boolean']);
+  fn.registerFunction('current-dateTime',@xqFunctionCurrent_Datetime, [xqcdContextTime]).setVersionsShared([dateTime]);
+  fn.registerFunction('current-date',@xqFunctionCurrent_Date, [xqcdContextTime]).setVersionsShared([date]);
+  fn.registerFunction('current-time',@xqFunctionCurrent_Time, [xqcdContextTime]).setVersionsShared([time]);
+
+  fn.registerFunction('trace',@xqFunctionTrace,[xqcdContextOther]).setVersionsShared([itemStar, stringt, itemStar]);
+  fn.registerFunction('default-collation', @xqFunctionDefault_Collation,[xqcdContextCollation]).setVersionsShared([stringt]);
+  fn.registerFunction('static-base-uri',@xqFunctionStatic_Base_Uri,[xqcdContextOther]).setVersionsShared([anyURIOrEmpty]);
+  fn.registerFunction('base-uri',@xqFunctionBase_Uri, [xqcdFocusItem]+dependencyNodeCollation).setVersionsShared([anyURIOrEmpty],  [nodeOrEmpty, anyURIOrEmpty]);
+  fn.registerFunction('document-uri',@xqFunctionDocument_Uri).setVersionsShared([nodeOrEmpty, anyURIOrEmpty]);
+  fn3.registerFunction('document-uri',@xqFunctionDocument_Uri0,[xqcdFocusItem]).setVersionsShared([anyURIOrEmpty]);
+
+  fn.registerFunction('doc', @xqFunctionDoc,[xqcdContextOther]).setVersionsShared([stringOrEmpty, documentNodeOrEmpty]);
+  fn.registerFunction('doc-available', @xqFunctionDoc_Available,[xqcdContextOther]).setVersionsShared([stringOrEmpty, boolean]);
+  fn.registerFunction('collection', @xqFunctionCollection,[xqcdContextOther]).setVersionsShared([nodeStar],  [stringOrEmpty, nodeStar]);
+  fn3.registerFunction('uri-collection', @xqFunctionUri_Collection,[xqcdContextOther]).setVersionsShared([anyURIStar],  [stringOrEmpty, anyURIStar]);
 
 
-  fn.registerFunction('QName',@xqFunctionQName, ['($paramURI as xs:string?, $paramQName as xs:string) as xs:QName']);
-  fn.registerFunction('name',@xqFunctionName, ['() as xs:string', '($arg as node()?) as xs:string'], [xqcdFocusItem]);
-  fn.registerFunction('local-name',@xqFunctionLocal_Name, ['() as xs:string', '($arg as node()?) as xs:string'], [xqcdFocusItem]);
-  fn.registerFunction('namespace-uri',@xqFunctionNamespace_URI, ['() as xs:anyURI', '($arg as node()?) as xs:anyURI'], [xqcdFocusItem]);
-  fn.registerFunction('node-name', @xqFunctionNode_Name, ['($arg as node()?) as xs:QName?']);
-  fn3.registerFunction('node-name', @xqFunctionNode_Name, ['() as xs:QName?']);
-  fn.registerFunction('resolve-QName',@xqFunctionResolve_QName, ['($qname as xs:string?, $element as element()) as xs:QName?'], [xqcdContextCollation]);
-  fn.registerFunction('prefix-from-QName',@xqFunctionPrefix_From_QName, ['($arg as xs:QName?) as xs:NCName?']);
-  fn.registerFunction('local-name-from-QName',@xqFunctionLocal_Name_From_QName, ['($arg as xs:QName?) as xs:NCName?']);
-  fn.registerFunction('namespace-uri-from-QName',@xqFunctionNamespace_URI_from_QName, ['($arg as xs:QName?) as xs:anyURI?']);
-  fn.registerFunction('namespace-uri-for-prefix',@xqFunctionNamespace_URI_For_Prefix, ['($prefix as xs:string?, $element as element()) as xs:anyURI?']);
-  fn.registerFunction('in-scope-prefixes',@xqFunctionIn_Scope_prefixes, ['($element as element()) as xs:string*']);
+  fn.registerFunction('root', @xqFunctionRoot, [xqcdFocusItem]).setVersionsShared([node],  [nodeOrEmpty, nodeOrEmpty]);
+  fn.registerFunction('lang', @xqFunctionLang, [xqcdFocusItem]+dependencyNodeCollation).setVersionsShared([stringOrEmpty, boolean],  [stringOrEmpty, node, boolean]);
 
 
-  fn.registerFunction('resolve-uri', @xqFunctionResolve_Uri, ['($relative as xs:string?) as xs:anyURI?', '($relative as xs:string?, $base as xs:string) as xs:anyURI?']);
-  fn.registerFunction('encode-for-uri', @xqFunctionEncode_For_Uri, ['($uri-part as xs:string?) as xs:string']);
-  fn.registerFunction('iri-to-uri', @xqFunctionIri_To_Uri, ['($iri as xs:string?) as xs:string']);
-  fn.registerFunction('escape-html-uri', @xqFunctionEscape_Html_Uri, ['($uri as xs:string?) as xs:string']);
+  fn.registerFunction('QName',@xqFunctionQName).setVersionsShared([stringOrEmpty, stringt, QName]);
+  fn.registerFunction('name',@xqFunctionName, [xqcdFocusItem]).setVersionsShared([stringt],  [nodeOrEmpty, stringt]);
+  fn.registerFunction('local-name',@xqFunctionLocal_Name, [xqcdFocusItem]).setVersionsShared([stringt],  [nodeOrEmpty, stringt]);
+  fn.registerFunction('namespace-uri',@xqFunctionNamespace_URI, [xqcdFocusItem]).setVersionsShared([anyURI],  [nodeOrEmpty, anyURI]);
+  fn.registerFunction('node-name', @xqFunctionNode_Name, dependencyNone).setVersionsShared([nodeOrEmpty, QNameOrEmpty]);
+  fn3.registerFunction('node-name', @xqFunctionNode_Name, [xqcdFocusItem]).setVersionsShared([QNameOrEmpty]);
+  fn.registerFunction('resolve-QName',@xqFunctionResolve_QName, dependencyNodeCollation).setVersionsShared([stringOrEmpty, element, QNameOrEmpty]);
+  fn.registerFunction('prefix-from-QName',@xqFunctionPrefix_From_QName).setVersionsShared([QNameOrEmpty, NCNameOrEmpty]);
+  fn.registerFunction('local-name-from-QName',@xqFunctionLocal_Name_From_QName).setVersionsShared([QNameOrEmpty, NCNameOrEmpty]);
+  fn.registerFunction('namespace-uri-from-QName',@xqFunctionNamespace_URI_from_QName).setVersionsShared([QNameOrEmpty, anyURIOrEmpty]);
+  fn.registerFunction('namespace-uri-for-prefix',@xqFunctionNamespace_URI_For_Prefix).setVersionsShared([stringOrEmpty, element, anyURIOrEmpty]);
+  fn.registerFunction('in-scope-prefixes',@xqFunctionIn_Scope_prefixes).setVersionsShared([element, stringStar]);
 
 
-  fn.registerFunction('data', @xqFunctionData, ['($arg as item()*) as xs:anyAtomicType*']);
-  fn3.registerFunction('data', @xqFunctionData, ['() as xs:anyAtomicType*']);
-  fn.registerFunction('number',@xqFunctionNumber, ['() as xs:double', '($arg as xs:anyAtomicType?) as xs:double'], [xqcdFocusItem]);
-  fn.registerFunction('string',@xqFunctionString, ['() as xs:string', '($arg as item()?) as xs:string'], [xqcdFocusItem]);
-  fn.registerFunction('string-length',@xqFunctionString_length, ['() as xs:integer', '($arg as xs:string?) as xs:integer'], [xqcdFocusItem]);
-  fn.registerFunction('normalize-space',@xqFunctionNormalize_space, ['() as xs:string', '($arg as xs:string?) as xs:string'], [xqcdFocusItem]);
-  fn.registerFunction('normalize-unicode', @xqFunctionNormalizeUnicode, ['($arg as xs:string?) as xs:string', '($arg as string?, $normalizationForm as xs:string) as xs:string']);
+  fn.registerFunction('resolve-uri', @xqFunctionResolve_Uri, [xqcdContextOther]).setVersionsShared([stringOrEmpty, anyURIOrEmpty], [stringOrEmpty, stringt, anyURIOrEmpty]);
+  fn.registerFunction('encode-for-uri', @xqFunctionEncode_For_Uri).setVersionsShared([stringOrEmpty, stringt]);
+  fn.registerFunction('iri-to-uri', @xqFunctionIri_To_Uri).setVersionsShared([stringOrEmpty, stringt]);
+  fn.registerFunction('escape-html-uri', @xqFunctionEscape_Html_Uri).setVersionsShared([stringOrEmpty, stringt]);
+
+
+  fn.registerFunction('data', @xqFunctionData, dependencyNone).setVersionsShared([itemStar, atomicStar]);
+  fn3.registerFunction('data', @xqFunctionData, [xqcdFocusItem]).setVersionsShared([atomicStar]);
+  fn.registerFunction('number',@xqFunctionNumber, [xqcdFocusItem]).setVersionsShared([double],  [atomicOrEmpty, double]);
+  fn.registerFunction('string',@xqFunctionString, [xqcdFocusItem]).setVersionsShared([stringt],  [itemOrEmpty, stringt]);
+  fn.registerFunction('string-length',@xqFunctionString_length, [xqcdFocusItem]).setVersionsShared([integer],  [stringOrEmpty, integer]);
+  fn.registerFunction('normalize-space',@xqFunctionNormalize_space, [xqcdFocusItem]).setVersionsShared([stringt],  [stringOrEmpty, stringt]);
+  fn.registerFunction('normalize-unicode', @xqFunctionNormalizeUnicode).setVersionsShared([stringOrEmpty, stringt],  [stringOrEmpty, stringt, stringt]);
 
   fn.registerFunction('concatenate',2, 2, @xqFunctionConcatenate, []); //this should be an operator
-  fn.registerFunction('index-of', @xqFunctionindex_of, ['($seqParam as xs:anyAtomicType*, $srchParam as xs:anyAtomicType) as xs:integer*', '($seqParam as xs:anyAtomicType*, $srchParam as xs:anyAtomicType, $collation as xs:string) as xs:integer*'], [xqcdContextCollation, xqcdContextTime, xqcdContextOther]);
-  fn.registerFunction('distinct-values', @xqFunctiondistinct_values, ['($arg as xs:anyAtomicType*) as xs:anyAtomicType*', '($arg as xs:anyAtomicType*, $collation as xs:string) as xs:anyAtomicType*'], [xqcdContextCollation, xqcdContextTime, xqcdContextOther]);
-  fn.registerFunction('insert-before', @xqFunctioninsert_before, ['($target as item()*, $position as xs:integer, $inserts as item()*) as item()*']);
-  fn.registerFunction('remove', @xqFunctionremove, ['($target as item()*, $position as xs:integer) as item()*']);
-  fn.registerFunction('reverse', @xqFunctionreverse, ['($arg as item()*) as item()*']);
-  fn.registerFunction('subsequence', @xqFunctionsubsequence, ['($sourceSeq as item()*, $startingLoc as xs:double) as item()*', '($sourceSeq as item()*, $startingLoc as xs:double, $length as xs:double) as item()*']);
-  fn.registerFunction('unordered', @xqFunctionunordered, ['($sourceSeq as item()*) as item()']);
-  fn.registerFunction('zero-or-one', @xqFunctionzero_or_one, ['($arg as item()*) as item()?']);
-  fn.registerFunction('one-or-more', @xqFunctionone_or_more, ['($arg as item()*) as item()+']);
-  fn.registerFunction('exactly-one', @xqFunctionexactly_one, ['($arg as item()*) as item()']);
-  fn.registerFunction('deep-equal', @xqFunctiondeep_equal, ['($parameter1 as item()*, $parameter2 as item()*) as xs:boolean', '($parameter1 as item()*, $parameter2 as item()*, $collation as string) as xs:boolean'], [xqcdContextCollation, xqcdContextTime, xqcdContextOther]);
-  fn.registerFunction('count', @xqFunctioncount, ['($arg as item()*) as xs:integer']);
-  fn.registerFunction('avg', @xqFunctionavg, ['($arg as xs:anyAtomicType*) as xs:anyAtomicType?']);
-  fn.registerFunction('max', @xqFunctionmax, ['($arg as xs:anyAtomicType*) as xs:anyAtomicType?', '($arg as xs:anyAtomicType*, $collation as string) as xs:anyAtomicType?'], [xqcdContextCollation, xqcdContextTime, xqcdContextOther]);
-  fn.registerFunction('min', @xqFunctionmin, ['($arg as xs:anyAtomicType*) as xs:anyAtomicType?', '($arg as xs:anyAtomicType*, $collation as string) as xs:anyAtomicType?'], [xqcdContextCollation, xqcdContextTime, xqcdContextOther]);
-  fn.registerFunction('sum', @xqFunctionsum, ['($arg as xs:anyAtomicType*) as xs:anyAtomicType', '($arg as xs:anyAtomicType*, $zero as xs:anyAtomicType?) as xs:anyAtomicType?']);
-  x.registerFunction('product', @xqFunctionProduct, ['($arg as xs:anyAtomicType*) as xs:anyAtomicType']);
+  fn.registerFunction('index-of', @xqFunctionindex_of, [xqcdContextCollation, xqcdContextTime, xqcdContextOther]).setVersionsShared([atomicStar, atomic, integerStar],  [atomicStar, atomic, stringt, integerStar]);
+  fn.registerFunction('distinct-values', @xqFunctiondistinct_values, [xqcdContextCollation, xqcdContextTime, xqcdContextOther]).setVersionsShared([atomicStar, atomicStar],  [atomicStar, stringt, atomicStar]);
+  fn.registerFunction('insert-before', @xqFunctioninsert_before).setVersionsShared([itemStar, integer, itemStar, itemStar]);
+  fn.registerFunction('remove', @xqFunctionremove).setVersionsShared([itemStar, integer, itemStar]);
+  fn.registerFunction('reverse', @xqFunctionreverse).setVersionsShared([itemStar, itemStar]);
+  fn.registerFunction('subsequence', @xqFunctionsubsequence).setVersionsShared([itemStar, double, itemStar], [itemStar, double, double, itemStar]);
+  fn.registerFunction('unordered', @xqFunctionunordered).setVersionsShared([itemStar, item]);
+  fn.registerFunction('zero-or-one', @xqFunctionzero_or_one).setVersionsShared([itemStar, itemOrEmpty]);
+  fn.registerFunction('one-or-more', @xqFunctionone_or_more).setVersionsShared([itemStar, itemPlus]);
+  fn.registerFunction('exactly-one', @xqFunctionexactly_one).setVersionsShared([itemStar, item]);
+  fn.registerFunction('deep-equal', @xqFunctiondeep_equal, [xqcdContextCollation, xqcdContextTime, xqcdContextOther]).setVersionsShared([itemStar, itemStar, boolean],  [itemStar, itemStar, stringt, boolean]);
+  fn.registerFunction('count', @xqFunctioncount).setVersionsShared([itemStar, integer]);
+  fn.registerFunction('avg', @xqFunctionavg).setVersionsShared([atomicStar, atomicOrEmpty]);
+  fn.registerFunction('max', @xqFunctionmax, [xqcdContextCollation, xqcdContextTime, xqcdContextOther]).setVersionsShared([atomicStar, atomicOrEmpty],  [atomicStar, stringt, atomicOrEmpty]);
+  fn.registerFunction('min', @xqFunctionmin, [xqcdContextCollation, xqcdContextTime, xqcdContextOther]).setVersionsShared([atomicStar, atomicOrEmpty],  [atomicStar, stringt, atomicOrEmpty]);
+  fn.registerFunction('sum', @xqFunctionsum).setVersionsShared([atomicStar, atomic],  [atomicStar, atomicOrEmpty, atomicOrEmpty]);
+  x.registerFunction('product', @xqFunctionProduct, dependencyNone).setVersionsShared([atomicStar, atomic]);
 
-  fn.registerFunction('position', @xqFunctionPosition, ['() as xs:integer'], [xqcdFocusPosition]);
-  fn.registerFunction('last', @xqFunctionLast, ['() as xs:integer'], [xqcdFocusLast]);
+  fn.registerFunction('position', @xqFunctionPosition, [xqcdFocusPosition]).setVersionsShared([integer]);
+  fn.registerFunction('last', @xqFunctionLast, [xqcdFocusLast]).setVersionsShared([integer]);
 
-  fn.registerFunction('id', @xqFunctionId, ['($arg as xs:string*) as element()*', '($arg as xs:string*, $node as node()) as element()*']);
-  fn.registerFunction('idref', @xqFunctionIdRef, ['($arg as xs:string*) as node()*', '($arg as xs:string*, $node as node()) as node()*']);
-  fn.registerFunction('element-with-id', @xqFunctionElement_With_Id, ['($arg as xs:string*) as element()*', '($arg as xs:string*, $node as node()) as element()*']); //TODO: should search for #ID nodes (?)
+  fn.registerFunction('id', @xqFunctionId, dependencyNodeCollation+[xqcdFocusItem]).setVersionsShared([stringStar, elementStar],  [stringStar, node, elementStar]);
+  fn.registerFunction('idref', @xqFunctionIdRef, dependencyNodeCollation+[xqcdFocusItem]).setVersionsShared([stringStar, nodeStar],  [stringStar, node, nodeStar]);
+  fn.registerFunction('element-with-id', @xqFunctionElement_With_Id, dependencyNodeCollation+[xqcdFocusItem]).setVersionsShared([stringStar, elementStar],  [stringStar, node, elementStar]); //TODO: should search for #ID nodes (?)
 
-  fn3.registerFunction('head', @xqFunctionHead, ['($arg as item()*) as item()?']);
-  fn3.registerFunction('tail', @xqFunctionTail, ['($arg as item()*) as item()*']);
+  fn3.registerFunction('head', @xqFunctionHead).setVersionsShared([itemStar, itemOrEmpty]);
+  fn3.registerFunction('tail', @xqFunctionTail).setVersionsShared([itemStar, itemStar]);
 
-  fn3.registerFunction('has-children', @xqFunctionHas_Children, ['() as xs:boolean', '($node as node()?) as xs:boolean']);
+  fn3.registerFunction('has-children', @xqFunctionHas_Children, [xqcdFocusItem]).setVersionsShared([boolean],  [nodeOrEmpty, boolean]);
+  //[nodeStar, nodeStar]
   fn3.registerInterpretedFunction('innermost', '($nodes as node()*) as node()*', '$nodes except $nodes/ancestor::node()', []);
+  //[nodeStar, nodeStar]
   fn3.registerInterpretedFunction('outermost', '($nodes as node()*) as node()*', '$nodes[not(ancestor::node() intersect $nodes)]/.', []);
-  fn3.registerFunction('path', @xqFunctionPath, ['() as xs:string?', '($arg as node()?) as xs:string?']);
+  fn3.registerFunction('path', @xqFunctionPath, [xqcdFocusItem]).setVersionsShared([stringOrEmpty],  [nodeOrEmpty, stringOrEmpty]);
 
-  fn3.registerFunction('format-integer', @xqFunctionFormat_Integer, ['($value as xs:integer?, $picture as xs:string) as xs:string', '(	$value	 as xs:integer?, $picture	 as xs:string,$lang	 as xs:string?) as xs:string']);
-  fn3.registerFunction('format-dateTime', @xqFunctionFormat_DateTime, ['($value as xs:dateTime?, $picture as xs:string) as xs:string?', '( 	$value 	 as xs:dateTime?, $picture 	 as xs:string, $language 	 as xs:string?, $calendar as xs:string?, $place as xs:string?) as xs:string?']);
-  fn3.registerFunction('format-date', @xqFunctionFormat_Date, ['($value as xs:date?, $picture as xs:string) as xs:string?', '( 	$value 	 as xs:date?,$picture 	 as xs:string,$language 	 as xs:string?,$calendar 	 as xs:string?,$place 	 as xs:string?) as xs:string?']);
-  fn3.registerFunction('format-time', @xqFunctionFormat_Time, ['($value as xs:time?, $picture as xs:string) as xs:string?','( 	$value 	 as xs:time?,$picture 	 as xs:string,$language 	 as xs:string?,$calendar 	 as xs:string?,$place 	 as xs:string?) as xs:string?']);
-  fn3.registerFunction('format-number', @xqFunctionFormat_Number, ['($value as xs:numeric?, $picture as xs:string) as xs:string', '(	$value	 as xs:numeric?, $picture	 as xs:string,$decimal-format-name	 as xs:string?) as xs:string']);
+  fn3.registerFunction('format-integer', @xqFunctionFormat_Integer, [xqcdContextOther]).setVersionsShared([integerOrEmpty, stringt, stringt],  [integerOrEmpty, stringt, stringOrEmpty, stringt]);
+  fn3.registerFunction('format-dateTime', @xqFunctionFormat_DateTime, [xqcdContextOther]).setVersionsShared([dateTimeOrEmpty, stringt, stringOrEmpty],  [dateTimeOrEmpty, stringt, stringOrEmpty, stringOrEmpty, stringOrEmpty, stringOrEmpty]);
+  fn3.registerFunction('format-date', @xqFunctionFormat_Date, [xqcdContextOther]).setVersionsShared([dateOrEmpty, stringt, stringOrEmpty],  [dateOrEmpty, stringt, stringOrEmpty, stringOrEmpty, stringOrEmpty, stringOrEmpty]);
+  fn3.registerFunction('format-time', @xqFunctionFormat_Time, [xqcdContextOther]).setVersionsShared([timeOrEmpty, stringt, stringOrEmpty],  [timeOrEmpty, stringt, stringOrEmpty, stringOrEmpty, stringOrEmpty, stringOrEmpty]);
+  fn3.registerFunction('format-number', @xqFunctionFormat_Number, [xqcdContextOther]).setVersionsShared([numericOrEmpty, stringt, stringt],  [numericOrEmpty, stringt, stringOrEmpty, stringt]);
 
-  fn3.registerFunction('function-lookup', @xqFunctionFunction_lookup, ['($name as xs:QName, $arity as xs:integer) as function(*)?']);
-  fn3.registerFunction('function-name', @xqFunctionFunction_Name, ['($func as function(*)) as xs:QName?']);
-  fn3.registerFunction('function-arity', @xqFunctionFunction_Arity, ['($func as function(*)) as xs:integer']);
+  fn3.registerFunction('function-lookup', @xqFunctionFunction_lookup, [xqcdContextOther]).setVersionsShared([QName, integer, functiontOrEmpty]);
+  fn3.registerFunction('function-name', @xqFunctionFunction_Name).setVersionsShared([functiont, QNameOrEmpty]);
+  fn3.registerFunction('function-arity', @xqFunctionFunction_Arity).setVersionsShared([functiont, integer]);
 
+  //[itemStar, functiont, itemStar]
   fn3.registerInterpretedFunction('for-each', '($seq as item()*, $f as function(item()) as item()*) as item()*', 'for $_ in $seq return $f($_)', []);
+  //[itemStar, functiont, itemStar]
   fn3.registerInterpretedFunction('filter', '($seq as item()*, $f as function(item()) as xs:boolean) as item()*', 'for $_ in $seq where $f($_) return $_', []);
-  fn3.registerFunction('fold-left', @xqFunctionFold_left, ['($seq as item()*, $zero as item()*, $f as function(item()*, item()) as item()*) as item()*']);
-  fn3.registerFunction('fold-right', @xqFunctionFold_right, ['($seq as item()*, $zero 	 as item()*, $f 	 as function(item(), item()*) as item()*) as item()*']);
-  fn3.registerFunction('for-each-pair', @xqFunctionFor_each_pair, ['($seq1 as item()*, $seq2 as item()*, $f as function(item(), item()) as item()*) as item()*']);
+  fn3.registerFunction('fold-left', @xqFunctionFold_left, [xqcdContextOther]).setVersionsShared([itemStar, itemStar, functionItemStarItemItemStar, itemStar]);
+  fn3.registerFunction('fold-right', @xqFunctionFold_right, [xqcdContextOther]).setVersionsShared([itemStar, itemStar, functionItemItemStarItemStar, itemStar]);
+  fn3.registerFunction('for-each-pair', @xqFunctionFor_each_pair, [xqcdContextOther]).setVersionsShared([itemStar, itemStar, functionItemItemItemStar, itemStar]);
 
-  fn3.registerFunction('environment-variable', @xqFunctionEnvironment_Variable, ['($name as xs:string) as xs:string?']);
-  fn3.registerFunction('available-environment-variables', @xqFunctionAvailable_Environment_Variables, ['() as xs:string*']);
+  fn3.registerFunction('environment-variable', @xqFunctionEnvironment_Variable).setVersionsShared([stringt, stringOrEmpty]);
+  fn3.registerFunction('available-environment-variables', @xqFunctionAvailable_Environment_Variables).setVersionsShared([stringStar]);
 
-  fn3.registerFunction('parse-xml', @xqFunctionParse_XML, ['($arg as xs:string?) as document-node(element(*))?'], [xqcdFocusItem]);
-  fn3.registerFunction('parse-xml-fragment', @xqFunctionParse_XML_Fragment, ['($arg as xs:string?) as document-node(element(*))?'], [xqcdFocusItem]);
-  {pxp3}pxpold.registerFunction('parse-html', @xqFunctionParse_HTML, ['($arg as xs:string?) as document-node(element(*))?'], [xqcdFocusItem]);
-  fn3.registerFunction('serialize', @xqFunctionSerialize, ['($arg as item()*) as xs:string', '($arg as item()*,$params as element(Q{http://www.w3.org/2010/xslt-xquery-serialization}serialization-parameters)?) as xs:string']);
-  fn3_1.registerFunction('serialize', @xqFunctionSerialize, ['($arg as item()*) as xs:string', '($arg as item()*,$params as item()?) as xs:string']);
+  fn3.registerFunction('parse-xml', @xqFunctionParse_XML, [xqcdFocusItem,xqcdContextOther]).setVersionsShared([stringOrEmpty, documentElementNodeOrEmpty]);
+  fn3.registerFunction('parse-xml-fragment', @xqFunctionParse_XML_Fragment, [xqcdFocusItem,xqcdContextOther]).setVersionsShared([stringOrEmpty, documentElementNodeOrEmpty]);
+  {pxp3}pxpold.registerFunction('parse-html', @xqFunctionParse_HTML, [xqcdFocusItem,xqcdContextOther]).setVersionsShared([stringOrEmpty, documentElementNodeOrEmpty]);
+  fn3.registerFunction('serialize', @xqFunctionSerialize, [xqcdContextOther]).setVersionsShared([itemStar, stringt],  [itemStar, elementSerializationParamsOrEmpty, stringt]);
+  fn3_1.registerFunction('serialize', @xqFunctionSerialize, [xqcdContextOther]).setVersionsShared([itemStar, stringt],  [itemStar, itemOrEmpty, stringt]);
 
-  fn3.registerFunction('unparsed-text', @xqFunctionUnparsed_Text, ['($href as xs:string?) as xs:string?', '($href as xs:string?, $encoding as xs:string) as xs:string?'], []);
-  fn3.registerFunction('unparsed-text-available', @xqFunctionUnparsed_Text_Available, ['($href as xs:string?) as xs:boolean', '($href as xs:string?, $encoding as xs:string) as xs:boolean'], []);
+  fn3.registerFunction('unparsed-text', @xqFunctionUnparsed_Text, dependencyNone).setVersionsShared([stringOrEmpty, stringOrEmpty],  [stringOrEmpty, stringt, stringOrEmpty]);
+  fn3.registerFunction('unparsed-text-available', @xqFunctionUnparsed_Text_Available, dependencyNone).setVersionsShared([stringOrEmpty, boolean],  [stringOrEmpty, stringt, boolean]);
   fn3.registerInterpretedFunction('unparsed-text-lines', '($href as xs:string?) as xs:string*',                          'x:lines(fn:unparsed-text($href           ))');
   fn3.registerInterpretedFunction('unparsed-text-lines', '($href as xs:string?, $encoding as xs:string) as xs:string*',  'x:lines(fn:unparsed-text($href, $encoding))');
 
@@ -7189,56 +8081,65 @@ begin
   x.registerInterpretedFunction('cps', '($list as item()*) as item()*',  '$list ! (typeswitch (.) case xs:decimal|xs:double|xs:float return codepoints-to-string(.) default return string-to-codepoints(.))');
 
 
-  fn3.registerFunction('generate-id', @xqFunctionGenerateId, ['() as xs:string', '($arg as node()?) as xs:string']);
+  fn3.registerFunction('generate-id', @xqFunctionGenerateId, dependencyAll).setVersionsShared([stringt],  [nodeOrEmpty, stringt]);
+  fn3.registerFunction('random-number-generator', @xqFunctionRandom_Number_Generator, ['() as map(xs:string, item())', '($seed as xs:anyAtomicType?) as map(xs:string, item())'], [xqcdContextOther]);
 
   //3.1 todo: collation-key, json-to-xml , load-xquery-module random-number-generator transform xml-to-json
 
-  fn3_1.registerFunction('apply', @xqFunctionApply, ['($function as function(*), $array as array(*)) as item()*']);
-  fn3_1.registerFunction('contains-token', @xqFunctionContains_Token, ['($input as xs:string*, $token as xs:string) as xs:boolean', '($input 	 as xs:string*, $token 	 as xs:string, $collation 	 as xs:string) as xs:boolean']);
-  fn3_1.registerFunction('default-language', @xqFunctionDefault_Language, ['() as xs:language']);
-  fn3_1.registerFunction('parse-ietf-date', @xqFunctionParse_Ietf_Date, ['($value as xs:string?) as xs:dateTime?']);
-  fn3_1.registerFunction('sort', @xqFunctionSort, ['($input as item()*) as item()*', '($input as item()*, $collation as xs:string?) as item()*', '($input as item()*, $collation 	 as xs:string?, $key as function(item()) as xs:anyAtomicType*) as item()*']);
-  fn3_1.registerFunction('tokenize',@xqFunctionTokenize_1,['($input as xs:string?) as xs:string*']);
-  fn3_1.registerFunction('trace', @xqFunctionTrace, ['($value as item()*) as item()*']);
-  fn3_1.registerFunction('error', @xqFunctionError,['($error as xs:QName?) as none']);
-  fn3_1.registerFunction('collation-key', @xqFunctionCollation_Key, ['($key as xs:string) as xs:base64Binary', '($key as xs:string, $collation as xs:string) as xs:base64Binary']);
+  fn3_1.registerFunction('apply', @xqFunctionApply, dependencyNone).setVersionsShared([functiont, arrayt, itemStar]);
+  fn3_1.registerFunction('contains-token', @xqFunctionContains_Token, [xqcdContextCollation]).setVersionsShared([stringStar, stringt, boolean],  [stringStar, stringt, stringt, boolean]);
+  fn3_1.registerFunction('default-language', @xqFunctionDefault_Language, [xqcdContextCollation]).setVersionsShared([language]);
+  fn3_1.registerFunction('parse-ietf-date', @xqFunctionParse_Ietf_Date).setVersionsShared([stringOrEmpty, dateTimeOrEmpty]);
+  lastfn := fn3_1.registerFunction('sort', @xqFunctionSort, [xqcdContextCollation]);
+  lastfn.setVersionsShared(3);
+  lastfn.setVersionsShared(0, [itemStar, itemStar]);
+  lastfn.setVersionsShared(1, [itemStar, stringOrEmpty, itemStar]);
+  lastfn.setVersionsShared(2, [itemStar, stringOrEmpty, functionItemAtomicStar, itemStar]);
+  fn3_1.registerFunction('tokenize',@xqFunctionTokenize_1).setVersionsShared([stringOrEmpty, stringStar]);
+  fn3_1.registerFunction('trace', @xqFunctionTrace, [xqcdContextOther]).setVersionsShared([itemStar, itemStar]);
+  fn3_1.registerFunction('error', @xqFunctionError).setVersionsShared([QNameOrEmpty, none]);
+  fn3_1.registerFunction('collation-key', @xqFunctionCollation_Key, [xqcdContextCollation]).setVersionsShared([stringt, base64Binary],  [stringt, stringt, base64Binary]);
 
-  fn3_1.registerFunction('json-doc', @xqFunctionJSON_doc, ['($href as xs:string?) as item()?',  '($href as xs:string?, $options as map(*)) as item()?']);
-  fn3_1.registerFunction('parse-json', @xqFunctionParseJSON, ['($json-text as xs:string?) as item()?',  '($json-text as xs:string?, $options as map(*)) as item()?']);
+  fn3_1.registerFunction('json-doc', @xqFunctionJSON_doc, [xqcdContextOther]).setVersionsShared([stringOrEmpty, itemOrEmpty],  [stringOrEmpty, map, itemOrEmpty]);
+  fn3_1.registerFunction('parse-json', @xqFunctionParseJSON, [xqcdContextOther]).setVersionsShared([stringOrEmpty, itemOrEmpty],  [stringOrEmpty, map, itemOrEmpty]);
 
   fnarray := TXQNativeModule.Create(XMLnamespace_XPathFunctionsArray);
   TXQueryEngine.registerNativeModule(fnarray);
-  fnarray.registerFunction('size', @xqFunctionArraySize, ['($array as array(*)) as xs:integer']);
-  fnarray.registerFunction('get', @xqFunctionArrayGet, ['($array as array(*), $position as xs:integer) as item()*']);
-  fnarray.registerFunction('put', @xqFunctionArrayPut, ['( $array as array(*), $position as xs:integer, $member as item()*) as array(*)']);
-  fnarray.registerFunction('append', @xqFunctionArrayAppend, ['($array as array(*), $appendage as item()*) as array(*)']);
-  fnarray.registerFunction('subarray', @xqFunctionArraySubarray, ['($array as array(*), $start as xs:integer) as array(*)', '($array as array(*),$start as xs:integer,$length as xs:integer) as array(*)']);
-  fnarray.registerFunction('remove', @xqFunctionArrayRemove, ['($array as array(*), $positions as xs:integer*) as array(*)']);
-  fnarray.registerFunction('insert-before', @xqFunctionArrayInsert_before, ['( $array as array(*), $position as xs:integer, $member as item()*) as array(*)']);
-  fnarray.registerFunction('head', @xqFunctionArrayHead, ['($array as array(*)) as item()*']);
-  fnarray.registerFunction('tail', @xqFunctionArrayTail, ['($array as array(*)) as array(*)']);
-  fnarray.registerFunction('reverse', @xqFunctionArrayReverse, ['($array as array(*)) as array(*)']);
-  fnarray.registerFunction('join', @xqFunctionArrayJoin, ['($arrays as array(*)*) as array(*)']);
-  fnarray.registerFunction('for-each', @xqFunctionArrayFor_each, ['( $array as array(*), $action as function(item()*) as item()*) as array(*)']);
-  fnarray.registerFunction('filter', @xqFunctionArrayFilter, ['( $array as array(*), $function as function(item()*) as xs:boolean) as array(*)']);
-  fnarray.registerFunction('fold-left', @xqFunctionArrayFold_left, ['( $array as array(*),$zero as item()*,$function as function(item()*, item()*) as item()*) as item()*']);
-  fnarray.registerFunction('fold-right', @xqFunctionArrayFold_right, ['( $array as array(*),$zero as item()*,$function as function(item()*, item()*) as item()*) as item()*']);
-  fnarray.registerFunction('for-each-pair', @xqFunctionArrayFor_each_pair, ['( $array1 as array(*),$array2 as array(*),$function as function(item()*, item()*) as item()*) as array(*)']);
-  fnarray.registerFunction('sort', @xqFunctionArraySort, ['($array as array(*)) as array(*)', '($array as array(*), $collation as xs:string?) as array(*)', '( $array as array(*), $collation as xs:string?, $key as function(item()*) as xs:anyAtomicType*) as array(*)']);
-  fnarray.registerFunction('flatten', @xqFunctionArrayFlatten, ['($input as item()*) as item()*']);
+  fnarray.registerFunction('size', @xqFunctionArraySize).setVersionsShared([arrayt, integer]);
+  fnarray.registerFunction('get', @xqFunctionArrayGet).setVersionsShared([arrayt, integer, itemStar]);
+  fnarray.registerFunction('put', @xqFunctionArrayPut).setVersionsShared([arrayt, integer, itemStar, arrayt]);
+  fnarray.registerFunction('append', @xqFunctionArrayAppend).setVersionsShared([arrayt, itemStar, arrayt]);
+  fnarray.registerFunction('subarray', @xqFunctionArraySubarray).setVersionsShared([arrayt, integer, arrayt], [arrayt, integer, integer, arrayt]);
+  fnarray.registerFunction('remove', @xqFunctionArrayRemove).setVersionsShared([arrayt, integerStar, arrayt]);
+  fnarray.registerFunction('insert-before', @xqFunctionArrayInsert_before).setVersionsShared([arrayt, integer, itemStar, arrayt]);
+  fnarray.registerFunction('head', @xqFunctionArrayHead).setVersionsShared([arrayt, itemStar]);
+  fnarray.registerFunction('tail', @xqFunctionArrayTail).setVersionsShared([arrayt, arrayt]);
+  fnarray.registerFunction('reverse', @xqFunctionArrayReverse).setVersionsShared([arrayt, arrayt]);
+  fnarray.registerFunction('join', @xqFunctionArrayJoin).setVersionsShared([arrayStar, arrayt]);
+  fnarray.registerFunction('for-each', @xqFunctionArrayFor_each, [xqcdContextOther]).setVersionsShared([arrayt, functionItemStarItemStar, arrayt]);
+  fnarray.registerFunction('filter', @xqFunctionArrayFilter, [xqcdContextOther]).setVersionsShared([arrayt, functionItemStarBoolean, arrayt]);
+  fnarray.registerFunction('fold-left', @xqFunctionArrayFold_left, [xqcdContextOther]).setVersionsShared([arrayt, itemStar, functionItemStarItemStarItemStar, itemStar]);
+  fnarray.registerFunction('fold-right', @xqFunctionArrayFold_right, [xqcdContextOther]).setVersionsShared([arrayt, itemStar, functionItemStarItemStarItemStar, itemStar]);
+  fnarray.registerFunction('for-each-pair', @xqFunctionArrayFor_each_pair, [xqcdContextOther]).setVersionsShared([arrayt, arrayt, functionItemStarItemStarItemStar, arrayt]);
+  lastfn := fnarray.registerFunction('sort', @xqFunctionArraySort, [xqcdContextOther,xqcdContextCollation]);
+  lastfn.setVersionsShared(3);
+  lastfn.setVersionsShared(0, [arrayt, arrayt]);
+  lastfn.setVersionsShared(1, [arrayt, stringOrEmpty, arrayt]);
+  lastfn.setVersionsShared(2, [arrayt, stringOrEmpty, functionItemStarAtomicStar, arrayt]);
+  fnarray.registerFunction('flatten', @xqFunctionArrayFlatten).setVersionsShared([itemStar, itemStar]);
 
   fnmap := TXQNativeModule.Create(XMLnamespace_XPathFunctionsMap);
   TXQueryEngine.registerNativeModule(fnmap);
-  fnmap.registerFunction('merge', @xqFunctionMapMerge, ['($maps as map(*)*) as map(*)', '($maps as map(*)*,$options as map(*)) as map(*)']);
-  fnmap.registerFunction('size', @xqFunctionMapSize, ['($map as map(*)) as xs:integer']);
-  fnmap.registerFunction('keys', @xqFunctionMapKeys, ['($map as map(*)) as xs:anyAtomicType*']);
-  fnmap.registerFunction('contains', @xqFunctionMapContains, ['($map as map(*),$key as xs:anyAtomicType) as xs:boolean']);
-  fnmap.registerFunction('get', @xqFunctionMapGet, ['($map as map(*),$key as xs:anyAtomicType) as item()*']);
-  fnmap.registerFunction('find', @xqFunctionMapFind, ['($input as item()*,$key as xs:anyAtomicType) as array(*)']);
-  fnmap.registerFunction('put', @xqFunctionMapPut, ['($map as map(*),$key as xs:anyAtomicType, $value as item()*) as map(*)']);
-  fnmap.registerFunction('entry', @xqFunctionMapEntry, ['($key as xs:anyAtomicType,$value as item()*) as map(*)']);
-  fnmap.registerFunction('remove', @xqFunctionMapRemove, ['($map as map(*),$keys as xs:anyAtomicType*) as map(*)']);
-  fnmap.registerFunction('for-each', @xqFunctionMapFor_each, ['($map as map(*),$action as function(xs:anyAtomicType, item()*) as item()*) as item()*']);
+  fnmap.registerFunction('merge', @xqFunctionMapMerge).setVersionsShared([mapStar, map],  [mapStar, map, map]);
+  fnmap.registerFunction('size', @xqFunctionMapSize).setVersionsShared([map, integer]);
+  fnmap.registerFunction('keys', @xqFunctionMapKeys).setVersionsShared([map, atomicStar]);
+  fnmap.registerFunction('contains', @xqFunctionMapContains).setVersionsShared([map, atomic, boolean]);
+  fnmap.registerFunction('get', @xqFunctionMapGet).setVersionsShared([map, atomic, itemStar]);
+  fnmap.registerFunction('find', @xqFunctionMapFind).setVersionsShared([itemStar, atomic, arrayt]);
+  fnmap.registerFunction('put', @xqFunctionMapPut).setVersionsShared([map, atomic, itemStar, map]);
+  fnmap.registerFunction('entry', @xqFunctionMapEntry).setVersionsShared([atomic, itemStar, map]);
+  fnmap.registerFunction('remove', @xqFunctionMapRemove).setVersionsShared([map, atomicStar, map]);
+  fnmap.registerFunction('for-each', @xqFunctionMapFor_each, [xqcdContextOther]).setVersionsShared([map, functionAtomicItemStarItemStar, itemStar]);
 
 
 
@@ -7248,63 +8149,146 @@ begin
   //For *, +  functions with reverted argument order were added (since the order does not matter )
   //For eq/ne/.. boolean and string cases were added
 
-  op.registerBinaryOp('/',@xqvalueNodeStepChild,300, [xqofAssociativeSyntax], [], []);
-  op.registerBinaryOp('//',@xqvalueNodeStepDescendant,300, [xqofAssociativeSyntax], [], []);
-  op.registerBinaryOp('!',@xqvalueSimpleMap,300, [xqofAssociativeSyntax], [], []).acceptedModels := PARSING_MODEL3;
+  op.registerBinaryOp('/',@xqvalueNodeStepChild,300, [xqofAssociativeSyntax], [xqcdFocusItem]);
+  op.registerBinaryOp('//',@xqvalueNodeStepDescendant,300, [xqofAssociativeSyntax], [xqcdFocusItem]);
+  op.registerBinaryOp('!',@xqvalueSimpleMap,300, [xqofAssociativeSyntax], [xqcdFocusItem]).acceptedModels := PARSING_MODEL3;
 
-  op.registerBinaryOp('unary~hack-', @xqvalueUnaryMinus, 200, [xqofAssociativeSyntax,xqofCastUntypedToDouble], ['($x as empty-sequence(), $arg as numeric?) as numeric?'], []);
-  op.registerBinaryOp('unary~hack+', @xqvalueUnaryPlus, 200, [xqofAssociativeSyntax,xqofCastUntypedToDouble], ['($x as empty-sequence(), $arg as numeric?) as numeric?'], []);
+  op.registerBinaryOp('unary~hack-', @xqvalueUnaryMinus, 200, [xqofAssociativeSyntax,xqofCastUntypedToDouble], [empty, numericOrEmpty, numericOrEmpty], []);
+  op.registerBinaryOp('unary~hack+', @xqvalueUnaryPlus, 200, [xqofAssociativeSyntax,xqofCastUntypedToDouble], [empty, numericOrEmpty, numericOrEmpty], []);
 
-  op.registerBinaryOp('=>',@xqvalueArrowOperator,190, [xqofAssociativeSyntax, xqofSpecialParsing], [], []).acceptedModels:= PARSING_MODEL3_1;
+  op.registerBinaryOp('=>',@xqvalueArrowOperator,190, [xqofAssociativeSyntax], []).acceptedModels:= PARSING_MODEL3_1;
 
-  op.registerBinaryOp('cast as',@xqvalueCastAs,170, [], [], []);
-  op.registerBinaryOp('castable as',@xqvalueCastableAs,160, [], [], []);
-  op.registerBinaryOp('treat as',@xqvalueTreatAs,150, [], [], []);
-  op.registerBinaryOp('instance of',@xqvalueInstanceOf,140, [], [], []);
+  op.registerBinaryOp('cast as',@xqvalueCastAs,170, [], []);
+  op.registerBinaryOp('castable as',@xqvalueCastableAs,160, [], []);
+  op.registerBinaryOp('treat as',@xqvalueTreatAs,150, [], []);
+  op.registerBinaryOp('instance of',@xqvalueInstanceOf,140, [], []);
 
-  op.registerBinaryOp('intersect',@xqvalueIntersect,125, [xqofAssociativeSyntax], ['intersect($parameter1 as node()*, $parameter2 as node()*) as node()*'], []);
-  op.registerBinaryOp('except',@xqvalueExcept,125,[xqofAssociativeSyntax],['except($parameter1 as node()*, $parameter2 as node()*) as node()*'], []);
+  op.registerBinaryOp('intersect',@xqvalueIntersect,125, [xqofAssociativeSyntax], [nodeStar, nodeStar, nodeStar], []);
+  op.registerBinaryOp('except',@xqvalueExcept,125,[xqofAssociativeSyntax],[nodeStar, nodeStar, nodeStar], []);
 
-  op.registerBinaryOp('|',@xqvalueUnion,115, [xqofAssociativeSyntax],['union($parameter1 as node()*, $parameter2 as node()*) as node()*'], []);
-  op.registerBinaryOp('union',@xqvalueUnion,115, [xqofAssociativeSyntax],['union($parameter1 as node()*, $parameter2 as node()*) as node()*'], []);
-
-
-  op.registerBinaryOp('idiv',@xqvalueDivideInt,100,[xqofAssociativeSyntax,xqofCastUntypedToDouble],['numeric-integer-divide($arg1 as numeric?, $arg2 as numeric?) as xs:integer'], []);
-  op.registerBinaryOp('div',@xqvalueDivide,100,[xqofAssociativeSyntax,xqofCastUntypedToDouble],['numeric-divide($arg1 as numeric?, $arg2 as numeric?) as numeric', 'divide-yearMonthDuration($arg1 as xs:yearMonthDuration?, $arg2 as xs:double?) as xs:yearMonthDuration', 'divide-yearMonthDuration-by-yearMonthDuration($arg1 as xs:yearMonthDuration?, $arg2 as xs:yearMonthDuration?) as xs:decimal', 'divide-dayTimeDuration($arg1 as xs:dayTimeDuration?, $arg2 as xs:double?) as xs:dayTimeDuration', 'divide-dayTimeDuration-by-dayTimeDuration($arg1 as xs:dayTimeDuration?, $arg2 as xs:dayTimeDuration?) as xs:decimal'], []);
-  op.registerBinaryOp('*',@xqvalueMultiply,100,[xqofAssociativeSyntax,xqofCastUntypedToDouble],['numeric-multiply($arg1 as numeric?, $arg2 as numeric?) as numeric', 'multiply-yearMonthDuration($arg1 as xs:yearMonthDuration?, $arg2 as xs:double?) as xs:yearMonthDuration', '($arg2 as xs:double?, $arg1 as xs:yearMonthDuration?) as xs:yearMonthDuration', 'multiply-dayTimeDuration($arg1 as xs:dayTimeDuration?, $arg2 as xs:double?) as xs:dayTimeDuration', '($arg2 as xs:double?, $arg1 as xs:dayTimeDuration?) as xs:dayTimeDuration'], []);
-  op.registerBinaryOp('mod',@xqvalueMod,100,[xqofAssociativeSyntax,xqofCastUntypedToDouble],['numeric-mod($arg1 as numeric?, $arg2 as numeric?) as numeric'], []);
-
-  op.registerBinaryOp('+',@xqvalueAdd,70,[xqofAssociativeSyntax,xqofCastUntypedToDouble],['numeric-add($arg1 as numeric?, $arg2 as numeric?) as numeric', 'add-yearMonthDurations($arg1 as xs:yearMonthDuration?, $arg2 as xs:yearMonthDuration?) as xs:yearMonthDuration', 'add-dayTimeDurations($arg1 as xs:dayTimeDuration?, $arg2 as xs:dayTimeDuration?) as xs:dayTimeDuration', 'add-yearMonthDuration-to-dateTime($arg1 as xs:dateTime?, $arg2 as xs:yearMonthDuration?) as xs:dateTime', 'add-dayTimeDuration-to-dateTime($arg1 as xs:dateTime?, $arg2 as xs:dayTimeDuration?) as xs:dateTime', 'add-yearMonthDuration-to-date($arg1 as xs:date?, $arg2 as xs:yearMonthDuration?) as xs:date', 'add-dayTimeDuration-to-date($arg1 as xs:date?, $arg2 as xs:dayTimeDuration?) as xs:date', 'add-dayTimeDuration-to-time($arg1 as xs:time?, $arg2 as xs:dayTimeDuration?) as xs:time', {reverted: } '($arg2 as xs:yearMonthDuration?, $arg1 as xs:dateTime?) as xs:dateTime', '($arg2 as xs:dayTimeDuration?, $arg1 as xs:dateTime?) as xs:dateTime', '($arg2 as xs:yearMonthDuration?, $arg1 as xs:date?) as xs:date', '($arg2 as xs:dayTimeDuration?, $arg1 as xs:date?) as xs:date', '($arg2 as xs:dayTimeDuration?, $arg1 as xs:time?) as xs:time'], []);
-  op.registerBinaryOp('-',@xqvalueSubtract,70,[xqofAssociativeSyntax,xqofCastUntypedToDouble],['numeric-subtract($arg1 as numeric?, $arg2 as numeric?) as numeric', 'subtract-yearMonthDurations($arg1 as xs:yearMonthDuration?, $arg2 as xs:yearMonthDuration?) as xs:yearMonthDuration', 'subtract-dayTimeDurations($arg1 as xs:dayTimeDuration?, $arg2 as xs:dayTimeDuration?) as xs:dayTimeDuration', 'subtract-dateTimes($arg1 as xs:dateTime?, $arg2 as xs:dateTime?) as xs:dayTimeDuration', 'subtract-dates($arg1 as xs:date?, $arg2 as xs:date?) as xs:dayTimeDuration', 'subtract-times($arg1 as xs:time?, $arg2 as xs:time?) as xs:dayTimeDuration', 'subtract-yearMonthDuration-from-dateTime($arg1 as xs:dateTime?, $arg2 as xs:yearMonthDuration?) as xs:dateTime', 'subtract-dayTimeDuration-from-dateTime($arg1 as xs:dateTime?, $arg2 as xs:dayTimeDuration?) as xs:dateTime', 'subtract-yearMonthDuration-from-date($arg1 as xs:date?, $arg2 as xs:yearMonthDuration?) as xs:date', 'subtract-dayTimeDuration-from-date($arg1 as xs:date?, $arg2 as xs:dayTimeDuration?) as xs:date', 'subtract-dayTimeDuration-from-time($arg1 as xs:time?, $arg2 as xs:dayTimeDuration?) as xs:time'], []);
-
-  op.registerBinaryOp('to',@xqvalueTo,60,[],['to($firstval as xs:integer?, $lastval as xs:integer?) as xs:integer*'], []);
-
-  op.registerBinaryOp('||',@xqvalueConcat,55,[xqofAssociativeSyntax],['($arg1 as xs:anyAtomicType?, $arg2 as xs:anyAtomicType?) as xs:string'], []).acceptedModels:=PARSING_MODEL3;
-
-  op.registerBinaryOp('eq',@xqvalueEqualAtomic,50,[xqofCastUntypedToString],['numeric-equal($arg1 as numeric?, $arg2 as numeric?) as xs:boolean', 'duration-equal($arg1 as xs:duration?, $arg2 as xs:duration?) as xs:boolean', 'dateTime-equal($arg1 as xs:dateTime?, $arg2 as xs:dateTime?) as xs:boolean', 'date-equal($arg1 as xs:date?, $arg2 as xs:date?) as xs:boolean', 'time-equal($arg1 as xs:time?, $arg2 as xs:time?) as xs:boolean', 'gYearMonth-equal($arg1 as xs:gYearMonth?, $arg2 as xs:gYearMonth?) as xs:boolean', 'gYear-equal($arg1 as xs:gYear?, $arg2 as xs:gYear?) as xs:boolean', 'gMonthDay-equal($arg1 as xs:gMonthDay?, $arg2 as xs:gMonthDay?) as xs:boolean', 'gMonth-equal($arg1 as xs:gMonth?, $arg2 as xs:gMonth?) as xs:boolean', 'gDay-equal($arg1 as xs:gDay?, $arg2 as xs:gDay?) as xs:boolean', 'QName-equal($arg1 as xs:QName?, $arg2 as xs:QName?) as xs:boolean', 'hexBinary-equal($value1 as xs:hexBinary?, $value2 as xs:hexBinary?) as xs:boolean', 'base64Binary-equal($value1 as xs:base64Binary?, $value2 as xs:base64Binary?) as xs:boolean', 'NOTATION-equal($arg1 as xs:NOTATION?, $arg2 as xs:NOTATION?) as xs:boolean', '($a as xs:string?, $b as xs:string?) as xs:boolean', '($a as xs:boolean?, $b as xs:boolean?) as xs:boolean'], [xqcdContextCollation, xqcdContextTime, xqcdContextOther]);
-  op.registerBinaryOp('ne',@xqvalueUnequalAtomic,50,[xqofCastUntypedToString], ['($arg1 as numeric?, $arg2 as numeric?) as xs:boolean', '($arg1 as xs:duration?, $arg2 as xs:duration?) as xs:boolean', '($arg1 as xs:dateTime?, $arg2 as xs:dateTime?) as xs:boolean', '($arg1 as xs:date?, $arg2 as xs:date?) as xs:boolean', '($arg1 as xs:time?, $arg2 as xs:time?) as xs:boolean', '($arg1 as xs:gYearMonth?, $arg2 as xs:gYearMonth?) as xs:boolean', '($arg1 as xs:gYear?, $arg2 as xs:gYear?) as xs:boolean', '($arg1 as xs:gMonthDay?, $arg2 as xs:gMonthDay?) as xs:boolean', '($arg1 as xs:gMonth?, $arg2 as xs:gMonth?) as xs:boolean', '($arg1 as xs:gDay?, $arg2 as xs:gDay?) as xs:boolean', '($arg1 as xs:QName?, $arg2 as xs:QName?) as xs:boolean', '($value1 as xs:hexBinary?, $value2 as xs:hexBinary?) as xs:boolean', '($value1 as xs:base64Binary?, $value2 as xs:base64Binary?) as xs:boolean', '($arg1 as xs:NOTATION?, $arg2 as xs:NOTATION?) as xs:boolean', '($a as xs:string?, $b as xs:string?) as xs:boolean', '($a as xs:boolean?, $b as xs:boolean?) as xs:boolean'], [xqcdContextCollation, xqcdContextTime, xqcdContextOther]);
-  op.registerBinaryOp('lt',@xqvalueLessThanAtomic,50,[xqofCastUntypedToString], ['numeric-less-than($arg1 as numeric?, $arg2 as numeric?) as xs:boolean', 'yearMonthDuration-less-than($arg1 as xs:yearMonthDuration?, $arg2 as xs:yearMonthDuration?) as xs:boolean', 'dayTimeDuration-less-than($arg1 as xs:dayTimeDuration?, $arg2 as xs:dayTimeDuration?) as xs:boolean', 'dateTime-less-than($arg1 as xs:dateTime?, $arg2 as xs:dateTime?) as xs:boolean', 'date-less-than($arg1 as xs:date?, $arg2 as xs:date?) as xs:boolean', 'time-less-than($arg1 as xs:time?, $arg2 as xs:time?) as xs:boolean', '($a as xs:string?, $b as xs:string?) as xs:boolean', '($a as xs:boolean?, $b as xs:boolean?) as xs:boolean'], [xqcdContextCollation, xqcdContextTime, xqcdContextOther]);
-  op.registerBinaryOp('gt',@xqvalueGreaterThanAtomic,50,[xqofCastUntypedToString],['numeric-greater-than($arg1 as numeric?, $arg2 as numeric?) as xs:boolean', 'yearMonthDuration-greater-than($arg1 as xs:yearMonthDuration?, $arg2 as xs:yearMonthDuration?) as xs:boolean', 'dayTimeDuration-greater-than($arg1 as xs:dayTimeDuration?, $arg2 as xs:dayTimeDuration?) as xs:boolean', 'dateTime-greater-than($arg1 as xs:dateTime?, $arg2 as xs:dateTime?) as xs:boolean', 'date-greater-than($arg1 as xs:date?, $arg2 as xs:date?) as xs:boolean', 'time-greater-than($arg1 as xs:time?, $arg2 as xs:time?) as xs:boolean', '($a as xs:string?, $b as xs:string?) as xs:boolean', '($a as xs:boolean?, $b as xs:boolean?) as xs:boolean'], [xqcdContextCollation, xqcdContextTime, xqcdContextOther]);
-  op.registerBinaryOp('le',@xqvalueLessEqualAtomic,50,[xqofCastUntypedToString],['($arg1 as numeric?, $arg2 as numeric?) as xs:boolean', '($arg1 as xs:yearMonthDuration?, $arg2 as xs:yearMonthDuration?) as xs:boolean', '($arg1 as xs:dayTimeDuration?, $arg2 as xs:dayTimeDuration?) as xs:boolean', '($arg1 as xs:dateTime?, $arg2 as xs:dateTime?) as xs:boolean', '($arg1 as xs:date?, $arg2 as xs:date?) as xs:boolean', '($arg1 as xs:time?, $arg2 as xs:time?) as xs:boolean', '($a as xs:string?, $b as xs:string?) as xs:boolean', '($a as xs:boolean?, $b as xs:boolean?) as xs:boolean'], [xqcdContextCollation, xqcdContextTime, xqcdContextOther]);
-  op.registerBinaryOp('ge',@xqvalueGreaterEqualAtomic,50,[xqofCastUntypedToString],['($arg1 as numeric?, $arg2 as numeric?) as xs:boolean', '($arg1 as xs:yearMonthDuration?, $arg2 as xs:yearMonthDuration?) as xs:boolean', '($arg1 as xs:dayTimeDuration?, $arg2 as xs:dayTimeDuration?) as xs:boolean', '($arg1 as xs:dateTime?, $arg2 as xs:dateTime?) as xs:boolean', '($arg1 as xs:date?, $arg2 as xs:date?) as xs:boolean', '($arg1 as xs:time?, $arg2 as xs:time?) as xs:boolean', '($a as xs:string?, $b as xs:string?) as xs:boolean', '($a as xs:boolean?, $b as xs:boolean?) as xs:boolean'], [xqcdContextCollation, xqcdContextTime, xqcdContextOther]);
+  op.registerBinaryOp('|',@xqvalueUnion,115, [xqofAssociativeSyntax],[nodeStar, nodeStar, nodeStar], []);
+  op.registerBinaryOp('union',@xqvalueUnion,115, [xqofAssociativeSyntax],[nodeStar, nodeStar, nodeStar], []);
 
 
+  op.registerBinaryOp('idiv',@xqvalueDivideInt,100,[xqofAssociativeSyntax,xqofCastUntypedToDouble],[numericOrEmpty, numericOrEmpty, integer], []);
+  lastfn := op.registerBinaryOp('div',@xqvalueDivide,100,[xqofAssociativeSyntax,xqofCastUntypedToDouble]);
+  lastfn.setVersionsShared(5);
+  lastfn.setVersionsShared(0, [numericOrEmpty, numericOrEmpty, numeric]);
+  lastfn.setVersionsShared(1, [yearMonthDurationOrEmpty, doubleOrEmpty, yearMonthDuration]);
+  lastfn.setVersionsShared(2, [yearMonthDurationOrEmpty, yearMonthDurationOrEmpty, decimal]);
+  lastfn.setVersionsShared(3, [dayTimeDurationOrEmpty, doubleOrEmpty, dayTimeDuration]);
+  lastfn.setVersionsShared(4, [dayTimeDurationOrEmpty, dayTimeDurationOrEmpty, decimal]);
+  lastfn := op.registerBinaryOp('*',@xqvalueMultiply,100,[xqofAssociativeSyntax,xqofCastUntypedToDouble]);
+  lastfn.setVersionsShared(5);
+  lastfn.setVersionsShared(0, [numericOrEmpty, numericOrEmpty, numeric]);
+  lastfn.setVersionsShared(1, [yearMonthDurationOrEmpty, doubleOrEmpty, yearMonthDuration]);
+  lastfn.setVersionsShared(2, [doubleOrEmpty, yearMonthDurationOrEmpty, yearMonthDuration]);
+  lastfn.setVersionsShared(3, [dayTimeDurationOrEmpty, doubleOrEmpty, dayTimeDuration]);
+  lastfn.setVersionsShared(4, [doubleOrEmpty, dayTimeDurationOrEmpty, dayTimeDuration]);
+  op.registerBinaryOp('mod',@xqvalueMod,100,[xqofAssociativeSyntax,xqofCastUntypedToDouble], [numericOrEmpty, numericOrEmpty, numeric], []);
 
-  op.registerBinaryOp('=',@xqvalueEqualGeneric,50,[],[], [xqcdContextCollation, xqcdContextTime, xqcdContextOther]);
-  op.registerBinaryOp('!=',@xqvalueUnequalGeneric,50,[],[], [xqcdContextCollation, xqcdContextTime, xqcdContextOther]);
-  op.registerBinaryOp('<',@xqvalueLessThanGeneric,50,[],[], [xqcdContextCollation, xqcdContextTime, xqcdContextOther]);
-  op.registerBinaryOp('>',@xqvalueGreaterThanGeneric,50,[],[], [xqcdContextCollation, xqcdContextTime, xqcdContextOther]);
-  op.registerBinaryOp('<=',@xqvalueLessEqualGeneric,50,[],[], [xqcdContextCollation, xqcdContextTime, xqcdContextOther]);
-  op.registerBinaryOp('>=',@xqvalueGreaterEqualGeneric,50,[],[], [xqcdContextCollation, xqcdContextTime, xqcdContextOther]);
-  op.registerBinaryOp('is',@xqvalueSameNode,50,[],['is-same-node($parameter1 as node()?, $parameter2 as node()?) as xs:boolean'], []);
-  op.registerBinaryOp('<<',@xqvalueNodeBefore,50,[],['node-before($parameter1 as node()?, $parameter2 as node()?) as xs:boolean'], []);
-  op.registerBinaryOp('>>',@xqvalueNodeAfter,50,[],['node-after($parameter1 as node()?, $parameter2 as node()?) as xs:boolean'], []);
+  lastfn := op.registerBinaryOp('+',@xqvalueAdd,70,[xqofAssociativeSyntax,xqofCastUntypedToDouble], []);
+  lastfn.setVersionsShared(13);
+  lastfn.setVersionsShared(0, [numericOrEmpty, numericOrEmpty, numeric]);
+  lastfn.setVersionsShared(1, [yearMonthDurationOrEmpty, yearMonthDurationOrEmpty, yearMonthDuration]);
+  lastfn.setVersionsShared(2, [dayTimeDurationOrEmpty, dayTimeDurationOrEmpty, dayTimeDuration]);
+  lastfn.setVersionsShared(3, [dateTimeOrEmpty, yearMonthDurationOrEmpty, dateTime]);
+  lastfn.setVersionsShared(4, [dateTimeOrEmpty, dayTimeDurationOrEmpty, dateTime]);
+  lastfn.setVersionsShared(5, [dateOrEmpty, yearMonthDurationOrEmpty, date]);
+  lastfn.setVersionsShared(6, [dateOrEmpty, dayTimeDurationOrEmpty, date]);
+  lastfn.setVersionsShared(7, [timeOrEmpty, dayTimeDurationOrEmpty, time]);
+  lastfn.setVersionsShared(8, [yearMonthDurationOrEmpty, dateTimeOrEmpty, dateTime]);
+  lastfn.setVersionsShared(9, [dayTimeDurationOrEmpty, dateTimeOrEmpty, dateTime]);
+  lastfn.setVersionsShared(10, [yearMonthDurationOrEmpty, dateOrEmpty, date]);
+  lastfn.setVersionsShared(11, [dayTimeDurationOrEmpty, dateOrEmpty, date]);
+  lastfn.setVersionsShared(12, [dayTimeDurationOrEmpty, timeOrEmpty, time]);
+
+  lastfn := op.registerBinaryOp('-',@xqvalueSubtract,70,[xqofAssociativeSyntax,xqofCastUntypedToDouble], []);
+  lastfn.setVersionsShared(11);
+  lastfn.setVersionsShared(0, [numericOrEmpty, numericOrEmpty, numeric]);
+  lastfn.setVersionsShared(1, [yearMonthDurationOrEmpty, yearMonthDurationOrEmpty, yearMonthDuration]);
+  lastfn.setVersionsShared(2, [dayTimeDurationOrEmpty, dayTimeDurationOrEmpty, dayTimeDuration]);
+  lastfn.setVersionsShared(3, [dateTimeOrEmpty, dateTimeOrEmpty, dayTimeDuration]);
+  lastfn.setVersionsShared(4, [dateOrEmpty, dateOrEmpty, dayTimeDuration]);
+  lastfn.setVersionsShared(5, [timeOrEmpty, timeOrEmpty, dayTimeDuration]);
+  lastfn.setVersionsShared(6, [dateTimeOrEmpty, yearMonthDurationOrEmpty, dateTime]);
+  lastfn.setVersionsShared(7, [dateTimeOrEmpty, dayTimeDurationOrEmpty, dateTime]);
+  lastfn.setVersionsShared(8, [dateOrEmpty, yearMonthDurationOrEmpty, date]);
+  lastfn.setVersionsShared(9, [dateOrEmpty, dayTimeDurationOrEmpty, date]);
+  lastfn.setVersionsShared(10, [timeOrEmpty, dayTimeDurationOrEmpty, time]);
+
+  op.registerBinaryOp('to',@xqvalueTo,60,[],[integerOrEmpty, integerOrEmpty, integerStar], []);
+
+  op.registerBinaryOp('||',@xqvalueConcat,55,[xqofAssociativeSyntax],[atomicOrEmpty, atomicOrEmpty, stringt], []).acceptedModels:=PARSING_MODEL3;
+
+
+  lastfn := op.registerBinaryOp('eq',@xqvalueEqualAtomic,50,[xqofCastUntypedToString], [xqcdContextCollation, xqcdContextTime, xqcdContextOther]);
+  lastfn.setVersionsShared( 16 );
+  lastfn.setVersionsShared( 0, [numericOrEmpty, numericOrEmpty, boolean]);
+  lastfn.setVersionsShared( 1, [durationOrEmpty, durationOrEmpty, boolean]);
+  lastfn.setVersionsShared( 2, [dateTimeOrEmpty, dateTimeOrEmpty, boolean]);
+  lastfn.setVersionsShared( 3, [dateOrEmpty, dateOrEmpty, boolean]);
+  lastfn.setVersionsShared( 4, [timeOrEmpty, timeOrEmpty, boolean]);
+  lastfn.setVersionsShared( 5, [gYearMonthOrEmpty, gYearMonthOrEmpty, boolean]);
+  lastfn.setVersionsShared( 6, [gYearOrEmpty, gYearOrEmpty, boolean]);
+  lastfn.setVersionsShared( 7, [gMonthDayOrEmpty, gMonthDayOrEmpty, boolean]);
+  lastfn.setVersionsShared( 8, [gMonthOrEmpty, gMonthOrEmpty, boolean]);
+  lastfn.setVersionsShared( 9, [gDayOrEmpty, gDayOrEmpty, boolean]);
+  lastfn.setVersionsShared(10, [QNameOrEmpty, QNameOrEmpty, boolean]);
+  lastfn.setVersionsShared(11, [hexBinaryOrEmpty, hexBinaryOrEmpty, boolean]);
+  lastfn.setVersionsShared(12, [base64BinaryOrEmpty, base64BinaryOrEmpty, boolean]);
+  lastfn.setVersionsShared(13, [NOTATIONOrEmpty, NOTATIONOrEmpty, boolean]);
+  lastfn.setVersionsShared(14, [stringOrEmpty, stringOrEmpty, boolean]);
+  lastfn.setVersionsShared(15, [booleanOrEmpty, booleanOrEmpty, boolean]);
+  op.registerBinaryOp('ne',@xqvalueUnequalAtomic,50,[xqofCastUntypedToString],  [xqcdContextCollation, xqcdContextTime, xqcdContextOther]).setVersionsShared(lastfn.versions);
+
+  templt := op.registerBinaryOp('lt',@xqvalueLessThanAtomic,50,[xqofCastUntypedToString], [xqcdContextCollation, xqcdContextTime, xqcdContextOther]);
+  templt.setVersionsShared( 8 );
+  templt.setVersionsShared( 0, [numericOrEmpty, numericOrEmpty, boolean]);
+  templt.setVersionsShared( 1, [yearMonthDurationOrEmpty, yearMonthDurationOrEmpty, boolean]);
+  templt.setVersionsShared( 2, [dayTimeDurationOrEmpty, dayTimeDurationOrEmpty, boolean]);
+  templt.setVersionsShared( 3, [dateTimeOrEmpty, dateTimeOrEmpty, boolean]);
+  templt.setVersionsShared( 4, [dateOrEmpty, dateOrEmpty, boolean]);
+  templt.setVersionsShared( 5, [timeOrEmpty, timeOrEmpty, boolean]);
+  templt.setVersionsShared( 6, [stringOrEmpty, stringOrEmpty, boolean]);
+  templt.setVersionsShared( 7, [booleanOrEmpty, booleanOrEmpty, boolean]);
+  op.registerBinaryOp('gt',@xqvalueGreaterThanAtomic,50,[xqofCastUntypedToString], [xqcdContextCollation, xqcdContextTime, xqcdContextOther]).setVersionsShared(templt.versions);
+  op.registerBinaryOp('le',@xqvalueLessEqualAtomic,50,[xqofCastUntypedToString],   [xqcdContextCollation, xqcdContextTime, xqcdContextOther]).setVersionsShared(templt.versions);
+  op.registerBinaryOp('ge',@xqvalueGreaterEqualAtomic,50,[xqofCastUntypedToString], [xqcdContextCollation, xqcdContextTime, xqcdContextOther]).setVersionsShared(templt.versions);
+
+  templt := op3_1.registerBinaryOp('lt',@xqvalueLessThanAtomic,50,[xqofCastUntypedToString], [xqcdContextCollation, xqcdContextTime, xqcdContextOther]);
+  templt.setVersionsShared( 10 );
+  templt.setVersionsShared( 0, [numericOrEmpty, numericOrEmpty, boolean]);
+  templt.setVersionsShared( 1, [yearMonthDurationOrEmpty, yearMonthDurationOrEmpty, boolean]);
+  templt.setVersionsShared( 2, [dayTimeDurationOrEmpty, dayTimeDurationOrEmpty, boolean]);
+  templt.setVersionsShared( 3, [dateTimeOrEmpty, dateTimeOrEmpty, boolean]);
+  templt.setVersionsShared( 4, [dateOrEmpty, dateOrEmpty, boolean]);
+  templt.setVersionsShared( 5, [timeOrEmpty, timeOrEmpty, boolean]);
+  templt.setVersionsShared( 6, [stringOrEmpty, stringOrEmpty, boolean]);
+  templt.setVersionsShared( 7, [booleanOrEmpty, booleanOrEmpty, boolean]);
+  templt.setVersionsShared( 8, [hexBinaryOrEmpty, hexBinaryOrEmpty, boolean]);
+  templt.setVersionsShared( 9, [base64BinaryOrEmpty, base64BinaryOrEmpty, boolean]);
+  op3_1.registerBinaryOp('gt',@xqvalueGreaterThanAtomic,50,[xqofCastUntypedToString], [xqcdContextCollation, xqcdContextTime, xqcdContextOther]).setVersionsShared(templt.versions);
+  op3_1.registerBinaryOp('le',@xqvalueLessEqualAtomic,50,[xqofCastUntypedToString],   [xqcdContextCollation, xqcdContextTime, xqcdContextOther]).setVersionsShared(templt.versions);
+  op3_1.registerBinaryOp('ge',@xqvalueGreaterEqualAtomic,50,[xqofCastUntypedToString], [xqcdContextCollation, xqcdContextTime, xqcdContextOther]).setVersionsShared(templt.versions);
+
+  op.registerBinaryOp('=',@xqvalueEqualGeneric,50,[],[xqcdContextCollation, xqcdContextTime, xqcdContextOther]);
+  op.registerBinaryOp('!=',@xqvalueUnequalGeneric,50,[], [xqcdContextCollation, xqcdContextTime, xqcdContextOther]);
+  op.registerBinaryOp('<',@xqvalueLessThanGeneric,50,[], [xqcdContextCollation, xqcdContextTime, xqcdContextOther]);
+  op.registerBinaryOp('>',@xqvalueGreaterThanGeneric,50,[], [xqcdContextCollation, xqcdContextTime, xqcdContextOther]);
+  op.registerBinaryOp('<=',@xqvalueLessEqualGeneric,50,[], [xqcdContextCollation, xqcdContextTime, xqcdContextOther]);
+  op.registerBinaryOp('>=',@xqvalueGreaterEqualGeneric,50,[], [xqcdContextCollation, xqcdContextTime, xqcdContextOther]);
+  op.registerBinaryOp('is',@xqvalueSameNode,50,[],[nodeOrEmpty, nodeOrEmpty, boolean], []);
+  op.registerBinaryOp('<<',@xqvalueNodeBefore,50,[],[nodeOrEmpty, nodeOrEmpty, boolean], []);
+  op.registerBinaryOp('>>',@xqvalueNodeAfter,50,[],[nodeOrEmpty, nodeOrEmpty, boolean], []);
 
   op.registerBinaryOp('and',@xqvalueAndPlaceholder,40,[xqofAssociativeSyntax],[]);
 
   op.registerBinaryOp('or',@xqvalueOrPlaceholder,30,[xqofAssociativeSyntax],[]);
 
-  op.registerBinaryOp(':=',@xqvalueAssignment,20,[xqofAssociativeSyntax],[]);
+  op.registerBinaryOp(':=',@xqvalueAssignment,20,[xqofAssociativeSyntax]);
+
+  end;
 end;
 
 procedure finalizeFunctions;
@@ -7316,10 +8300,13 @@ begin
   fn3.free;
   fn3_1.free;
   op.free;
+  op3_1.free;
   fnarray.free;
   fnmap.free;
 end;
 
+initialization
+  GlobalNodeSerializationCallback := @GlobalNodeSerializationCallbackImpl;
 
 end.
 

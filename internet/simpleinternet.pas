@@ -265,7 +265,7 @@ begin
         context.ParentElement := tree.getLastTree;
         context.RootElement := tree.getLastTree;
       end else
-        pxpParser.VariableChangelog.add('json', TXQJsonParser.parse(data, [jpoAllowMultipleTopLevelItems, jpoJSONiq])); //TODO: this is bad, it leaks all JSON data, till the engine is reset
+        pxpParser.VariableChangelog.add('json', pxpParser.DefaultJSONParser.parse(data)); //TODO: this is bad, it leaks all JSON data, till the engine is reset
 
       result := pxpParser.evaluate(context);
     end;
@@ -325,8 +325,8 @@ var dest: IXQValue;
 begin
   if destination.kind = pvkSequence then dest := destination.get(1)
   else dest := destination;
-  dest := defaultQueryEngine.evaluateXPath3('pxp:resolve-html(.)', dest);
   if dest.kind = pvkSequence then dest := dest.get(1);
+  if dest.kind <> pvkObject then dest := defaultQueryEngine.evaluateXPath3('pxp:resolve-html(.)', dest);
 
   case dest.kind of
     pvkUndefined: exit('');

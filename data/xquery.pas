@@ -157,6 +157,7 @@ type
   public
     constructor create(); reintroduce;
     destructor destroy; override;
+    function addClone(n: TTreeNode): TTreeNode;
     property documentCache[url: string]: TTreeDocument read GetdocumentCache write SetdocumentCache;
   end;
 
@@ -197,7 +198,6 @@ type
     stringEncoding: TSystemCodePage;    //**< Encoding of strings. Currently only affects the decoding of entities in direct element constructors
     strictTypeChecking: boolean;  //**< Activates strict type checking. If enabled, things like "2" + 3 raise an exception, otherwise it is evaluated to 5. Does not affect *correct* queries (and it makes it slower, so there is no reason to enable this option unless you need compatibility to other interpreters)
     useLocalNamespaces: boolean;  //**< When a statically unknown namespace is encountered in a matching expression it is resolved using the in-scope-namespaces of the possible matching elements
-    objectsRestrictedToJSONTypes: boolean; //**< When false, all values can be stored in object properties; when true all property values are JSON values (e.g. sequences become arrays, () becomes null, xml is serialized, ...)
     jsonPXPExtensions: boolean; //**< Allows further json extensions, going beyond jsoniq (especially child and descendant axis test matching object properties) (for dot operator, see TXQParsingOptions) (default is true)
 
     model: TXQParsingModel;
@@ -295,6 +295,7 @@ type
     function getGlobalVariable(const v: TXQTermVariable): IXQValue; inline;
 
     function parseDoc(const data, url, contenttype: string): TTreeDocument; //for internal use
+    function parseCachedDocFromUrl(const url: string; const errorCode: string = 'FODC0002'): TTreeDocument; //for internal use
 
     function SeqValueAsString: string;
     function contextNode(mustExists: boolean = true): TTreeNode;
@@ -326,9 +327,18 @@ type
   PXQValueDateTimeData = ^TXQValueDateTimeData;
 
   TXQSerializerInsertWhitespace = (xqsiwNever, xqsiwConservative, xqsiwIndent);
+  TXQSerializerOnString = procedure (const s: string) of object;
+  TXQSerializerOnNode = function (const n: TTreeNode): boolean of object;
+  TXQSerializerOnAttribute = function (const n: TTreeAttribute): boolean of object;
   TXQSerializer = object(TJSONXHTMLStrBuilder)
     nodeFormat: TTreeNodeSerialization;
+    allowDuplicateNames: boolean;
     insertWhitespace: TXQSerializerInsertWhitespace;
+
+    onInterceptAppendJSONString: TXQSerializerOnString;
+    onInterceptAppendXMLHTMLText: TXQSerializerOnNode;
+    onInterceptAppendXMLHTMLAttribute: TXQSerializerOnAttribute;
+
     procedure init(abuffer:pstring; basecapacity: SizeInt = 64; aencoding: TSystemCodePage = {$ifdef HAS_CPSTRING}CP_ACP{$else}CP_UTF8{$endif});
     procedure indent;
     procedure appendIndent;
@@ -338,9 +348,17 @@ type
     procedure appendJSONArrayComma;
     procedure appendJSONArrayEnd;
     procedure appendJSONObjectStart;
+    procedure appendJSONObjectKeyColon(const key: string); inline;
     procedure appendJSONObjectComma;
     procedure appendJSONObjectEnd;
+    procedure appendJSONString(const s: string);
 
+    procedure appendQualifiedQName(const namespaceurl, local: string);
+    procedure appendXQueryString(const s: string);
+    procedure appendTypeNameFunctionStart(t: TXSType);
+
+    procedure error(const code: string; value: TXQValue);
+    procedure error(const code: string; message: string; value: TXQValue);
   protected
     indentCache: string;
     indentLevel: integer;
@@ -348,6 +366,54 @@ type
     elementTag: string;// = 'e';
     objectTag: string;// = 'object';
   end;
+
+  type
+    TXQMapDuplicateResolve = (xqmdrReject, xqmdrUseFirst, xqmdrUseLast, xqmdrCombine);
+    TXQMapDuplicateResolveHelper = type helper for TXQMapDuplicateResolve
+      procedure setFromString(const s: string);
+    end;
+
+    TXQJsonParser = object
+      type
+      //**Parsing options
+      //**@value jpoAllowMultipleTopLevelItems allow @code([], [], {}) as input
+      //**@value jpoLiberal             does not set joStrict for fpc's json scanner
+      //**@value jpoAllowTrailingComma  sets joIgnoreTrailingComma for fpc's json scanner
+      //**@value jpoEscapeCharacters    escapes characters for XPath/XQuery 3.1, e.g. return strings with \n or \uxxxx
+      //**@value jpoJSONiq              change from XPath/XQuery 3.1 parsing mode to JSONiq:
+      //**       @table(
+      //**       @rowHead(@cell(input)   @cell(XPath/XQuery 3.1)    @cell(  JSONiq))
+      //**       @row(@cell(number)      @cell(double  )            @cell(  int, decimal, double))
+      //**       @row(@cell(null)        @cell(empty sequence, () ) @cell(  null          ))
+      //**       @row(@cell(invalid)     @cell(err:FOJS0001)        @cell(  jerr:JNDY0021))
+      //**       )
+      TOption = (jpoAllowMultipleTopLevelItems, jpoLiberal, jpoAllowTrailingComma, jpoEscapeCharacters, jpoJSONiq);
+      TOptions = set of TOption;
+    public
+      context: PXQEvaluationContext;
+      options: TOptions;
+      duplicateResolve: TXQMapDuplicateResolve;
+      escapeFunction: TXQValueFunction;
+      procedure init;
+      procedure setConfigFromMap(const map: IXQValue);
+      function parse(argc: SizeInt; args: PIXQValue): IXQValue;
+      function parse(const data: string): IXQValue;
+      class function parse(const data: string; someOptions: TOptions): IXQValue; static;
+    end;
+    TXQBatchFunctionCall = record
+      tempcontext: TXQEvaluationContext;
+      func: TXQValueFunction;
+      stack: TXQEvaluationStack;
+      stacksize: Integer;
+      //prepares calls to f on outerContext.
+      //It pushes a sufficient number of temp values on the stack (override with stack.topptr), so that the function can be called.
+      //Note that pushing can change all stack addresses, invalidating all pointers to the stack (i.e., if you use this in a function called by the interpreter, the function arguments become inaccessible)
+      procedure init(const outerContext: TXQEvaluationContext; const f: ixqvalue; const def: IXQValue = nil);
+      procedure done;
+      function call(): IXQValue; inline;
+      function call1(const v: IXQValue): IXQValue;
+      function call2(const v, w: IXQValue): IXQValue;
+    end;
 
   (***
   @abstract(Variant used in XQuery-expressions)
@@ -431,6 +497,7 @@ type
     function xmlSerialize(nodeFormat: TTreeNodeSerialization; sequenceTag: string = 'seq'; elementTag: string = 'e'; objectTag: string = 'object'): string; //**< Returns a xml representation of this value
     procedure jsonSerialize(var serializer: TXQSerializer);
     procedure xmlSerialize(var serializer: TXQSerializer);
+    procedure adaptiveSerialize(var serializer: TXQSerializer);
     function stringifyNodes: IXQValue; //preliminary
     function hasNodes: boolean;
 
@@ -469,8 +536,6 @@ type
   See IXQValue for an actual description
   *)
   TXQValue = class(TFastInterfacedObject, IXQValue)
-  private
-    ffreelist: TXQValue;
   public
     ftypeAnnotation: TXSType;
     constructor create(atypeAnnotation: TXSType); virtual;
@@ -514,6 +579,7 @@ type
     function xmlSerialize(nodeFormat: TTreeNodeSerialization; sequenceTag: string = 'seq'; elementTag: string = 'e'; objectTag: string = 'object'): string;
     procedure jsonSerialize(var serializer: TXQSerializer); virtual;
     procedure xmlSerialize(var serializer: TXQSerializer); virtual;
+    procedure adaptiveSerialize(var serializer: TXQSerializer); virtual;
     function stringifyNodes: IXQValue; virtual;
     function hasNodes: boolean; virtual;
 
@@ -541,7 +607,7 @@ type
 
   { TXQValueUndefined }
   //**undefined/empty sequence
-  TXQValueUndefined = class(TXQValue)
+  TXQValueUndefined = class (TXQValue)
     class function classKind: TXQValueKind; override;
     function isUndefined: boolean; override;
     function toArray: TXQVArray; override;
@@ -551,6 +617,7 @@ type
 
     procedure jsonSerialize(var serializer: TXQSerializer); override; overload;
     procedure xmlSerialize(var serializer: TXQSerializer); override; overload;
+    procedure adaptiveSerialize(var serializer: TXQSerializer); override;
 
     function map(const q: string): IXQValue; override;
     function map(const q: string; const vs: array of ixqvalue): IXQValue; override;
@@ -583,6 +650,7 @@ type
     function clone: IXQValue; override;
 
     procedure jsonSerialize(var serializer: TXQSerializer); override; overload;
+    procedure adaptiveSerialize(var serializer: TXQSerializer); override;
   end;
 
 
@@ -608,6 +676,7 @@ type
     function toDateTime: TDateTime; override; //**< Converts the TXQValue dynamically to TDateTime
 
     procedure jsonSerialize(var serializer: TXQSerializer); override; overload;
+    procedure adaptiveSerialize(var serializer: TXQSerializer); override;
 
     function clone: IXQValue; override;
   end;
@@ -636,6 +705,7 @@ type
     function toDateTime: TDateTime; override; //**< Converts the TXQValue dynamically to TDateTime
 
     procedure jsonSerialize(var serializer: TXQSerializer); override; overload;
+    procedure adaptiveSerialize(var serializer: TXQSerializer); override;
 
     function clone: IXQValue; override;
   end;
@@ -662,6 +732,7 @@ type
     function toDateTime: TDateTime; override; //**< Converts the TXQValue dynamically to TDateTime
 
     procedure jsonSerialize(var serializer: TXQSerializer); override; overload;
+    procedure adaptiveSerialize(var serializer: TXQSerializer); override;
 
     function clone: IXQValue; override;
   end;
@@ -712,6 +783,8 @@ type
 
     function toString: string; override; //**< Converts the TXQValue dynamically to string (excludes namespace url)
     function toBooleanEffective: boolean; override;
+
+    procedure adaptiveSerialize(var serializer: TXQSerializer); override;
 
     function clone: IXQValue; override;
   end;
@@ -800,6 +873,7 @@ type
 
     procedure jsonSerialize(var serializer: TXQSerializer); override; overload;
     procedure xmlSerialize(var serializer: TXQSerializer); override; overload;
+    procedure adaptiveSerialize(var serializer: TXQSerializer); override;
     function stringifyNodes: IXQValue; override;
     function hasNodes: boolean; override;
 
@@ -841,6 +915,7 @@ type
 
     procedure jsonSerialize(var serializer: TXQSerializer); override; overload;
     procedure xmlSerialize(var serializer: TXQSerializer); override; overload;
+    procedure adaptiveSerialize(var serializer: TXQSerializer); override;
     function stringifyNodes: IXQValue; override;
     function hasNodes: boolean; override;
 
@@ -931,6 +1006,7 @@ type
 
     procedure jsonSerialize(var serializer: TXQSerializer); override; overload;
     procedure xmlSerialize(var serializer: TXQSerializer); override; overload;
+    procedure adaptiveSerialize(var serializer: TXQSerializer); override;
     function stringifyNodes: IXQValue; override;
     function hasNodes: boolean; override;
 
@@ -963,6 +1039,7 @@ type
 
     procedure jsonSerialize(var serializer: TXQSerializer); override; overload;
     procedure xmlSerialize(var serializer: TXQSerializer); override; overload;
+    procedure adaptiveSerialize(var serializer: TXQSerializer); override;
     function stringifyNodes: IXQValue; override;
     function hasNodes: boolean; override;
 
@@ -983,8 +1060,6 @@ type
     procedure jsonSerialize(var serializer: TXQSerializer); override; overload;
     procedure xmlSerialize(var serializer: TXQSerializer); override; overload;
   end;
-
-  { TXQValueFunction }
 
   { TXQFunctionParameter }
 
@@ -1019,7 +1094,7 @@ type
   TXQAnnotations = array of TXQAnnotation;
 
   //** A function. Anonymous or a named reference. Also used to store type information
-  TXQValueFunction = class(TXQValue)
+  TXQValueFunction = class (TXQValue)
     name, namespaceURL, namespacePrefix: string;
     parameters: array of TXQFunctionParameter;
     resulttype: txqtermsequencetype;
@@ -1047,6 +1122,8 @@ type
     function debugAsStringWithTypeAnnotation(textOnly: boolean=true): string;
 
     procedure assignCopiedTerms(const func: TXQValueFunction); //for internal use
+
+    procedure adaptiveSerialize(var serializer: TXQSerializer); override;
 
     procedure visit(visitor: TXQTerm_Visitor);
   end;
@@ -1257,6 +1334,7 @@ type
   TXSStringSubType = (xsstString, xsstHexBinary, xsstBase64Binary, xsstUrl);
   TXSStringType = class(TXSSimpleType)
     lexicalSpaceRegex: TObject {TWrappedRegExpr};
+    lexicalSpacePattern: string;
     lexicalSpaceRegexCS: TRTLCriticalSection;
     subType: TXSStringSubType;
     function tryCreateValueInternal(const v: IXQValue; outv: PXQValue = nil): TXSCastingError; override;
@@ -1326,10 +1404,11 @@ type
     node: TXSType;
 
     sequence, function_: TXSType;
-    numericPseudoType, untypedOrNodeUnion: TXSUnionType;
+    untypedOrNodeUnion: TXSUnionType;
 
-    //1.1 only
+    //3.1 only
     error: TXSSimpleType;
+    numeric: TXSUnionType;
 
     constructor Create;
     destructor Destroy; override;
@@ -1431,12 +1510,11 @@ type
 
 
 
-  { TXQParsingContext }
   TXQFunctionParameterTypes = record
-    name: string;
     types: array of TXQTermSequenceType;
     returnType: TXQTermSequenceType;
     function serialize: string;
+    function clone: TXQFunctionParameterTypes;
     procedure raiseErrorMessage(values: PIXQValue; count: integer; const context: TXQEvaluationContext; term: TXQTerm; const addendum: string);
     procedure checkOrConvertTypes(values: PIXQValue; count: integer; const context:TXQEvaluationContext; term: TXQTerm);
   end;
@@ -1453,13 +1531,20 @@ type
   { TXQAbstractFunctionInfo }
 
   TXQAbstractFunctionInfo = class
+    name: string;
     minArgCount, maxArgCount: word;
     versions: array of TXQFunctionParameterTypes;
+    sharedVersions: boolean;
     //used for user defined functions where the parameters must be promoted to the right type
     class procedure convertType(var result: IXQValue; const typ: TXQTermSequenceType; const context: TXQEvaluationContext; term: TXQTerm); static;
     //used for native functions (which should be robust enough to handle different types on the Pascal side)
     class function checkType(const v: IXQValue; const typ: TXQTermSequenceType; const context: TXQEvaluationContext): boolean; static;
     function getVersion(arity: integer): PXQFunctionParameterTypes;
+    procedure setVersionsShared(const v: array of TXQFunctionParameterTypes);
+    procedure setVersionsShared(const v: array of TXQTermSequenceType);
+    procedure setVersionsShared(const v,w: array of TXQTermSequenceType);
+    procedure setVersionsShared(i: integer; const v: array of TXQTermSequenceType);
+    procedure setVersionsShared(count: integer);
     function checkOrConvertTypes(values: PIXQValue; count: integer; const context:TXQEvaluationContext; term: TXQTerm): integer;
     destructor Destroy; override;
   private
@@ -1495,7 +1580,6 @@ type
                              xqofSpecialParsing
                              );
   TXQOperatorInfo = class(TXQAbstractFunctionInfo)
-    name: string;
     func: TXQBinaryOp;
     priority: integer;
     flags: TXQOperatorFlags;
@@ -1646,13 +1730,17 @@ type
 
   { TXQTermArray }
 
-  TXQTermJSONArray = class(TXQTermWithChildren)
-    function evaluate(var context: TXQEvaluationContext): IXQValue; override;
+  TXQTermArrayBase = class(TXQTermWithChildren)
     function getContextDependencies: TXQContextDependencies; override;
   end;
-  TXQTermArray3_1 = class(TXQTermWithChildren)
+  TXQTermJSONArray = class(TXQTermArrayBase)
     function evaluate(var context: TXQEvaluationContext): IXQValue; override;
-    function getContextDependencies: TXQContextDependencies; override;
+  end;
+  TXQTermArray3_1 = class(TXQTermArrayBase)
+    function evaluate(var context: TXQEvaluationContext): IXQValue; override;
+  end;
+  TXQTermJSONiqArray = class(TXQTermArrayBase)
+    function evaluate(var context: TXQEvaluationContext): IXQValue; override;
   end;
 
   { TXQTermType }
@@ -1671,6 +1759,7 @@ type
     arguments: array of TXQTermSequenceType; //only for tikFunctionTest, last is return type
 
     constructor create();
+    constructor create(akind: TXQTypeInformationKind);
     constructor create(atomic: TXSType; aallowNone: boolean = false);
     destructor destroy; override;
     function evaluate(var context: TXQEvaluationContext): IXQValue; override;
@@ -2161,8 +2250,10 @@ type
 
   TXQTermJSONObjectConstructor = class(TXQTermWithChildren)
     optionals: array of boolean;
+    objectsRestrictedToJSONTypes: boolean;
     function evaluate(var context: TXQEvaluationContext): IXQValue; override;
     function getContextDependencies: TXQContextDependencies; override;
+    function clone: TXQTerm; override;
   end;
 
   { TXQTermTryCatch }
@@ -2270,7 +2361,9 @@ type
 
   //**Exception raised during the parsing of an expression
   EXQParsingException = class(EXQException)
+    next: EXQParsingException;
     constructor create(aerrcode, amessage: string; anamespace: INamespace = nil);
+    destructor Destroy; override;
   end;
 
   //**Exception raised during the evaluation of an expression
@@ -2323,16 +2416,27 @@ type
 
   //** Record grouping different parsing options
   TXQParsingOptionsStringEntities = (xqseDefault, xqseIgnoreLikeXPath, xqseResolveLikeXQuery);
+  TXQJSONObjectMode = (xqjomForbidden, xqjomMapAlias, xqjomJSONiq );
+  TXQJSONArrayMode = (xqjamStandard, xqjamArrayAlias, xqjamJSONiq );
   TXQParsingOptions = record
+  private
+    procedure SetAllowJSON(AValue: boolean);
+  public
     AllowExtendedStrings: boolean; //**< If strings with x-prefixes are allowed, like x"foo{$variable}bar" to embed xquery expressions in strings
     AllowPropertyDotNotation: TXQPropertyDotNotation; //**< If it is possible to access (json) object properties with the @code(($obj).property) or even @code($obj.property) syntax (default is xqpdnAllowUnambiguousDotNotation, property syntax can be used, where a dot would be an invalid expression in standard xquery)
-    AllowJSON: boolean; //**< If {"foo": bar} and [..] can be used to create json objects/arrays (default false, unless xquery_json was loaded, then it is true)
     AllowJSONLiterals: boolean; //**< If true/false/null literals are treated like true()/false()/jn:null()  (default true! However, this option is ignored and handled as false, if allowJSON is false).
+    JSONArrayMode: TXQJSONArrayMode;
+    JSONObjectMode: TXQJSONObjectMode;
+    AllowJSONiqTests: boolean;
     StringEntities: TXQParsingOptionsStringEntities; //**< XQuery is almost a super set of XPath, except for the fact that they parse string entities differently. This option lets you change the parsing behaviour.
     LineEndingNormalization: (xqlenNone, xqlenXML1, xqlenXML11); //**< If all line breaks (#$D or #$D,#$85,#$2028) should be replaced by #$A
     AllowMutableVariables: boolean; //**< If $var := 123 without let should be allowed
+    property AllowJSON: boolean write SetAllowJSON; deprecated;
   end;
 
+  TXQDebugInfo = class
+    function lineInfoMessage(t: TObject): string; virtual; abstract;
+  end;
 
 
   //============================MAIN CLASS==========================
@@ -2614,6 +2718,8 @@ public
 
   public
     DefaultParser: TTreeParser; //used by fn:doc if no context node is there (internally used)
+    DefaultJSONParser: TXQJsonParser;
+    LastDebugInfo: TXQDebugInfo;
 
     class procedure registerNativeModule(const module: TXQNativeModule);
     class function collationsInternal: TStringList;
@@ -2906,36 +3012,41 @@ type
   constructor create(const anamespace: TNamespace; const aparentModule: array of TXQNativeModule);
   constructor create(const anamespace: TNamespace);
   destructor Destroy; override;
+protected
+  procedure setTypeChecking(const name: string; info: TXQAbstractFunctionInfo; const typeChecking: array of string);
+  procedure setTypeChecking(const name: string; info: TXQAbstractFunctionInfo; const typeChecking: array of TXQTermSequenceType);
+public
+  function registerFunction(const name: string; func: TXQComplexFunction; contextDependencies: TXQContextDependencies): TXQComplexFunctionInfo; overload;
+  function registerFunction(const name: string; func: TXQBasicFunction): TXQBasicFunctionInfo; overload;
   //** Registers a function that does not depend on the context.
   //** TypeChecking contains a list of standard XQuery function declarations (without the function name) for strict type checking.
-  procedure registerFunction(const name: string; minArgCount, maxArgCount: integer; func: TXQBasicFunction; const typeChecking: array of string); overload;
-  procedure registerFunction(const name: string; func: TXQBasicFunction; const typeChecking: array of string);
+  function registerFunction(const name: string; minArgCount, maxArgCount: integer; func: TXQBasicFunction; const typeChecking: array of string): TXQBasicFunctionInfo; overload;
+  function registerFunction(const name: string; func: TXQBasicFunction; const typeChecking: array of string): TXQBasicFunctionInfo; overload;
+  function registerBasicFunction(const name: string; func: TXQBasicFunction; const typeChecking: array of TXQTermSequenceType): TXQBasicFunctionInfo; //this should also be called registerFunction, but then it does not find the overload
   //** Registers a function that does depend on the context.
   //**TypeChecking contains a list of standard XQuery function declarations (without the function name) for strict type checking.
-  procedure registerFunction(const name: string; minArgCount, maxArgCount: integer; func: TXQComplexFunction; const typeChecking: array of string; contextDependencies: TXQContextDependencies = [low(TXQContextDependency)..high(TXQContextDependency)]);
-  procedure registerFunction(const name: string; func: TXQComplexFunction; const typeChecking: array of string; contextDependencies: TXQContextDependencies = [low(TXQContextDependency)..high(TXQContextDependency)]);
+  function registerFunction(const name: string; minArgCount, maxArgCount: integer; func: TXQComplexFunction; const typeChecking: array of string; contextDependencies: TXQContextDependencies = [low(TXQContextDependency)..high(TXQContextDependency)]): TXQComplexFunctionInfo;
+  function registerFunction(const name: string; func: TXQComplexFunction; const typeChecking: array of string; contextDependencies: TXQContextDependencies = [low(TXQContextDependency)..high(TXQContextDependency)]): TXQComplexFunctionInfo;
+  function registerFunction(const name: string; func: TXQComplexFunction; const typeChecking: array of TXQTermSequenceType; contextDependencies: TXQContextDependencies = [low(TXQContextDependency)..high(TXQContextDependency)]): TXQComplexFunctionInfo;
   //** Registers a function from an XQuery body
   //**TypeChecking must a standard XQuery function declarations (without the function name but WITH the variable names) (it uses a simplified parser, so only space whitespace is allowed)
   procedure registerInterpretedFunction(const name, typeDeclaration, func: string; contextDependencies: TXQContextDependencies = [low(TXQContextDependency)..high(TXQContextDependency)]);
   //** Registers a binary operator
   //**TypeChecking contains a list of standard XQuery function declarations (with or without the function name) for strict type checking.
-  function registerBinaryOp(const name:string; func: TXQBinaryOp;  priority: integer; flags: TXQOperatorFlags; const typeChecking: array of string; contextDependencies: TXQContextDependencies = [low(TXQContextDependency)..high(TXQContextDependency)]): TXQOperatorInfo;
+  function registerBinaryOp(const name:string; func: TXQBinaryOp;  priority: integer; flags: TXQOperatorFlags; const typeChecking: array of string; contextDependencies: TXQContextDependencies): TXQOperatorInfo;
+  function registerBinaryOp(const name:string; func: TXQBinaryOp;  priority: integer; flags: TXQOperatorFlags; const typeChecking: array of TXQTermSequenceType; contextDependencies: TXQContextDependencies): TXQOperatorInfo;
+  function registerBinaryOp(const name:string; func: TXQBinaryOp;  priority: integer; flags: TXQOperatorFlags; contextDependencies: TXQContextDependencies = [low(TXQContextDependency)..high(TXQContextDependency)]): TXQOperatorInfo;
 
   function findBasicFunction(const name: string; argCount: integer; model: TXQParsingModel = xqpmXQuery3_1): TXQBasicFunctionInfo;
   function findComplexFunction(const name: string; argCount: integer; model: TXQParsingModel = xqpmXQuery3_1): TXQComplexFunctionInfo;
   function findInterpretedFunction(const name: string; argCount: integer; model: TXQParsingModel = xqpmXQuery3_1): TXQInterpretedFunctionInfo;
-  function findBinaryOp(const name: string; model: TXQParsingModel = xqpmXQuery3_1): TXQOperatorInfo;
+  //function findBinaryOp(const name: string; model: TXQParsingModel = xqpmXQuery3_1): TXQOperatorInfo;
 
   function findSimilarFunctionsDebug(searched: TList; const localname: string): string;
 protected
   basicFunctions, complexFunctions, interpretedFunctions: TXQMapStringOwningObject;
   binaryOpLists: TXQMapStringOwningObject;
-  binaryOpFunctions: TXQMapStringOwningObject;
   class function findFunction(const sl: TStringList; const name: string; argCount: integer): TXQAbstractFunctionInfo;
-  procedure parseTypeChecking(const info: TXQAbstractFunctionInfo; const typeChecking: array of string; op: boolean);
-  {$ifdef dumpFunctions}
-  procedure logFunctionCreation(const name: string; const info: TXQAbstractFunctionInfo; const typeChecking: array of string);
-  {$endif}
 end;
 
 
@@ -3001,7 +3112,9 @@ function defaultQueryEngine: TXQueryEngine;
 procedure freeThreadVars;
 
 
-type TXQAbstractParsingContext = class
+type
+
+TXQAbstractParsingContext = class
 protected
   engine: TXQueryEngine;
 
@@ -3012,6 +3125,8 @@ protected
 
   str: string;
   pos: pchar;
+
+  debugInfo: TXQDebugInfo;
   procedure parseQuery(aquery: TXQuery); virtual; abstract;
   procedure parseQueryXStringOnly(aquery: TXQuery); virtual; abstract;
   procedure parseFunctionTypeInfo(info: TXQAbstractFunctionInfo; const typeChecking: array of string; op: boolean); virtual; abstract;
@@ -3028,58 +3143,15 @@ type TXQTerm_VisitorTrackKnownVariables = class(TXQTerm_Visitor)
   procedure undeclare(v: PXQTermVariable); override;
 end;
 
+const
+PARSING_MODEL3 = [xqpmXPath3_0, xqpmXQuery3_0, xqpmXPath3_1, xqpmXQuery3_1];
+PARSING_MODEL3_1 = [xqpmXPath3_1, xqpmXQuery3_1];
+PARSING_MODEL_XQUERY = [xqpmXQuery1, xqpmXQuery3_0, xqpmXQuery3_1];
 
 var XMLNamespace_XPathFunctions, XMLnamespace_XPathFunctionsArray, XMLnamespace_XPathFunctionsMap, XMLNamespace_MyExtensionsNew, XMLNamespace_MyExtensionsMerged, XMLNamespace_MyExtensionOperators, XMLNamespace_XMLSchema: TNamespace;
 
 
 function xqFunctionConcat(argc: SizeInt; args: PIXQValue): IXQValue;
-type
-  TXQMapDuplicateResolve = (xqmdrReject, xqmdrUseFirst, xqmdrUseLast, xqmdrCombine);
-  TXQMapDuplicateResolveHelper = type helper for TXQMapDuplicateResolve
-    procedure setFromString(const s: string);
-  end;
-
-  TXQJsonParser = object
-    type
-    //**Parsing options
-    //**@value jpoAllowMultipleTopLevelItems allow @code([], [], {}) as input
-    //**@value jpoLiberal             does not set joStrict for fpc's json scanner
-    //**@value jpoAllowTrailingComma  sets joIgnoreTrailingComma for fpc's json scanner
-    //**@value jpoEscapeCharacters    escapes characters for XPath/XQuery 3.1, e.g. return strings with \n or \uxxxx
-    //**@value jpoJSONiq              change from XPath/XQuery 3.1 parsing mode to JSONiq:
-    //**       @table(
-    //**       @rowHead(@cell(input)   @cell(XPath/XQuery 3.1)    @cell(  JSONiq))
-    //**       @row(@cell(number)      @cell(double  )            @cell(  int, decimal, double))
-    //**       @row(@cell(null)        @cell(empty sequence, () ) @cell(  null          ))
-    //**       @row(@cell(invalid)     @cell(err:FOJS0001)        @cell(  jerr:JNDY0021))
-    //**       )
-    TOption = (jpoAllowMultipleTopLevelItems, jpoLiberal, jpoAllowTrailingComma, jpoEscapeCharacters, jpoJSONiq);
-    TOptions = set of TOption;
-  public
-    context: PXQEvaluationContext;
-    options: TOptions;
-    duplicateResolve: TXQMapDuplicateResolve;
-    escapeFunction: TXQValueFunction;
-    procedure init;
-    procedure setConfigFromMap(const map: IXQValue);
-    function parse(argc: SizeInt; args: PIXQValue): IXQValue;
-    function parse(const data: string): IXQValue;
-    class function parse(const data: string; someOptions: TOptions): IXQValue; static;
-  end;
-  TXQBatchFunctionCall = record
-    tempcontext: TXQEvaluationContext;
-    func: TXQValueFunction;
-    stack: TXQEvaluationStack;
-    stacksize: Integer;
-    //prepares calls to f on outerContext.
-    //It pushes a sufficient number of temp values on the stack (override with stack.topptr), so that the function can be called.
-    //Note that pushing can change all stack addresses, invalidating all pointers to the stack (i.e., if you use this in a function called by the interpreter, the function arguments become inaccessible)
-    procedure init(const outerContext: TXQEvaluationContext; const f: ixqvalue; const def: IXQValue = nil);
-    procedure done;
-    function call(): IXQValue; inline;
-    function call1(const v: IXQValue): IXQValue;
-    function call2(const v, w: IXQValue): IXQValue;
-  end;
 
 function xqgetTypeInfo(wrapper: Ixqvalue): TXQTermSequenceType;
 function xqvalueCastAs(const cxt: TXQEvaluationContext; const ta, tb: IXQValue): IXQValue;
@@ -3125,6 +3197,73 @@ type TXQueryInternals = object
     class function treeElementAsString(node: TTreeNode; deepSeparator: string = ''): string; static; inline;
 end;
 
+
+type TXQGlobalTypes = record
+private
+   procedure init;
+   procedure free;
+   function orEmpty(t: TXQTermSequenceType): TXQTermSequenceType;
+   function star(t: TXQTermSequenceType): TXQTermSequenceType;
+   function f(args: array of TXQTermSequenceType): TXQTermSequenceType;
+public
+   case boolean of
+   true: (
+    none,
+    empty,
+    atomic, atomicOrEmpty, atomicStar,
+    item, itemPlus, itemStar, itemOrEmpty,
+
+    boolean, booleanOrEmpty,
+
+    integer, integerOrEmpty, integerStar,
+    decimal, decimalOrEmpty,
+    double, doubleOrEmpty,
+    numeric, numericOrEmpty,
+
+
+
+    stringt, stringOrEmpty, stringStar,
+    untypedAtomic,
+    anyURI, anyURIOrEmpty, anyURIStar,
+    hexBinary, hexBinaryOrEmpty, base64Binary, base64BinaryOrEmpty, anyBinary,
+    NOTATIONOrEmpty,
+    NCNameOrEmpty,
+    QName, QNameOrEmpty,
+    language,
+
+    time, timeOrEmpty,
+    date, dateOrEmpty,
+    dateTime, dateTimeOrEmpty,
+    durationOrEmpty,
+    dayTimeDuration, dayTimeDurationOrEmpty,
+    yearMonthDuration, yearMonthDurationOrEmpty,
+    gYearMonthOrEmpty,
+    gYearOrEmpty,
+    gMonthDayOrEmpty,
+    gMonthOrEmpty,
+    gDayOrEmpty,
+
+
+
+    map, mapStar,
+    arrayt, arrayOrEmpty, arrayStar,
+    null, jsonItemOrEmpty, jsonItemStar,
+
+    functiont, functiontOrEmpty,
+    functionItemAtomicStar, functionAtomicItemStarItemStar, functionItemStarAtomicStar,
+    functionItemStarItemItemStar, functionItemItemStarItemStar, functionItemItemItemStar,
+    functionItemStarItemStar, functionItemStarBoolean, functionItemStarItemStarItemStar,
+
+    node, nodeOrEmpty, nodeStar,
+    element, elementStar,
+    documentNodeOrEmpty, documentElementNodeOrEmpty,
+    elementSerializationParams, elementSerializationParamsOrEmpty
+    : TXQTermSequenceType;
+  );
+  false: (cachedTypes: array[1..81] of TXQTermSequenceType);
+end;
+var globalTypes: TXQGlobalTypes;
+
 implementation
 uses base64, jsonscanner, strutils, xquery__regex, bbutilsbeta;
 
@@ -3157,8 +3296,6 @@ var
 
   const ALL_CONTEXT_DEPENDENCIES = [xqcdFocusItem, xqcdFocusPosition, xqcdFocusLast, xqcdContextCollation, xqcdContextTime, xqcdContextVariables, xqcdContextOther];
   const ALL_CONTEXT_DEPENDENCIES_FOCUS = [xqcdFocusItem, xqcdFocusPosition, xqcdFocusLast];
-
-  PARSING_MODEL3 = [xqpmXPath3_0, xqpmXQuery3_0, xqpmXPath3_1, xqpmXQuery3_1];
 
 
 
@@ -3197,16 +3334,38 @@ begin
   PPointer(@b)^ := t;
 end;
 
+
+procedure TXQParsingOptions.SetAllowJSON(AValue: boolean);
+begin
+  if avalue then begin
+    JSONArrayMode := xqjamArrayAlias;
+    JSONObjectMode := xqjomMapAlias;
+    AllowJSONiqTests := true;
+  end else begin
+    JSONArrayMode := xqjamStandard;
+    JSONObjectMode := xqjomForbidden;
+    AllowJSONiqTests := false;
+  end;
+end;
+
 procedure TXQSerializer.init(abuffer: pstring; basecapacity: SizeInt; aencoding: TSystemCodePage);
 begin
   inherited init(abuffer, basecapacity, aencoding);
   nodeFormat := tnsText;
+  allowDuplicateNames := true;
   insertWhitespace := xqsiwConservative;
   indentCache := '  ';
   indentLevel := 0;
+  standard := false;
   sequenceTag :=  'seq';
   elementTag := 'e';
   objectTag := 'object';
+
+  onInterceptAppendXMLHTMLAttribute := nil;
+  onInterceptAppendXMLHTMLText := nil;
+
+  //this is basically a custom VMT on the stack
+  onInterceptAppendJSONString := @appendJSONStringWithoutQuotes;
 end;
 
 procedure TXQSerializer.indent;
@@ -3274,6 +3433,13 @@ begin
   end;
 end;
 
+procedure TXQSerializer.appendJSONObjectKeyColon(const key: string);
+begin
+  appendJSONString(key);
+  if insertWhitespace = xqsiwNever then append(':')
+  else append(': ');
+end;
+
 procedure TXQSerializer.appendJSONObjectComma;
 begin
   appendJSONArrayComma
@@ -3291,15 +3457,66 @@ begin
   inherited appendJSONObjectEnd;
 end;
 
+procedure TXQSerializer.appendJSONString(const s: string);
+begin
+  append('"');
+  onInterceptAppendJSONString(s);
+  append('"');
+end;
+
+procedure TXQSerializer.appendQualifiedQName(const namespaceurl, local: string);
+begin
+  append('Q{');
+  append(namespaceurl);
+  append('}');
+  append(local);
+end;
+
+procedure TXQSerializer.appendXQueryString(const s: string);
+var
+  temp: String;
+  quot: Char;
+begin
+  temp := StringReplace(s, '&', '&amp;', [rfReplaceAll]);
+  if pos('"', temp) = 0 then quot := '"'
+  else if pos('''', temp) = 0 then quot := ''''
+  else begin
+    quot := '"';
+    temp := StringReplace(temp, '"', '""', [rfReplaceAll]);
+  end;
+  append(quot);
+  append(temp);
+  append(quot);
+end;
+
+procedure TXQSerializer.appendTypeNameFunctionStart(t: TXSType);
+begin
+  if t is TXSSimpleType then t := TXSSimpleType(t).primitive;
+  {if (t.schema <> baseSchema) and (t.schema.url <> XMLNamespaceURL_XMLSchema) then begin
+    appendQualifiedQName(t.schema.url, t.name);
+  end else begin}
+  append('xs:');
+  append(t.name);
+  append('(');
+end;
+
+procedure TXQSerializer.error(const code: string; value: TXQValue);
+begin
+  error(code, 'Serialization error', value);
+end;
+
+procedure TXQSerializer.error(const code: string; message: string; value: TXQValue);
+begin
+  raise EXQEvaluationException.create(code, message + ', when serializing ' + value.toXQuery);
+end;
+
 function TXQTempTreeNodes.GetDocumentCache(const url: string): TTreeDocument;
 begin
-  if fdocumentCache = nil then exit(nil);
   result := fdocumentCache[url];
 end;
 
 procedure TXQTempTreeNodes.SetDocumentCache(const url: string; AValue: TTreeDocument);
 begin
-  if fdocumentCache = nil then fdocumentCache := TXQHashmapStrOwningTreeDocument.Create;
   fdocumentCache[url] := AValue;
 end;
 
@@ -3312,6 +3529,7 @@ constructor TXQTempTreeNodes.create();
 begin
   inherited create(nil);
   tempnodes := TFPList.Create;
+  fdocumentCache.init;
 end;
 
 destructor TXQTempTreeNodes.destroy;
@@ -3321,8 +3539,14 @@ begin
   for i:= 0 to tempnodes.count - 1 do
     TTreeNode(tempnodes[i]).freeAll();
   tempnodes.free;
-  fdocumentCache.free;
+  fdocumentCache.done;
   inherited destroy;
+end;
+
+function TXQTempTreeNodes.addClone(n: TTreeNode): TTreeNode;
+begin
+  result := n.clone(self);
+  tempnodes.add(result);
 end;
 
 function TXQParsingModelsHelper.requiredModelToString: string;
@@ -3870,10 +4094,22 @@ begin
   if returnType <> nil then result += ' as ' + returnType.serialize
 end;
 
+function TXQFunctionParameterTypes.clone: TXQFunctionParameterTypes;
+var
+  i: Integer;
+begin
+  result := self;
+  SetLength(result.types, length(types));
+  for i := 0 to high(types) do
+    result.types[i] := TXQTermSequenceType(types[i].clone);
+  if returnType <> nil then
+    result.returnType := TXQTermSequenceType(returnType.clone);
+end;
+
 procedure TXQFunctionParameterTypes.raiseErrorMessage(values: PIXQValue; count: integer; const context: TXQEvaluationContext;
   term: TXQTerm; const addendum: string);
 var
-  errCode, errMessage: String;
+  errCode, errMessage, name: String;
   i: Integer;
 begin
   errCode := 'XPTY0004';
@@ -3885,7 +4121,13 @@ begin
      errCode := 'XPTY0117'; //wtf?
      break;
     end;
-  errMessage := 'Invalid types for function '+name+'#'+IntToStr(count)+'.'+LineEnding;
+  name := '';
+  if (term is TXQTermNamedFunction) and (TXQTermNamedFunction(term).func is TXQAbstractFunctionInfo) then
+    name := 'function ' + TXQAbstractFunctionInfo(TXQTermNamedFunction(term).func).name
+  else if term is TXQTermBinaryOp then
+    name := 'operator ' + TXQTermBinaryOp(term).op.name
+  ;
+  errMessage := 'Invalid types for '+name+'#'+IntToStr(count)+'.'+LineEnding;
   errMessage += 'Got: ';
   for i := 0 to high(types) do begin
     if i <> 0 then errMessage += ', ';
@@ -4320,7 +4562,7 @@ begin
     message := message + ':'+LineEnding+value.toXQuery();
   term := aterm;
   if term <> nil then
-    message := message + ' in '+LineEnding+term.ToString;
+    message := message + LineEnding+'in '+term.ToString;
 end;
 
 
@@ -4329,6 +4571,12 @@ end;
 constructor EXQParsingException.create(aerrcode, amessage: string; anamespace: INamespace);
 begin
   inherited;
+end;
+
+destructor EXQParsingException.Destroy;
+begin
+  next.free;
+  inherited Destroy;
 end;
 
 
@@ -4385,8 +4633,6 @@ begin
       checkAddr( TXQBasicFunctionInfo(module.basicFunctions.Objects[j]).func, 'Q{' +nativeModules[i] + '}'+ module.basicFunctions[j]);
     for j := 0 to module.complexFunctions.Count - 1 do
     checkAddr( TXQComplexFunctionInfo(module.complexFunctions.Objects[j]).func, 'Q{' +nativeModules[i] + '}'+ module.complexFunctions[j]);
-    for j := 0 to module.binaryOpFunctions.Count - 1 do
-      checkAddr( TXQOperatorInfo(module.binaryOpFunctions.Objects[j]).func, 'Q{' +nativeModules[i] + '}'+ module.binaryOpFunctions[j]);
   end;
   if delta > 2048 then result := 'perhaps ' + result + ' ? but unlikely';
 end;
@@ -6030,7 +6276,6 @@ begin
     result.stringEncoding:=stringEncoding;
     result.strictTypeChecking:=strictTypeChecking;
     Result.useLocalNamespaces:=useLocalNamespaces;
-    result.objectsRestrictedToJSONTypes:=objectsRestrictedToJSONTypes;
     result.jsonPXPExtensions := jsonPXPExtensions;
     if decimalNumberFormats <> nil then begin
       result.decimalNumberFormats:= TFPList.Create;
@@ -6239,21 +6484,68 @@ var ak, bk: TXQValueKind;
   end;
 
   function compareCommonAsStrings(): integer;
-  var sa, sb: string;
+    function compareStrSignCapped(const sa, sb: string): integer;
+    begin
+      result := CompareStr(sa, sb);
+      if result <> 0 then
+        if result < 0 then result := -1
+        else result := 1
+    end;
+
+    function compareCommonAsBinary(): integer;
+    var sa, sb, temp: string;
+        at, bt: (tBase64, tHex, tUntyped, tOther);
+    begin
+      sa := '';
+      sb := '';
+      if a.typeAnnotation <> b.typeAnnotation then begin
+        if a.instanceOf(baseSchema.base64Binary) then at := tBase64
+        else if a.instanceOf(baseSchema.hexBinary) then at := tHex
+        else if a.instanceOf(baseSchema.untypedAtomic) then at := tUntyped
+        else at := tOther;
+        if b.instanceOf(baseSchema.base64Binary) then bt := tBase64
+        else if b.instanceOf(baseSchema.hexBinary) then bt := tHex
+        else if b.instanceOf(baseSchema.untypedAtomic) then bt := tUntyped
+        else bt := tOther;
+
+        result := 0;
+        if (at = tUntyped) or (bt = tUntyped) then begin
+          try
+            if at = tUntyped then temp := a.toString
+            else temp := b.toString;
+            if (at = tBase64) or (bt = tBase64) then temp := base64.DecodeStringBase64(temp)
+            else begin
+              if length(temp) and 1 = 1 then exit(-2);
+              temp := temp.DecodeHex;
+            end;
+            if at = tUntyped then sa := temp
+            else sb := temp;
+          except
+            on e: Exception do exit(-2); {StreamError for base64, exception for hex}
+          end;
+        end else if ((at = tHex) and (bt = tHex)) or ((at = tBase64) and (bt = tBase64)) then begin
+         //okay
+        end else begin
+          if strictTypeChecking then raiseXPTY0004TypeError(a, 'binary like ' + b.toXQuery);
+          exit(-2);
+        end;
+      end;
+      if sa = '' then sa := (a as TXQValueString).toRawBinary;
+      if sb = '' then sb := (b as TXQValueString).toRawBinary;
+      result := compareStrSignCapped(sa, sb);
+      //todo: less-than/greater-than should raise exception unless 3.1 mode is enabled
+    end;
+
   begin
-    if overrideCollation = nil then overrideCollation := collation;
-    if a.instanceOf(baseSchema.base64Binary) or a.instanceOf(baseSchema.hexBinary) then begin
-      sa := (a as TXQValueString).toRawBinary;
-      overrideCollation := nil;
-    end else sa := a.toString;
-    if b.instanceOf(baseSchema.base64Binary) or b.instanceOf(baseSchema.hexBinary) then begin
-      sb := (b as TXQValueString).toRawBinary;
-      overrideCollation := nil;
-    end else sb := b.toString;
+    if    a.instanceOf(baseSchema.base64Binary) or a.instanceOf(baseSchema.hexBinary)
+       or b.instanceOf(baseSchema.base64Binary) or b.instanceOf(baseSchema.hexBinary)
+    then exit(compareCommonAsBinary());
 
-
-    if overrideCollation <> nil then result := overrideCollation.compare(sa,sb)
-    else result := CompareStr(sa, sb);
+    if overrideCollation = nil then begin
+      overrideCollation := collation;
+      if overrideCollation = nil then exit(compareStrSignCapped(a.toString, b.toString));
+    end;
+    result := overrideCollation.compare(a.toString, b.toString)
   end;
   function compareBooleans(const ab, bb: boolean): integer; inline;
   begin
@@ -6698,7 +6990,7 @@ function TXQEvaluationContext.contextNode(mustExists: boolean): TTreeNode;
 begin
   if SeqValue <> nil then begin //tests pass without this branch. Why???
     result := SeqValue.toNode;
-    if result = nil then raise EXQEvaluationException.create('XPTY0004', 'Context item is not a node');
+    if result = nil then raise EXQEvaluationException.create('XPTY0004', 'Context item is not a node', nil, SeqValue);
     exit;
   end;
   if ParentElement <> nil then exit(ParentElement);
@@ -6744,6 +7036,25 @@ begin
       parser.repairMissingStartTags := startTags;
     end;
   end
+end;
+
+function TXQEvaluationContext.parseCachedDocFromUrl(const url: string; const errorCode: string): TTreeDocument;
+var
+  data, contenttype: String;
+begin
+  result := staticContext.needTemporaryNodes.documentCache[url];
+  if result = nil then begin
+    data := staticContext.retrieveFromURI(url, contenttype, errorCode);
+
+    try
+      result := parseDoc(data, url, contenttype);
+    except
+      on e: ETreeParseException do raise EXQEvaluationException.Create(errorCode, 'Failed to parse document: '+url + LineEnding+e.Message);
+    end;
+
+    staticContext.temporaryNodes.documentCache[url] := result;
+  end;
+  if result = nil then raise EXQEvaluationException.Create(errorCode, 'Failed to parse document: '+url);
 end;
 
 function TXQEvaluationContext.SeqValueAsString: string;
@@ -6892,18 +7203,21 @@ end;
 
 threadvar threadLocalCache: record
    runningEngines: integer;
-   commonValues: array[TXQValueKind] of TXQValue;
+   commonValues: array[TXQValueKind] of record
+      head: PPointer; //This is a TXQValue. But we override the first bytes with a pointer to the previously freed element, so it cannot be used as TXQValue
+      vmt: pointer;   //The first overriden bytes of the TXQValue. They should be the same between all TXQValues of one kind
+   end;
 end;
 
 class procedure TXQueryEngine.freeCommonCaches;
 var k: TXQValueKind;
-  v, w: TXQValue;
+  v, w: PPointer;
 begin
   with threadLocalCache do begin
     for k := low(commonValues) to high(commonValues) do begin
-      v := commonValues[k];
+      v := commonValues[k].head;
       while v <> nil do begin
-        w := v.ffreelist;
+        w := v^;
         Freemem(pointer(v));
         v := w;
       end;
@@ -7118,6 +7432,58 @@ begin
   result := nil;
 end;
 
+procedure TXQAbstractFunctionInfo.setVersionsShared(const v: array of TXQFunctionParameterTypes);
+var
+  i: Integer;
+begin
+  SetLength(versions, length(v));
+  for i := 0 to high(v) do
+    versions[i] := v[i];
+  sharedVersions := true;
+end;
+
+procedure TXQAbstractFunctionInfo.setVersionsShared(const v: array of TXQTermSequenceType);
+begin
+  sharedVersions := true;
+  SetLength(versions, 1);
+  minArgCount:=length(v) - 1;
+  maxArgCount:=maxArgCount;
+  setVersionsShared(0, v);
+end;
+
+procedure TXQAbstractFunctionInfo.setVersionsShared(const v, w: array of TXQTermSequenceType);
+begin
+  sharedVersions := true;
+  SetLength(versions, 2);
+  minArgCount:=length(v) - 1;
+  maxArgCount:=maxArgCount;
+  setVersionsShared(0, v);
+  setVersionsShared(1, w);
+end;
+
+procedure TXQAbstractFunctionInfo.setVersionsShared(i: integer; const v: array of TXQTermSequenceType);
+var
+  arglen: Integer;
+begin
+  arglen := length(v) - 1;
+  with versions[i] do begin
+    SetLength(types, arglen);
+    for i := 0 to high(types) do
+      types[i] := v[i];
+    returnType := v[high(v)];
+  end;
+  minArgCount:=min(minArgCount, arglen);
+  maxArgCount:=max(maxArgCount, arglen);
+end;
+
+procedure TXQAbstractFunctionInfo.setVersionsShared(count: integer);
+begin
+  SetLength(versions, count);
+  sharedVersions := true;
+  minArgCount := high(minArgCount);
+  maxArgCount := low(minArgCount);
+end;
+
 
 function TXQAbstractFunctionInfo.checkOrConvertTypes(values: PIXQValue; count: integer; const context: TXQEvaluationContext; term: TXQTerm): integer;
 var
@@ -7136,7 +7502,7 @@ var
     for i := 0 to high(versions) do begin
       if length(versions[i].types) <> count then continue;
       if i = countMatch then continue;
-      errMessage += LineEnding + 'or ' + versions[i].serialize;
+      errMessage += LineEnding + '          or ' + versions[i].serialize;
     end;
     versions[countMatch].raiseErrorMessage(values, count, context, term, errMessage);
   end;
@@ -7172,11 +7538,12 @@ destructor TXQAbstractFunctionInfo.Destroy;
 var
   i, j: Integer;
 begin
-  for i := 0 to High(versions) do begin
-    for j := 0 to high(versions[i].types) do
-      versions[i].types[j].free;
-    versions[i].returnType.Free;
-  end;
+  if not sharedVersions then
+    for i := 0 to High(versions) do begin
+      for j := 0 to high(versions[i].types) do
+        versions[i].types[j].free;
+      versions[i].returnType.Free;
+    end;
   versions := nil;
   inherited Destroy;
 end;
@@ -7412,6 +7779,7 @@ end;
 procedure TXQueryEngine.clear;
 begin
   FLastQuery:=nil;
+  FreeAndNil(LastDebugInfo);
   FModules.Clear;
 end;
 
@@ -7517,6 +7885,8 @@ begin
   FPendingModules := TXQueryModuleList.Create;
   inc(threadLocalCache.runningEngines);
   FCreationThread := GetThreadID;
+  DefaultJSONParser.init;
+  if AllowJSONDefaultInternal then DefaultJSONParser.options := [jpoAllowMultipleTopLevelItems, jpoLiberal, jpoAllowTrailingComma, jpoJSONiq];
 end;
 
 procedure threadSafetyViolated;
@@ -7763,6 +8133,9 @@ begin
     result := TXQuery.Create(cxt.staticContext);
     result.staticContextShared := staticContextShared;
     cxt.parseQuery(result);
+    if LastDebugInfo <> nil then LastDebugInfo.free;
+    LastDebugInfo := cxt.debugInfo;
+    cxt.debugInfo := nil;
   finally
     cxt.free;
   end;
@@ -8637,8 +9010,8 @@ class function TXQueryEngine.findOperator(const pos: pchar): TXQOperatorInfo;
 var
   i: Integer;
   j: Integer;
-  sl: TStringList;
   bestMatch: Integer;
+  sl: TStringList;
   k: Integer;
 begin
   result := nil;
@@ -8653,6 +9026,7 @@ begin
             bestMatch := length(sl[k]);
             result := TXQOperatorInfo(sl.Objects[k]);
           end;
+      if result <> nil then exit;
     end;
   end;
 end;
@@ -8799,8 +9173,6 @@ begin
   complexFunctions:=TXQMapStringOwningObject.Create;
   interpretedFunctions:=TXQMapStringOwningObject.Create;
   binaryOpLists:=TXQMapStringOwningObject.Create;
-  binaryOpFunctions:=TXQMapStringOwningObject.Create;
-  binaryOpFunctions.OwnsObjects := false;
   if length(aparentModule) > 0 then begin
     SetLength(parents, length(aparentModule));
     for i := 0 to high(aparentModule) do parents[i] := aparentModule[i];
@@ -8822,12 +9194,10 @@ begin
   complexFunctions.Clear;
   interpretedFunctions.Clear;
   binaryOpLists.Clear;
-  binaryOpFunctions.Clear;
 
   basicFunctions.free;
   complexFunctions.free;
   binaryOpLists.free;
-  binaryOpFunctions.Free;
   interpretedFunctions.free;
 
   i := nativeModules.IndexOf(namespace.getURL);
@@ -8839,57 +9209,170 @@ begin
 end;
 
 
-
-procedure TXQNativeModule.registerFunction(const name: string; minArgCount, maxArgCount: integer; func: TXQBasicFunction; const typeChecking: array of string);
+{$ifdef dumpFunctionTypes}
+function pascalType(t: TXQTermSequenceType): string;
 var
-  temp: TXQBasicFunctionInfo;
+  i: Integer;
+  temp: String;
 begin
-  temp := TXQBasicFunctionInfo.Create;
-  temp.func := func;
-  basicFunctions.AddObject(name, temp);
-   parseTypeChecking(temp, typeChecking, false);
-  if length(temp.versions) > 0 then temp.versions[0].name:=name; //just for error printing
-  if minArgCount <> high(Integer) then begin
-     temp.minArgCount := minArgCount;
-     if maxArgCount <> - 1 then temp.maxArgCount := maxArgCount
-     else temp.maxArgCount:=high(temp.maxArgCount);
-  end else temp.guessArgCount;
+  if t = nil then exit('NIL???');
+  with t do begin
+  result := t.name;
+  case kind of
+    tikNone: exit('empty');
+    tikAny: result := 'item';
+    tikAtomic: begin
+      if atomicTypeInfo = nil then exit(name + '(TYPE NOT FOUND)????');
+      if atomicTypeInfo = baseSchema.anyAtomicType then result := 'atomic'
+      else if atomicTypeInfo = baseJSONiqSchema.object_ then begin
+        result := 'map';
+        if length(children) > 0 then result += '???';
+      end else if atomicTypeInfo = baseJSONiqSchema.array_ then begin
+        result := 'array';
+        if length(children) > 0 then result += '???';
+      end else result := atomicTypeInfo.name;
+    end;
+    tikFunctionTest: begin
+      if length(arguments) = 0 then result := 'functiont'
+      else begin
+        result := 'function';
+        for i := 0 to high(arguments) do begin
+          temp := pascalType(arguments[i] as TXQTermSequenceType);
+          temp[1] := UpCase(temp[1]);
+          result += temp
+        end;
+        if allowNone or allowMultiple then result += '???';
+      end;
+    end;
+    tikElementTest: begin
+      if (nodeMatching.typ = tneaDirectChild) and (nodeMatching.matching = [qmElement,qmText,qmComment,qmProcessingInstruction,qmAttribute,qmDocument])
+      then  result := 'node'
+      else if (nodeMatching.typ = tneaDirectChild) and (nodeMatching.matching = [qmElement])
+      then  result := 'element'
+      else result := nodeMatching.serialize()+'????';
+    end;
+    tikUnion: begin
+      result := '';
+      for i := 0 to high(children) do
+        result += '| ' + (children[i] as TXQTermSequenceType).serialize;
+      delete(result, 1, 2);
+      result += '???';
+    end;
+  end;
 
-  {$ifdef dumpFunctions}
-  logFunctionCreation(name, temp, typeChecking);
-  {$endif}
+  if allowNone and allowMultiple then result += 'Star'
+  else if allowMultiple then result += 'Plus'
+  else if allowNone then result += 'OrEmpty';
+  end;
+  if result = 'string' then result := 'stringt';
+  if result = 'array' then result := 'arrayt';
 end;
 
-
-procedure TXQNativeModule.registerFunction(const name: string; func: TXQBasicFunction; const typeChecking: array of string);
-begin
-  registerFunction(name, high(integer), 0, func, typeChecking);
-end;
-
-procedure TXQNativeModule.registerFunction(const name: string; minArgCount, maxArgCount: integer; func: TXQComplexFunction; const typeChecking: array of string; contextDependencies: TXQContextDependencies);
+procedure logFunctionTypes(const name: string; info: TXQAbstractFunctionInfo);
 var
-  temp: TXQComplexFunctionInfo;
+  i, j: Integer;
+  v: TXQFunctionParameterTypes;
 begin
-  temp := TXQComplexFunctionInfo.Create;
-  temp.func := func;
-  temp.contextDependencies:=contextDependencies;
-  complexFunctions.AddObject(name, temp);
-  parseTypeChecking(temp, typeChecking, false);
-  if length(temp.versions) > 0 then temp.versions[0].name:=name; //just for error printing
-  if minArgCount <> high(Integer) then begin
-     temp.minArgCount:=minArgCount;
-     if maxArgCount <> - 1 then temp.maxArgCount := maxArgCount
-     else temp.maxArgCount:=high(temp.maxArgCount);
-  end else temp.guessArgCount;
-  {$ifdef dumpFunctions}
-  logFunctionCreation(name, temp, typeChecking);
-  {$endif}
+  writeln(name);
+  if (length(info.versions) > 1) then write('[');
+  for i := 0 to high(info.versions) do begin
+    write('[');
+    v := info.versions[i];
+    for j := 0 to high(v.types) do begin
+      write(pascalType(v.types[j]));
+      write(', ');
+    end;
+    write(pascalType(v.returnType));
+    write(']');
+    if i <> high(info.versions) then write(',  ');
+  end;
+  if (length(info.versions) > 1) then writeln(']')
+  else writeln
+
+end;
+{$endif}
+
+function TXQNativeModule.registerFunction(const name: string; func: TXQBasicFunction): TXQBasicFunctionInfo;
+begin
+  result := TXQBasicFunctionInfo.Create;
+  result.func := func;
+  result.name := name;
+  basicFunctions.AddObject(name, result);
 end;
 
-procedure TXQNativeModule.registerFunction(const name: string; func: TXQComplexFunction; const typeChecking: array of string; contextDependencies: TXQContextDependencies = [low(TXQContextDependency)..high(TXQContextDependency)]);
+function TXQNativeModule.registerFunction(const name: string; func: TXQComplexFunction; contextDependencies: TXQContextDependencies
+  ): TXQComplexFunctionInfo;
 begin
-  registerFunction(name, high(Integer), 0, func, typeChecking, contextDependencies);
+  result := TXQComplexFunctionInfo.Create;
+  result.func := func;
+  result.name := name;
+  result.contextDependencies:=contextDependencies;
+  complexFunctions.AddObject(name, result);
 end;
+
+var globalTypeParsingContext: TXQAbstractParsingContext;
+
+procedure TXQNativeModule.setTypeChecking(const name: string; info: TXQAbstractFunctionInfo; const typeChecking: array of string);
+begin
+  globalTypeParsingContext.parseFunctionTypeInfo(info, typeChecking, true);
+  {$ifdef dumpFunctionTypes}logFunctionTypes(name, info);{$endif}
+  if length(info.versions) > 0 then begin
+    info.name := name;
+    info.guessArgCount;
+  end;
+end;
+
+procedure TXQNativeModule.setTypeChecking(const name: string; info: TXQAbstractFunctionInfo; const typeChecking: array of TXQTermSequenceType);
+begin
+  info.setVersionsShared(typeChecking);
+  info.name := name;
+end;
+
+function TXQNativeModule.registerFunction(const name: string; minArgCount, maxArgCount: integer; func: TXQBasicFunction; const typeChecking: array of string): TXQBasicFunctionInfo;
+begin
+  result := registerFunction(name, func);
+  setTypeChecking(name, result, typeChecking);
+  result.minArgCount := minArgCount;
+  if maxArgCount <> - 1 then result.maxArgCount := maxArgCount
+  else result.maxArgCount:=high(result.maxArgCount);
+end;
+
+
+function TXQNativeModule.registerFunction(const name: string; func: TXQBasicFunction; const typeChecking: array of string): TXQBasicFunctionInfo;
+begin
+  result := registerFunction(name, func);
+  setTypeChecking(name, result, typeChecking);
+end;
+
+function TXQNativeModule.registerBasicFunction(const name: string; func: TXQBasicFunction; const typeChecking: array of TXQTermSequenceType): TXQBasicFunctionInfo;
+begin
+  result := registerFunction(name, func);
+  setTypeChecking(name, result, typeChecking);
+end;
+
+
+function TXQNativeModule.registerFunction(const name: string; minArgCount, maxArgCount: integer; func: TXQComplexFunction; const typeChecking: array of string; contextDependencies: TXQContextDependencies): TXQComplexFunctionInfo;
+begin
+  result := registerFunction(name, func, contextDependencies);
+  setTypeChecking(name, result, typeChecking);
+  result.minArgCount := minArgCount;
+  if maxArgCount <> - 1 then result.maxArgCount := maxArgCount
+  else result.maxArgCount:=high(result.maxArgCount);
+end;
+
+function TXQNativeModule.registerFunction(const name: string; func: TXQComplexFunction; const typeChecking: array of string; contextDependencies: TXQContextDependencies = [low(TXQContextDependency)..high(TXQContextDependency)]): TXQComplexFunctionInfo;
+begin
+  result := registerFunction(name, func, contextDependencies);
+  setTypeChecking(name, result, typeChecking);
+end;
+
+function TXQNativeModule.registerFunction(const name: string; func: TXQComplexFunction;
+  const typeChecking: array of TXQTermSequenceType; contextDependencies: TXQContextDependencies): TXQComplexFunctionInfo;
+begin
+  result := registerFunction(name, func, contextDependencies);
+  setTypeChecking(name, result, typeChecking);
+end;
+
 
 procedure TXQNativeModule.registerInterpretedFunction(const name, typeDeclaration, func: string; contextDependencies: TXQContextDependencies = [low(TXQContextDependency)..high(TXQContextDependency)]);
 var
@@ -8900,16 +9383,25 @@ begin
   temp.source:='function ' + typeDeclaration + '{' +  func + '}';
   temp.contextDependencies:=contextDependencies;
   interpretedFunctions.AddObject(name, temp);
-  parseTypeChecking(temp, [typeDeclaration], false);
-  temp.versions[0].name:=name; //just for error printing
-  temp.guessArgCount;
-  {$ifdef dumpFunctions}
-  logFunctionCreation(name, temp, [typeDeclaration]);
-  {$endif}
+  setTypeChecking(name, temp, [typeDeclaration]);
 end;
 
 function TXQNativeModule.registerBinaryOp(const name: string; func: TXQBinaryOp; priority: integer; flags: TXQOperatorFlags;
   const typeChecking: array of string; contextDependencies: TXQContextDependencies): TXQOperatorInfo;
+begin
+  result := registerBinaryOp(name, func, priority, flags, contextDependencies);
+  setTypeChecking(name, result, typeChecking);
+end;
+
+function TXQNativeModule.registerBinaryOp(const name: string; func: TXQBinaryOp; priority: integer; flags: TXQOperatorFlags;
+  const typeChecking: array of TXQTermSequenceType; contextDependencies: TXQContextDependencies): TXQOperatorInfo;
+begin
+  result := registerBinaryOp(name, func, priority, flags, contextDependencies);
+  setTypeChecking(name, result, typeChecking);
+end;
+
+function TXQNativeModule.registerBinaryOp(const name: string; func: TXQBinaryOp; priority: integer; flags: TXQOperatorFlags;
+  contextDependencies: TXQContextDependencies): TXQOperatorInfo;
 var
   spacepos: SizeInt;
   i: Integer;
@@ -8939,9 +9431,6 @@ begin
     result.followedBy := strCopyFrom(name, spacepos+1);
     include(result.flags, xqofSpecialParsing);
   end;
-  parseTypeChecking(result, typeChecking, true);
-  for i := 0 to high(result.versions) do
-    binaryOpFunctions.AddObject(result.versions[i].name, TObject(result));
 end;
 
 function TXQNativeModule.findBasicFunction(const name: string; argCount: integer; model: TXQParsingModel): TXQBasicFunctionInfo;
@@ -8989,7 +9478,7 @@ begin
   result := nil;
 end;
 
-function TXQNativeModule.findBinaryOp(const name: string; model: TXQParsingModel): TXQOperatorInfo;
+{function TXQNativeModule.findBinaryOp(const name: string; model: TXQParsingModel): TXQOperatorInfo;
 var
   i: Integer;
 begin
@@ -9002,7 +9491,7 @@ begin
    if result <> nil then exit;
   end;
   result := nil;
-end;
+end;            }
 
 function TXQNativeModule.findSimilarFunctionsDebug(searched: TList; const localname: string): string;
   function strSimilar(const s, ref: string): boolean;
@@ -9055,12 +9544,6 @@ begin
     result += parents[i].findSimilarFunctionsDebug(searched, localname);
 end;
 
-var globalTypeParsingContext: TXQAbstractParsingContext;
-
-procedure TXQNativeModule.parseTypeChecking(const info: TXQAbstractFunctionInfo; const typeChecking: array of string; op: boolean);
-begin
-  globalTypeParsingContext.parseFunctionTypeInfo(info, typeChecking, op);
-end;
 
 {$ifdef dumpFunctions}
 procedure TXQNativeModule.logFunctionCreation(const name: string; const info: TXQAbstractFunctionInfo; const typeChecking: array of string);
@@ -9339,6 +9822,8 @@ begin
   raise EXQEvaluationException.create(code, message);
 end;
 
+
+
 var xs: TXQNativeModule;
 initialization
 
@@ -9396,6 +9881,7 @@ baseSchema := TJSONiqOverrideSchema.create;
 baseSchema.url:=XMLNamespace_XMLSchema.getURL;
 baseJSONiqSchema := TJSONiqAdditionSchema.create();
 
+globalTypes.init;
 xquery__functions.initializeFunctions;
 
 TXQueryInternals.commonValuesUndefined := TXQValueUndefined.create(baseSchema.untyped); //the type should probably be sequence (as undefined = empty-sequence()). however that cause xqts failures atm.
@@ -9408,7 +9894,6 @@ baseSchema.cacheDescendants; //this ignores the jsoniq types
 baseSchema.hide('node()');
 baseSchema.hide('sequence*');
 baseSchema.hide('function(*)');
-baseSchema.hide('numeric');
 
 {$ifdef dumpFunctions}baseSchema.logConstructorFunctions;{$endif}
 
@@ -9419,6 +9904,8 @@ DoneCriticalsection(interpretedFunctionSynchronization);
 
 xquery__functions.finalizeFunctions;
 xs.free;
+
+globalTypes.free;
 
 collations.Clear;
 collations.Free;

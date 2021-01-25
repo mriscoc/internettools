@@ -43,6 +43,11 @@ begin
   serializer.appendXMLEmptyElement(serializer.sequenceTag);
 end;
 
+procedure TXQValueUndefined.adaptiveSerialize(var serializer: TXQSerializer);
+begin
+  serializer.append('()');
+end;
+
 function TXQValueUndefined.map(const q: string): IXQValue;
 begin
   ignore(q);
@@ -158,12 +163,15 @@ type TNewinstanceFunc = function: tobject of object;
 class function TXQValue.newinstance: tobject;
 var k: TXQValueKind;
   hackMethod: TMethod;
+  head: PPointer;
 begin
   k := classKind;
   with threadLocalCache do begin
-    if commonValues[k] <> nil then begin
-      result := commonValues[k];
-      commonValues[k] := txqvalue(result).ffreelist;
+    if commonValues[k].head <> nil then begin
+      head := commonValues[k].head;
+      result := TXQValue(head);
+      commonValues[k].head := head^;
+      head^ := commonValues[k].vmt;
       //A normal object needs to be cleaned up and initialized. We do the clean up in the destructor and can skip it here
       //hackMethod := tmethod(@CleanupInstance);
       //hackMethod.Data := result;
@@ -181,12 +189,16 @@ end;
 procedure TXQValue.FreeInstance;
 var
   k: TXQValueKind;
+  pself: ppointer;
 begin
   k := classKind;
   with threadLocalCache do begin
     if runningEngines > 0 then begin
-      ffreelist := commonValues[k];
-      commonValues[k] := self;
+      pself := ppointer(self);
+      if commonValues[k].vmt = nil then commonValues[k].vmt := pself^
+      else assert(commonValues[k].vmt = pself^);
+      pself^ := commonValues[k].head;
+      commonValues[k].head := pself;
     end else Freemem(pointer(self));
   end;
 end;
@@ -430,6 +442,16 @@ begin
   serializer.appendXMLText(toString);
 end;
 
+procedure TXQValue.adaptiveSerialize(var serializer: TXQSerializer);
+var
+  withType: Boolean;
+begin
+  withType := not (typeAnnotation.derivedFrom([baseSchema.string_, baseSchema.untypedAtomic, baseSchema.anyURI]));
+  if withType then serializer.appendTypeNameFunctionStart(typeAnnotation);
+  serializer.appendXQueryString(toString);
+  if withType then serializer.append(')');
+end;
+
 
 function TXQValue.stringifyNodes: IXQValue;
 begin
@@ -540,12 +562,10 @@ var tempContext: TXQEvaluationContext;
     f: TInternetToolsFormat;
     p: PChar;
     l: SizeInt;
-    tempv: IXQValue;
   begin
     f := guessFormat(data, uri, contenttype);
-    if (f = itfJSON) and (defaultQueryEngine.ParsingOptions.AllowJSON) then begin
-      tempv := xqvalue(data);
-      exit ( defaultQueryEngine.findNativeModule('http://jsoniq.org/functions').findBasicFunction('parse-json', 1).func(1, @tempv));
+    if (f = itfJSON) then begin
+      exit(defaultQueryEngine.DefaultJSONParser.parse(data));
     end;
     if f = itfXML then begin
       if data = '' then exit(TXQValueString.create(baseSchema.untypedAtomic, ''));
@@ -666,6 +686,12 @@ begin
   if bool then serializer.append('true') else serializer.append('false');
 end;
 
+procedure TXQValueBoolean.adaptiveSerialize(var serializer: TXQSerializer);
+begin
+  if bool then serializer.append('true()')
+  else serializer.append('false()')
+end;
+
 
 {$ImplicitExceptions off}
 constructor TXQValueInt64.create(atypeAnnotation: TXSType);
@@ -737,6 +763,17 @@ end;
 procedure TXQValueInt64.jsonSerialize(var serializer: TXQSerializer);
 begin
   serializer.appendNumber(value);
+end;
+
+procedure TXQValueInt64.adaptiveSerialize(var serializer: TXQSerializer);
+begin
+  if (typeAnnotation = baseSchema.integer) or (typeAnnotation = baseSchema.decimal) then begin
+    serializer.appendNumber(value);
+  end else begin
+    serializer.appendTypeNameFunctionStart(typeAnnotation);
+    serializer.appendXQueryString(toString);
+    serializer.append(')');
+  end;
 end;
 
 function TXQValueInt64.clone: IXQValue;
@@ -856,7 +893,59 @@ end;
 
 procedure TXQValueFloat.jsonSerialize(var serializer: TXQSerializer);
 begin
-  serializer.append(toString);
+  if IsNan(value) or IsInfinite(value) then begin
+    if serializer.standard then serializer.error('SERE0020', self);
+    if IsNan(value) then serializer.append('NaN')
+    else if isPosInf(value) then serializer.appendJSONString('INF')
+    else serializer.appendJSONString('-INF');
+  end else if value = 0 then begin
+    if isSignedXQFloat(value) then serializer.append('-0')
+    else serializer.append('0');
+  end else if frac(value) = 0 then begin
+    serializer.append(IntToStr(trunc(value)));
+  end else
+    serializer.append(toString);
+end;
+
+procedure TXQValueFloat.adaptiveSerialize(var serializer: TXQSerializer);
+var s: shortstring;
+  dot, e, i, cutoff: Integer;
+  withType: Boolean;
+begin
+  withType := typeAnnotation <> baseSchema.double;
+  if withType then serializer.appendTypeNameFunctionStart(typeAnnotation);
+  if IsNan(value) or IsInfinite(value) then begin
+    if withType then serializer.append('"');
+    if IsNan(value) then serializer.append('NaN')
+    else if isPosInf(value) then serializer.append('INF')
+    else serializer.append('-INF');
+    if withType then serializer.append('"');
+  end else begin
+    system.str(value, s);
+    //trim
+    cutoff := 0;
+    while s[cutoff + 1] = ' ' do inc(cutoff);
+    delete(s, 1, cutoff);
+    //convert x.y0000E+0000z to x.yez
+    dot := 0;
+    e := length(s) + 1;
+    for i := 1 to length(s) do
+      case s[i] of
+        'E': begin
+          s[i] := 'e';
+          if s[i + 1] = '+' then delete(s, i + 1, 1);
+          while (i + 1 < length(s)) and (s[i + 1] = '0') do delete(s, i + 1, 1);
+          e := i;
+          break;
+        end;
+        '.': dot := i;
+      end;
+    cutoff := 0;
+    if dot > 0 then while (e - cutoff - 1 > dot + 1) and (s[e - cutoff - 1] = '0') do inc(cutoff);
+    if cutoff > 0 then delete(s, e - cutoff, cutoff);
+    serializer.append(s);
+  end;
+  if withType then serializer.append(')');
 end;
 
 function TXQValueFloat.clone: IXQValue;
@@ -932,6 +1021,17 @@ end;
 procedure TXQValueDecimal.jsonSerialize(var serializer: TXQSerializer);
 begin
   serializer.append(toString);
+end;
+
+procedure TXQValueDecimal.adaptiveSerialize(var serializer: TXQSerializer);
+begin
+  if (typeAnnotation = baseSchema.integer) or (typeAnnotation = baseSchema.decimal) then begin
+    serializer.append(toString);
+  end else begin
+    serializer.appendTypeNameFunctionStart(typeAnnotation);
+    serializer.appendXQueryString(toString);
+    serializer.append(')');
+  end;
 end;
 
 function TXQValueDecimal.clone: IXQValue;
@@ -1095,6 +1195,11 @@ function TXQValueQName.toBooleanEffective: boolean;
 begin
   raise EXQEvaluationException.Create('FORG0006', 'A QName cannot be used a boolean');
   result := false;
+end;
+
+procedure TXQValueQName.adaptiveSerialize(var serializer: TXQSerializer);
+begin
+  serializer.appendQualifiedQName(url, local);
 end;
 
 function TXQValueQName.clone: IXQValue;
@@ -1659,9 +1764,10 @@ var
   ws: TXQSerializerInsertWhitespace;
 begin
   case seq.Count of
-    0: serializer.appendJSONEmptyArray;
+    0: serializer.append('null');
     1: seq[0].jsonSerialize(serializer);
     else begin
+      if serializer.standard then serializer.error('SERE0023', self);
       ws := serializer.insertWhitespace;
       if (ws = xqsiwIndent) and (seq.Count <= 8) then begin
         serializer.insertWhitespace := xqsiwConservative;
@@ -1704,6 +1810,25 @@ begin
        end;
        appendXMLElementEndTag(sequenceTag);
      end;
+end;
+
+procedure TXQValueSequence.adaptiveSerialize(var serializer: TXQSerializer);
+var
+  i: Integer;
+begin
+  case getSequenceCount of
+    0: serializer.append('()');
+    1: seq[0].adaptiveSerialize(serializer);
+    else begin
+      serializer.append('(');
+      seq[0].adaptiveSerialize(serializer);
+      for i := 1 to getSequenceCount - 1 do begin
+        serializer.append(',');
+        seq[i].adaptiveSerialize(serializer);
+      end;
+      serializer.append(')');
+    end;
+  end;
 end;
 
 function TXQValueSequence.stringifyNodes: IXQValue;
@@ -1813,10 +1938,15 @@ end;
 procedure TXQValueNode.jsonSerialize(var serializer: TXQSerializer);
 begin
   if node <> nil then begin
-    case serializer.nodeFormat of
-      tnsText: serializer.appendJSONString(toString);
-      tnsXML: serializer.appendJSONString(node.outerXML());
-      tnsHTML: serializer.appendJSONString(node.outerHTML());
+    case node.typ of
+      tetAttribute: if serializer.standard then serializer.error('SENR0001', 'Attribute', self)
+                    else adaptiveSerialize(serializer);
+      else
+        case serializer.nodeFormat of
+          tnsText: serializer.appendJSONString(toString);
+          tnsXML: serializer.appendJSONString(node.outerXML());
+          tnsHTML: serializer.appendJSONString(node.outerHTML());
+        end;
     end;
   end else serializer.append('null');
 end;
@@ -1826,10 +1956,27 @@ begin
   if node <> nil then begin
     case serializer.nodeFormat of
       tnsText: serializer.appendXMLText(toString);
-      tnsXML: serializer.appendXMLText(node.outerXML());
+      tnsXML: serializer.appendXMLText(node.outerXML()); //is this supposed to be like this?
       tnsHTML: serializer.appendXMLText(node.outerHTML());
     end;
   end
+end;
+
+procedure TXQValueNode.adaptiveSerialize(var serializer: TXQSerializer);
+begin
+  case node.typ of
+    tetAttribute: begin
+      if node.namespace <> nil then begin
+        serializer.append(node.getNamespacePrefix());
+        serializer.append(':');
+      end;
+      serializer.append(node.value);
+      serializer.append('="');
+      serializer.appendXMLAttrib((node as TTreeAttribute).realvalue);
+      serializer.append('"');
+    end;
+    else serializer.append(node.outerXML());
+  end;
 end;
 
 function TXQValueNode.stringifyNodes: IXQValue;
@@ -2081,20 +2228,32 @@ procedure TXQValueObject.jsonSerialize(var serializer: TXQSerializer);
 var
   prop: TXQProperty;
   first: Boolean;
+  nameCheck: ^TXQHashmapStrStr;
 begin
+  if serializer.allowDuplicateNames then nameCheck := nil
+  else new(nameCheck,init);
   first := true;
-  with serializer do begin
-    for prop in getPropertyEnumerator do begin
-      if not first then appendJSONObjectComma
-      else begin
-        first := false;
-        appendJSONObjectStart;
+  try
+    with serializer do begin
+      for prop in getPropertyEnumerator do begin
+        if not first then appendJSONObjectComma
+        else begin
+          first := false;
+          appendJSONObjectStart;
+        end;
+        if assigned(nameCheck) then begin
+          if nameCheck.contains(prop.name) then
+            raiseXQEvaluationError('SERE0022', 'Duplicate key names when serializing.', self);
+          nameCheck.include(prop.Name, '');
+        end;
+        appendJSONObjectKeyColon(prop.Name);
+        prop.Value.jsonSerialize(serializer);
       end;
-      appendJSONObjectKeyColon(prop.Name);
-      prop.Value.jsonSerialize(serializer);
+      if not first then appendJSONObjectEnd
+      else appendJSONEmptyObject;
     end;
-    if not first then appendJSONObjectEnd
-    else appendJSONEmptyObject;
+  finally
+    if assigned(nameCheck) then nameCheck^.done;
   end;
 end;
 
@@ -2125,6 +2284,29 @@ begin
     end;
     if first then appendXMLEmptyElement(objectTag) //no properties
     else appendXMLElementEndTag(objectTag);
+  end;
+end;
+
+procedure TXQValueObject.adaptiveSerialize(var serializer: TXQSerializer);
+var
+  prop: TXQProperty;
+  first: Boolean;
+begin
+  first := true;
+  with serializer do begin
+    append('map');
+    for prop in getPropertyEnumerator do begin
+      if not first then appendJSONObjectComma
+      else begin
+        first := false;
+        appendJSONObjectStart;
+      end;
+      appendXQueryString(prop.Name);
+      append(':');
+      prop.Value.adaptiveSerialize(serializer);
+    end;
+    if not first then appendJSONObjectEnd
+    else appendJSONEmptyObject;
   end;
 end;
 
@@ -2341,6 +2523,21 @@ begin
      end;
 end;
 
+procedure TXQValueJSONArray.adaptiveSerialize(var serializer: TXQSerializer);
+var
+  i: Integer;
+begin
+  serializer.appendJSONArrayStart;
+  if seq.Count > 0 then begin
+    seq[0].adaptiveSerialize(serializer);
+    for i := 1 to seq.Count-1 do begin
+      serializer.appendJSONArrayComma();
+      seq[i].adaptiveSerialize(serializer);
+    end;
+  end;
+  serializer.appendJSONArrayEnd;
+end;
+
 function TXQValueJSONArray.stringifyNodes: IXQValue;
 begin
   Result:= TXQValueJSONArray.create(seq.stringifyNodes);
@@ -2549,6 +2746,28 @@ begin
     resulttype := func.resulttype.clone as TXQTermSequenceType;
   copyAnnotations(annotations, func.annotations);
   ownsTerms := true;
+end;
+
+procedure TXQValueFunction.adaptiveSerialize(var serializer: TXQSerializer);
+begin
+  if (namespaceURL = '') and (name = '') then serializer.append('(anonymous-function)')
+  else begin
+    case namespaceURL of
+      'http://www.w3.org/2005/xpath-functions': serializer.append('fn:');
+      'http://www.w3.org/2005/xpath-functions/math': serializer.append('math:');
+      'http://www.w3.org/2005/xpath-functions/map': serializer.append('map:');
+      'http://www.w3.org/2005/xpath-functions/array': serializer.append('array:');
+      'http://www.w3.org/2001/XMLSchema': serializer.append('xs:');
+      else begin
+        serializer.append('Q{');
+        serializer.append(namespaceURL);
+        serializer.append('}');
+      end;
+    end;
+    serializer.append(name);
+  end;
+  serializer.append('#');
+  serializer.appendNumber(length(parameters));
 end;
 
 procedure TXQValueFunction.visit(visitor: TXQTerm_Visitor);

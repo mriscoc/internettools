@@ -187,6 +187,7 @@ var
 var //vars: TXQVariableChangeLog;
   helper: THelper;
   modu: TXQNativeModule;
+  i: integer;
 begin
 //  time := Now;
   //vars:= TXQVariableChangeLog.create();
@@ -216,6 +217,7 @@ begin
   t('''&quot;''',                 '"',                        '');
   t('"x&quot;y"',                   'x"y',                        '');
   t('''x&quot;y''',                 'x"y',                        '');
+  t('"&#9;"',                   #9);
 
   t('"Ben &amp; Jerry&apos;s"', 'Ben & Jerry''s');
   t('"&#8364;99.50"', '€99.50'); //assuming utf 8 encoding
@@ -395,12 +397,12 @@ begin
   t('outer-xml(<a><!-- co<! <? <aas aas asa sas mment -->{1,2,3}</a>)', '<a><!-- co<! <? <aas aas asa sas mment -->1 2 3</a>');
   t('outer-xml(<!-- Tags are ignored in the following section -->)', '<!-- Tags are ignored in the following section -->');
 
-  t('outer-xml(<?piempty?>)', '<?piempty ?>');
-  t('outer-xml(<?piempty       ?>)', '<?piempty ?>');
+  t('outer-xml(<?piempty?>)', '<?piempty?>');
+  t('outer-xml(<?piempty       ?>)', '<?piempty?>');
   t('outer-xml(<?pifull     foobar?>)', '<?pifull foobar?>');
   t('outer-xml(<?pispace     balls   ?>)', '<?pispace balls   ?>');
-  t('outer-xml(<a><?piempty?></a>)', '<a><?piempty ?></a>');
-  t('outer-xml(<a><?piempty       ?></a>)', '<a><?piempty ?></a>');
+  t('outer-xml(<a><?piempty?></a>)', '<a><?piempty?></a>');
+  t('outer-xml(<a><?piempty       ?></a>)', '<a><?piempty?></a>');
   t('outer-xml(<a><?pispace     balls   ?></a>)', '<a><?pispace balls   ?></a>');
   t('outer-xml(<a>{1,2}<?pispace     balls   ?>8</a>)', '<a>1 2<?pispace balls   ?>8</a>');
   t('outer-xml(<?format role="output" ?>)', '<?format role="output" ?>');
@@ -448,10 +450,10 @@ begin
   t('count(element a { text { 13 }, text{ 17 } } / text())', '1');
   t('count(element a { text { 13 }, "23", text{ 17 } } / text())', '1');
 
-  t('outer-xml(element a { processing-instruction pipi {  } })', '<a><?pipi ?></a>');
+  t('outer-xml(element a { processing-instruction pipi {  } })', '<a><?pipi?></a>');
   t('outer-xml(element a { processing-instruction pipi { 13 } })', '<a><?pipi 13?></a>');
   t('outer-xml(element a { processing-instruction pipi { 13, 14, 15 } })', '<a><?pipi 13 14 15?></a>');
-  t('outer-xml(  processing-instruction pipi {  })', '<?pipi ?>');
+  t('outer-xml(  processing-instruction pipi {  })', '<?pipi?>');
   t('outer-xml(  processing-instruction pipi { 13  })', '<?pipi 13?>');
   t('outer-xml( processing-instruction pipi { 13, 14, 15  })', '<?pipi 13 14 15?>');
   t('outer-xml(  processing-instruction {concat("pi", "PI") } { "lang" })', '<?piPI lang?>');
@@ -1483,7 +1485,7 @@ begin
   t('count(<a>{(comment {""})}{""}</a> / comment())', '1');
   t('count(<a>{""}{(comment {""})}{""}</a> / comment())', '1');
   t('count(<a>{" "}{(comment {""})}{""}</a> / comment())', '1');
-  t('outer-xml(<a>{ processing-instruction { "  abc  "} { () }}</a>)', '<a><?abc ?></a>');
+  t('outer-xml(<a>{ processing-instruction { "  abc  "} { () }}</a>)', '<a><?abc?></a>');
   t('outer-xml(<a>{ processing-instruction { "  abc  "} { ("   ", "  foo ", "  bar ", "   ") }}</a>)', '<a><?abc foo    bar     ?></a>');
 
   t('let $x := <x xmlns=""/> return outer-xml(<a xmlns="ANS">{$x}</a>)', '<a xmlns="ANS"><x xmlns=""/></a>');
@@ -1499,7 +1501,7 @@ begin
   t('outer-xml(for $x in <parent2 xmlns:foo="http://www.example.com/parent2" foo:attr2="attr2"><foo:child2 foo:attr="child"/></parent2> return <new xmlns="http://www.example.com">{$x//*:child2}</new>)', '<new xmlns="http://www.example.com"><foo:child2 xmlns:foo="http://www.example.com/parent2" foo:attr="child"/></new>');
   t('outer-xml(for $x in <parent2 xmlns:foo="http://www.example.com/parent2" foo:attr2="attr2"><foo:child2 foo:attr="child">foobar</foo:child2></parent2> return <new xmlns="http://www.example.com">{$x//*:child2}</new>)', '<new xmlns="http://www.example.com"><foo:child2 xmlns:foo="http://www.example.com/parent2" foo:attr="child">foobar</foo:child2></new>');
   t('outer-xml(for $x in <parent2 xmlns:foo="http://www.example.com/parent2" foo:attr2="attr2"><foo:child2 foo:attr="child"><!--x--></foo:child2></parent2> return <new xmlns="http://www.example.com">{$x//*:child2}</new>)', '<new xmlns="http://www.example.com"><foo:child2 xmlns:foo="http://www.example.com/parent2" foo:attr="child"><!--x--></foo:child2></new>');
-  t('outer-xml(for $x in <parent2 xmlns:foo="http://www.example.com/parent2" foo:attr2="attr2"><foo:child2 foo:attr="child"><?pi?></foo:child2></parent2> return <new xmlns="http://www.example.com">{$x//*:child2}</new>)', '<new xmlns="http://www.example.com"><foo:child2 xmlns:foo="http://www.example.com/parent2" foo:attr="child"><?pi ?></foo:child2></new>');
+  t('outer-xml(for $x in <parent2 xmlns:foo="http://www.example.com/parent2" foo:attr2="attr2"><foo:child2 foo:attr="child"><?pi?></foo:child2></parent2> return <new xmlns="http://www.example.com">{$x//*:child2}</new>)', '<new xmlns="http://www.example.com"><foo:child2 xmlns:foo="http://www.example.com/parent2" foo:attr="child"><?pi?></foo:child2></new>');
   t('let $a := <a/> return outer-xml(<x xmlns="hallo">{$a}</x>)', '<x xmlns="hallo"><a xmlns=""/></x>');
   t('let $a := element a {()}  return outer-xml(<x xmlns="hallo">{$a}</x>)', '<x xmlns="hallo"><a xmlns=""/></x>');
   t('let $a := <a/> return outer-xml(<x xmlns="hallo">{element {xs:QName("a")} {()}}</x>)', '<x xmlns="hallo"><a/></x>');
@@ -1799,25 +1801,38 @@ begin
   t('serialize-json(<r><a>AA</a><b>BB</b></r> / {a : b})', '{"AA": "<b>BB</b>"}');
   //t('serialize-json(<r><a>AA</a><b>BB</b></r> / {a:b})', '{"AA": "<b>BB</b>"}'); ??? what that's supposed to be?
 
-  m('declare option pxp:pure-json-objects "off"; {"a": <foo>bar</foo>}.a', 'bar');
-  m('declare option pxp:pure-json-objects "off"; jn:is-null({"a": ()}.a)', 'false');
-  m('declare option pxp:pure-json-objects "on"; {"a": <foo>bar</foo>}.a', '<foo>bar</foo>');
-  m('declare option pxp:pure-json-objects "on"; jn:is-null({"a": ()}.a)', 'true');
-//  m('declare option pxp:pure-json-objects "on"; {a: <foo>bar</foo>}.a', 'bar');
-
+  m('outer-xml({"a": <foo>bar</foo>}.a)', '<foo>bar</foo>');
+  m('let $x := <x><foo>bar</foo></x> return outer-xml({"a": $x/foo}.a/root())', '<x><foo>bar</foo></x>');
+  m('jn:is-null({"a": ()}.a)', 'false');
+  ps.ParsingOptions.JSONObjectMode:=xqjomJSONiq;
+//  m('outer-xml({"a": <foo>bar</foo>/text()}.a)', 'bar');
+  m('outer-xml({"a": <foo>bar</foo>}.a)', '<foo>bar</foo>');
+  m('let $x := <x><foo>bar</foo></x> return outer-xml({"a": $x/foo}.a/root())', '<foo>bar</foo>');
+  m('jn:is-null({"a": ()}.a)', 'true');
+  ps.ParsingOptions.JSONObjectMode:=xqjomMapAlias;
+  ps.ParsingOptions.JSONArrayMode:=xqjamStandard;
+  f('[1,2,3]', 'XPST0003');
+  ps.ParsingOptions.JSONArrayMode:=xqjamArrayAlias;
+  m('let $x := <x><foo>bar</foo></x> return outer-xml([1,2,3,$x/foo](4)/root())', '<x><foo>bar</foo></x>');
+  ps.ParsingOptions.JSONArrayMode:=xqjamJSONiq;
+  m('let $x := <x><foo>bar</foo></x> return outer-xml([1,2,3,$x/foo](4)/root())', '<foo>bar</foo>');
 
   //JSON examples from JSONiq spec
-  t('let $map := { "eyes" : "blue", "hair" : "fuchsia" } return $map("eyes")', 'blue');
-  t('serialize-json(let $x := { "eyes" : "blue", "hair" : "fuchsia" } let $y := { "eyes" : brown, "hair" : "brown" } return { "eyes" : $x("eyes"), "hair" : $y("hair") })', '{"eyes": "blue", "hair": "brown"}');
-  t('let $wd := ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"] return $wd(1)', 'Sunday');
-  t('let $f := [          [ "mercury", "venus", "earth", "mars" ],      [ "monday", "tuesday", "wednesday", "thursday" ]     ] return serialize-json($f(1))', '["mercury", "venus", "earth", "mars"]');
-  t('let $f := [          [ "mercury", "venus", "earth", "mars" ],      [ "monday", "tuesday", "wednesday", "thursday" ]     ] return serialize-json($f(2)(2))', '"tuesday"');
-  t('let $o := { "a" : 1, "b" : 2 } return jn:keys($o)', 'a b');  t('let $map := { "eyes" : "blue", "hair" : "fuchsia" }  for $key in jn:keys($map) return serialize-json({ $key : $map($key) })', '{"eyes": "blue"} {"hair": "fuchsia"}');
-  t('let $planets :=  [ "mercury", "venus", "earth", "mars" ] return jn:members($planets)', 'mercury venus earth mars');
-  t('let $a := [1 to 10] return jn:size($a)', '10');
-  t('let $planets :=  [ "mercury", "venus", "earth", "mars" ] for $i in 1 to jn:size($planets) return $planets($i)', 'mercury venus earth mars');
-  t('let $object1 := { "Captain" : "Kirk" } let $object2 := { "First officer" : "Spock" } return serialize-json(jn:object(($object1, $object2)))', '{"Captain": "Kirk", "First officer": "Spock"}');
-  t('serialize-json(jn:object(for $d at $i in ("Sunday", "Monday", "Tuesday",  "Wednesday",  "Thursday",  "Friday",  "Saturday" ) return { $d : $i }  ))', '{"Sunday": 1, "Monday": 2, "Tuesday": 3, "Wednesday": 4, "Thursday": 5, "Friday": 6, "Saturday": 7}');
+  for i := 1 to 2 do begin
+    if i = 1 then ps.ParsingOptions.JSONArrayMode:=xqjamArrayAlias
+    else ps.ParsingOptions.JSONArrayMode:=xqjamJSONiq;
+    t('let $map := { "eyes" : "blue", "hair" : "fuchsia" } return $map("eyes")', 'blue');
+    t('serialize-json(let $x := { "eyes" : "blue", "hair" : "fuchsia" } let $y := { "eyes" : brown, "hair" : "brown" } return { "eyes" : $x("eyes"), "hair" : $y("hair") })', '{"eyes": "blue", "hair": "brown"}');
+    t('let $wd := ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"] return $wd(1)', 'Sunday');
+    t('let $f := [          [ "mercury", "venus", "earth", "mars" ],      [ "monday", "tuesday", "wednesday", "thursday" ]     ] return serialize-json($f(1))', '["mercury", "venus", "earth", "mars"]');
+    t('let $f := [          [ "mercury", "venus", "earth", "mars" ],      [ "monday", "tuesday", "wednesday", "thursday" ]     ] return serialize-json($f(2)(2))', '"tuesday"');
+    t('let $o := { "a" : 1, "b" : 2 } return jn:keys($o)', 'a b');  t('let $map := { "eyes" : "blue", "hair" : "fuchsia" }  for $key in jn:keys($map) return serialize-json({ $key : $map($key) })', '{"eyes": "blue"} {"hair": "fuchsia"}');
+    t('let $planets :=  [ "mercury", "venus", "earth", "mars" ] return jn:members($planets)', 'mercury venus earth mars');
+    t('let $a := [1 to 10] return jn:size($a)', '10');
+    t('let $planets :=  [ "mercury", "venus", "earth", "mars" ] for $i in 1 to jn:size($planets) return $planets($i)', 'mercury venus earth mars');
+    t('let $object1 := { "Captain" : "Kirk" } let $object2 := { "First officer" : "Spock" } return serialize-json(jn:object(($object1, $object2)))', '{"Captain": "Kirk", "First officer": "Spock"}');
+    t('serialize-json(jn:object(for $d at $i in ("Sunday", "Monday", "Tuesday",  "Wednesday",  "Thursday",  "Friday",  "Saturday" ) return { $d : $i }  ))', '{"Sunday": 1, "Monday": 2, "Tuesday": 3, "Wednesday": 4, "Thursday": 5, "Friday": 6, "Saturday": 7}');
+  end;
 
   t('let $a := for $b in (1,2,3) return $b+1 return $a', '2 3 4');
   t('string-join(let $a := for $b in (1,2,3) return $b+1 return $a, " ")', '2 3 4');

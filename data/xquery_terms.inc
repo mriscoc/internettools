@@ -756,6 +756,11 @@ constructor TXQTermSequenceType.create();
 begin
 end;
 
+constructor TXQTermSequenceType.create(akind: TXQTypeInformationKind);
+begin
+  kind := akind
+end;
+
 constructor TXQTermSequenceType.create(atomic: TXSType; aallowNone: boolean);
 begin
   kind := tikAtomic;
@@ -1248,6 +1253,14 @@ begin
   seq.add(value);
 end;
 
+function TXQTermArrayBase.getContextDependencies: TXQContextDependencies;
+var
+  i: Integer;
+begin
+  result := [];
+  for i:= 0 to high(children) do result += children[i].getContextDependencies;
+end;
+
 function TXQTermJSONArray.evaluate(var context: TXQEvaluationContext): IXQValue;
 var
   i: Integer;
@@ -1259,13 +1272,6 @@ begin
   result := tempSeq;
 end;
 
-function TXQTermJSONArray.getContextDependencies: TXQContextDependencies;
-var
-  i: Integer;
-begin
-  result := [];
-  for i:= 0 to high(children) do result += children[i].getContextDependencies;
-end;
 
 function TXQTermArray3_1.evaluate(var context: TXQEvaluationContext): IXQValue;
 var
@@ -1279,13 +1285,23 @@ begin
     list.addInArray(children[i].evaluate(context));
 end;
 
-function TXQTermArray3_1.getContextDependencies: TXQContextDependencies;
+
+function TXQTermJSONiqArray.evaluate(var context: TXQEvaluationContext): IXQValue;
 var
   i: Integer;
+  tempSeq: TXQValueJSONArray;
+  v: IXQValue;
 begin
-  result := [];
-  for i:= 0 to high(children) do result += children[i].getContextDependencies;
+  tempSeq := TXQValueJSONArray.create(length(children));
+  result := tempSeq;
+  for i := 0 to high(children) do begin
+    v := children[i].evaluate(context);
+    if (v.kind = pvkNode) and (v.toNode.getParent() <> nil) then
+      v := xqvalue(context.staticContext.needTemporaryNodes.addClone(v.toNode));
+    tempSeq.add(v);
+  end;
 end;
+
 
 
 { TXQTermSomeEvery }
@@ -2745,7 +2761,6 @@ end;
 
 class function TXQTermNamedFunction.findKindIndex(const anamespace, alocalname: string; const argcount: integer; const staticContext: TXQStaticContext; out akind: TXQTermNamedFunctionKind; out afunc: TXQAbstractFunctionInfo): boolean;
 var
-  aindex: Integer;
   module: TXQNativeModule;
   t: TXSType;
   model: TXQParsingModel;
@@ -2773,14 +2788,6 @@ begin
     if afunc <> nil then begin
       akind:=xqfkNativeInterpreted;
       exit(true);
-    end;
-
-    if argcount = 2 then begin
-      aindex := module.binaryOpFunctions.IndexOf(alocalname);
-      if aindex >= 0 then begin
-        afunc := TXQOperatorInfo(module.binaryOpFunctions.Objects[aindex]);
-        exit(true);
-      end;
     end;
   end;
 
@@ -4342,7 +4349,7 @@ function TXQTermJSONObjectConstructor.evaluate(var context: TXQEvaluationContext
         exit;
       end else v := v.get(1);
     if v is TXQValueNode then
-      exit(xqvalue(v.toNode.outerXML(false)));
+      exit(xqvalue(context.staticContext.needTemporaryNodes.addClone(v.toNode)));
     result := v;
   end;
 
@@ -4356,7 +4363,7 @@ begin
   for i := 0 to length(children) div 2 - 1 do begin
     v := children[i*2+1].evaluate(context);
     if (length(optionals) > i) and (optionals[i]) and (v.getSequenceCount = 0) then continue;
-    if context.staticContext.objectsRestrictedToJSONTypes then v := transformValue(v);
+    if objectsRestrictedToJSONTypes then v := transformValue(v);
     obj.setMutable(children[i*2].evaluate(context).toString, v);
   end;
   result := obj;
@@ -4365,6 +4372,12 @@ end;
 function TXQTermJSONObjectConstructor.getContextDependencies: TXQContextDependencies;
 begin
   result := getChildrenContextDependencies;
+end;
+
+function TXQTermJSONObjectConstructor.clone: TXQTerm;
+begin
+  Result:=inherited clone;
+  TXQTermJSONObjectConstructor(result).objectsRestrictedToJSONTypes := objectsRestrictedToJSONTypes;
 end;
 
 
@@ -4586,12 +4599,12 @@ begin
   end;
 end;
 
-function nativeMetaTypeToActualType(t: TXQTermSequenceType): TXQTermSequenceType;
+function nativeMetaTypeToActualType(const context: TXQEvaluationContext; t: TXQTermSequenceType): TXQTermSequenceType;
 begin
   if t = nil then exit(nil);
   result := TXQTermSequenceType(t.clone);
   if (t.kind = tikAtomic) then
-    if ((t.atomicTypeInfo = baseSchema.numericPseudoType)) then
+    if ((t.atomicTypeInfo = baseSchema.numeric)) and not (context.staticContext.model in PARSING_MODEL3_1) then
       result.atomicTypeInfo := baseSchema.anyAtomicType;
 end;
 
@@ -4712,8 +4725,8 @@ begin
     if version <> nil then begin
       for i := 0 to parameterCount-1 do
         if version^.types[i] <> nil then
-          (children[i] as TXQTermDefineVariable).push(nativeMetaTypeToActualType(version^.types[i]));
-      resulttype := nativeMetaTypeToActualType(version^.returnType);
+          (children[i] as TXQTermDefineVariable).push(nativeMetaTypeToActualType(context, version^.types[i]));
+      resulttype := nativeMetaTypeToActualType(context, version^.returnType);
     end else if (f.kind = xqfkBasic) and (TXQBasicFunctionInfo(f.func).func = @xqFunctionConcat) then begin
       for i := 0 to parameterCount-1 do
         (children[i] as TXQTermDefineVariable).push(TXQTermSequenceType.create(baseSchema.anyAtomicType, true));
@@ -4770,7 +4783,7 @@ begin
       TXQTermNamedFunction(result.body).push(makeNumberedVariable(parameterCount - j - 1, parameterCount - j - 1 + i));
       result.parameters[j].variable := makeNumberedVariable(parameterCount - j - 1);
       if version <> nil then
-        result.parameters[j].seqtype := nativeMetaTypeToActualType(version^.types[i])
+        result.parameters[j].seqtype := nativeMetaTypeToActualType(context, version^.types[i])
        else if (f.kind = xqfkBasic) and (TXQBasicFunctionInfo(f.func).func = @xqFunctionConcat) then begin
         result.parameters[j].seqtype := TXQTermSequenceType.create(baseSchema.anyAtomicType, true);
        end else if f.kind in [xqfkUnknown, xqfkNativeInterpreted] then begin
@@ -4788,7 +4801,7 @@ begin
   assert(j = parameterCount);
   result.ownsTerms := true;
   if version <> nil then
-    result.resulttype := nativeMetaTypeToActualType(version^.returnType)
+    result.resulttype := nativeMetaTypeToActualType(context, version^.returnType)
   else if (f.kind = xqfkBasic) and (TXQBasicFunctionInfo(f.func).func = @xqFunctionConcat) then
     result.resulttype := TXQTermSequenceType.create(baseSchema.string_)
   else if (f.kind in [xqfkUnknown, xqfkNativeInterpreted]) and (f.interpretedFunction.resulttype <> nil)  then
@@ -4931,13 +4944,19 @@ end;
 
 function TXQTermTryCatch.clone: TXQTerm;
 var
-  i: Integer;
+  i, j: Integer;
+  r: TXQTermTryCatch;
 begin
-  result := TXQTermTryCatch.create(body);
-  TXQTermTryCatch(result).catches := catches;
-  SetLength(TXQTermTryCatch(result).catches, length(catches));
-  for i := 0 to high(catches) do
-    TXQTermTryCatch(result).catches[i].expr := catches[i].expr.clone;
+  result := TXQTermTryCatch.create(body.clone);
+  r := TXQTermTryCatch(result);
+  r.catches := catches;
+  SetLength(r.catches, length(catches));
+  for i := 0 to high(catches) do begin
+    r.catches[i].expr := catches[i].expr.clone;
+    SetLength(r.catches[i].tests, length(r.catches[i].tests));
+    for j := 0 to high(r.catches[i].tests) do
+      r.catches[i].tests[j].name := r.catches[i].tests[j].name.clone;
+  end;
 end;
 
 destructor TXQTermTryCatch.Destroy;
