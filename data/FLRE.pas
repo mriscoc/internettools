@@ -3,7 +3,7 @@
 ********************************************************************************
 
 FLRE - Fast Light Regular Expressions - A fast light regular expression library
-Copyright (C) 2015-2017, Benjamin 'BeRo' Rosseaux
+Copyright (C) 2015-2023, Benjamin 'BeRo' Rosseaux
 
 The source code of the FLRE engine library and helper tools are
 distributed under the Library GNU Lesser General Public License Version 2.1 
@@ -55,7 +55,9 @@ unit FLRE;
   {$endif}
  {$endif}
  {-$pic off}
- {$define caninline}
+ {$define CanInline}
+ {$define HasAdvancedRecords}
+ {$define NewCompiler}
  {$ifdef FPC_HAS_TYPE_EXTENDED}
   {$define HAS_TYPE_EXTENDED}
  {$else}
@@ -97,6 +99,170 @@ unit FLRE;
    {$define cpu32}
   {$endif}
  {$endif}
+ {$undef CanInline}
+ {$undef HasAdvancedRecords}
+ {$ifndef BCB}
+  {$ifdef ver120}
+   {$define Delphi4or5}
+  {$endif}
+  {$ifdef ver130}
+   {$define Delphi4or5}
+  {$endif}
+  {$ifdef ver140}
+   {$define Delphi6}
+  {$endif}
+  {$ifdef ver150}
+   {$define Delphi7}
+  {$endif}
+  {$ifdef ver170}
+   {$define Delphi2005}
+  {$endif}
+ {$else}
+  {$ifdef ver120}
+   {$define Delphi4or5}
+   {$define BCB4}
+  {$endif}
+  {$ifdef ver130}
+   {$define Delphi4or5}
+  {$endif}
+ {$endif}
+ {$ifdef conditionalexpressions}
+  {$if CompilerVersion>=24.0}
+   {$legacyifend on}       
+  {$ifend}
+  {$if CompilerVersion>=14.0}
+   {$if CompilerVersion=14.0}
+    {$define Delphi6}
+   {$ifend}
+   {$define Delphi6AndUp}
+  {$ifend}
+  {$if CompilerVersion>=15.0}
+   {$if CompilerVersion=15.0}
+    {$define Delphi7}
+   {$ifend}
+   {$define Delphi7AndUp}
+  {$ifend}
+  {$if CompilerVersion>=17.0}
+   {$if CompilerVersion=17.0}
+    {$define Delphi2005}
+   {$ifend}
+   {$define Delphi2005AndUp}
+  {$ifend}
+  {$if CompilerVersion>=18.0}
+   {$if CompilerVersion=18.0}
+    {$define BDS2006}
+    {$define Delphi2006}
+   {$ifend}
+   {$define Delphi2006AndUp}
+   {$define CanInline}
+   {$define HasAdvancedRecords}
+  {$ifend}
+  {$if CompilerVersion>=18.5}
+   {$if CompilerVersion=18.5}
+    {$define Delphi2007}
+   {$ifend}
+   {$define Delphi2007AndUp}
+  {$ifend}
+  {$if CompilerVersion=19.0}
+   {$define Delphi2007Net}
+  {$ifend}
+  {$if CompilerVersion>=20.0}
+   {$if CompilerVersion=20.0}
+    {$define Delphi2009}
+   {$ifend}
+   {$define Delphi2009AndUp}
+  {$ifend}
+  {$if CompilerVersion>=21.0}
+   {$if CompilerVersion=21.0}
+    {$define Delphi2010}
+   {$ifend}
+   {$define Delphi2010AndUp}
+  {$ifend}
+  {$if CompilerVersion>=22.0}
+   {$if CompilerVersion=22.0}
+    {$define DelphiXE}
+   {$ifend}
+   {$define DelphiXEAndUp}
+  {$ifend}
+  {$if CompilerVersion>=23.0}
+   {$if CompilerVersion=23.0}
+    {$define DelphiXE2}
+   {$ifend}
+   {$define DelphiXE2AndUp}
+   {$define NewCompiler}
+  {$ifend}
+  {$if CompilerVersion>=24.0}
+   {$legacyifend on}
+   {$if CompilerVersion=24.0}
+    {$define DelphiXE3}
+   {$ifend}
+   {$define DelphiXE3AndUp}
+  {$ifend}
+  {$if CompilerVersion>=25.0}
+   {$if CompilerVersion=25.0}
+    {$define DelphiXE4}
+   {$ifend}
+   {$define DelphiXE4AndUp}
+  {$ifend}
+  {$if CompilerVersion>=26.0}
+   {$if CompilerVersion=26.0}
+    {$define DelphiXE5}
+   {$ifend}
+   {$define DelphiXE5AndUp}
+  {$ifend}
+  {$if CompilerVersion>=27.0}
+   {$if CompilerVersion=27.0}
+    {$define DelphiXE6}
+   {$ifend}
+   {$define DelphiXE6AndUp}
+  {$ifend}
+  {$if CompilerVersion>=28.0}
+   {$if CompilerVersion=28.0}
+    {$define DelphiXE7}
+   {$ifend}
+   {$define DelphiXE7AndUp}
+  {$ifend}
+  {$if CompilerVersion>=29.0}
+   {$if CompilerVersion=29.0}
+    {$define DelphiXE8}
+   {$ifend}
+   {$define DelphiXE8AndUp}
+  {$ifend}
+  {$if CompilerVersion>=30.0}
+   {$if CompilerVersion=30.0}
+    {$define Delphi10Seattle}
+   {$ifend}
+   {$define Delphi10SeattleAndUp}
+  {$ifend}
+  {$if CompilerVersion>=31.0}
+   {$if CompilerVersion=31.0}
+    {$define Delphi10Berlin}
+   {$ifend}
+   {$define Delphi10BerlinAndUp}
+  {$ifend}
+ {$endif}
+ {$ifndef Delphi4or5}
+  {$ifndef BCB}
+   {$define Delphi6AndUp}
+  {$endif}
+   {$ifndef Delphi6}
+    {$define BCB6OrDelphi7AndUp}
+    {$ifndef BCB}
+     {$define Delphi7AndUp}
+    {$endif}
+    {$ifndef BCB}
+     {$ifndef Delphi7}
+      {$ifndef Delphi2005}
+       {$define BDS2006AndUp}
+      {$endif}
+     {$endif}
+    {$endif}
+   {$endif}
+ {$endif}
+ {$ifdef Delphi6AndUp}
+  {$warn symbol_platform off}
+  {$warn symbol_deprecated off}
+ {$endif} 
  {$define HAS_TYPE_EXTENDED}
  {$define HAS_TYPE_DOUBLE}
  {$ifdef conditionalexpressions}
@@ -115,15 +281,9 @@ unit FLRE;
   {$undef HAS_TYPE_UTF8STRING}
  {$endif}
 {$endif}
-{$ifdef win32}
- {$define windows}
-{$endif}
-{$ifdef win64}
- {$define windows}
-{$endif}
-{$ifdef wince}
- {$define windows}
-{$endif}
+{$if defined(Win32) or defined(Win64) or defined(WinCE)}
+ {$define Windows}
+{$ifend}
 {$rangechecks off}
 {$extendedsyntax on}
 {$writeableconst on}
@@ -136,6 +296,13 @@ unit FLRE;
 {$overflowchecks off}
 {$longstrings on}
 {$openstrings on}
+{$ifndef fpc}
+ {$ifdef conditionalexpressions}
+  {$if CompilerVersion>=24.0}
+   {$legacyifend on}
+  {$ifend}
+ {$endif}
+{$endif}
 
 {-$define UseOpcodeJMP}
 
@@ -143,9 +310,9 @@ interface
 
 uses {$ifdef windows}Windows,{$endif}{$ifdef unix}dl,BaseUnix,Unix,UnixType,{$endif}SysUtils,Classes,PUCU;
 
-const FLREVersion=$00000004;
+const FLREVersion=$00000006;
 
-      FLREVersionString='1.00.2018.03.09.02.10.0000';
+      FLREVersionString='1.00.2023.02.26.07.41.0000';
 
       FLREMaxPrefixCharClasses=32;
 
@@ -166,46 +333,65 @@ const FLREVersion=$00000004;
 
 type EFLRE=class(Exception);
 
-     PFLREQWord=^TFLREQWord;
-     PFLREPtrUInt=^TFLREPtrUInt;
+     PFLREInt8=^TFLREInt8;
+     TFLREInt8={$if declared(Int8)}Int8{$else}ShortInt{$ifend};
+
+     PFLREUInt8=^TFLREUInt8;
+     TFLREUInt8={$if declared(UInt8)}UInt8{$else}Byte{$ifend};
+
+     PFLREInt16=^TFLREInt16;
+     TFLREInt16={$if declared(Int16)}Int16{$else}SmallInt{$ifend};
+
+     PFLREUInt16=^TFLREUInt16;
+     TFLREUInt16={$if declared(UInt16)}UInt16{$else}Word{$ifend};
+
+     PFLREInt32=^TFLREInt32;
+     TFLREInt32={$if declared(Int32)}Int32{$else}LongInt{$ifend};
+
+     PFLREUInt32=^TFLREUInt32;
+     TFLREUInt32={$if declared(UInt32)}UInt32{$else}LongWord{$ifend};
+
+     PFLREInt64=^TFLREInt64;
+     TFLREInt64=Int64;
+
+     PFLREUInt64=^TFLREUInt64;
+     TFLREUInt64={$if declared(UInt64)}UInt64{$else}QWord{$ifend};
+
+     PFLRENativeInt=^TFLRENativeInt;
+     TFLRENativeInt={$if declared(PtrInt)}PtrInt{$elseif defined(NewCompiler) and declared(NativeInt)}NativeInt{$else}TFLREInt32{$ifend};
+
+     PFLRENativeUInt=^TFLRENativeUInt;
+     TFLRENativeUInt={$if declared(PtrUInt)}PtrUInt{$elseif defined(NewCompiler) and declared(NativeUInt)}NativeUInt{$else}TFLREUInt32{$ifend};
+
+     PFLRESizeInt=^TFLRESizeInt;
+     TFLRESizeInt={$if declared(PtrInt)}PtrInt{$elseif defined(NewCompiler) and declared(NativeInt)}NativeInt{$else}TFLREInt32{$ifend};
+
+     PFLRESizeUInt=^TFLRESizeUInt;
+     TFLRESizeUInt={$if declared(PtrUInt)}PtrUInt{$elseif defined(NewCompiler) and declared(NativeUInt)}NativeUInt{$else}TFLREUInt32{$ifend};
+
      PFLREPtrInt=^TFLREPtrInt;
+     TFLREPtrInt={$if declared(PtrInt)}PtrInt{$elseif defined(NewCompiler) and declared(NativeInt)}NativeInt{$else}TFLREInt32{$ifend};
 
-     PFLRERawByteChar=PAnsiChar;
-     TFLRERawByteChar=ansichar;
-
-     PFLRERawByteCharSet=^TFLRERawByteCharSet;
-     TFLRERawByteCharSet=set of TFLRERawByteChar;
-
-     TFLRERawByteString={$ifdef HAS_TYPE_RAWBYTESTRING}RawByteString{$else}AnsiString{$endif};
+     PFLREPtrUInt=^TFLREPtrUInt;
+     TFLREPtrUInt={$if declared(PtrUInt)}PtrUInt{$elseif defined(NewCompiler) and declared(NativeUInt)}NativeUInt{$else}TFLREUInt32{$ifend};
 
      TFLREUTF8String={$ifdef HAS_TYPE_UTF8STRING}UTF8String{$else}AnsiString{$endif};
 
-{$ifdef fpc}
-     TFLREQWord=qword;
+     TFLRERawByteString={$ifdef HAS_TYPE_RAWBYTESTRING}RawByteString{$else}AnsiString{$endif};
 
-     TFLREPtrUInt=PtrUInt;
-     TFLREPtrInt=PtrInt;
-{$else}
-{$if Declared(CompilerVersion) and (CompilerVersion>=23.0)}
-     TFLREQWord=uint64;
+     PFLRERawByteChar=PAnsiChar;
+     TFLRERawByteChar=AnsiChar;
 
-     TFLREPtrUInt=NativeUInt;
-     TFLREPtrInt=NativeInt;
-{$else}
-     TFLREQWord=int64;
+     PFLRERawByteCharSet=^TFLRERawByteCharSet;
+     TFLRERawByteCharSet=Set of AnsiChar;
 
-{$ifdef cpu64}
-     TFLREPtrUInt=TFLREQWord;
-     TFLREPtrInt=int64;
-{$else}
-     TFLREPtrUInt=longword;
-     TFLREPtrInt=longint;
-{$endif}
-{$ifend}
-{$endif}
+     PFLREQWord=^TFLREQWord;
+     TFLREQWord={$ifdef fpc}qword{$else}{$if Declared(CompilerVersion) and (CompilerVersion>=23.0)}TFLREUInt64{$else}TFLREInt64{$ifend}{$endif};
 
      PFLREParallelLock=^TFLREParallelLock;
-     TFLREParallelLock=longint;
+     TFLREParallelLock=TFLREInt32;
+
+     TFLREPointerList={$ifdef fpc}TFPList{$else}TList{$endif};
 
      TFLRE=class;
 
@@ -233,8 +419,8 @@ type EFLRE=class(Exception);
 
      PFLRECapture=^TFLRECapture;
      TFLRECapture=record
-      Start:longint;
-      Length:longint;
+      Start:TFLRESizeInt;
+      Length:TFLRESizeInt;
      end;
 
      TFLRECaptures=array of TFLRECapture;
@@ -260,18 +446,22 @@ type EFLRE=class(Exception);
 
      TFLRECharClassChars=array of TFLRERawByteChar;
 
-     TFLREReplacementCallback=function(const Input:PFLRERawByteChar;const Captures:TFLRECaptures):TFLRERawByteString of object;
+     TFLREReplacementCallback=function(const Data:pointer;const Input:PFLRERawByteChar;const InputLength:TFLRESizeInt;const Captures:TFLRECaptures):TFLRERawByteString;
+
+     TFLREReplacementObjectCallback=function(const Input:PFLRERawByteChar;const InputLength:TFLRESizeInt;const Captures:TFLRECaptures):TFLRERawByteString of object;
+
+     TFLREReplacementExternalCallback=function(const Data:pointer;const Input:PFLRERawByteChar;const InputLength:TFLRESizeInt;const Captures:Pointer;const CountCaptures:TFLRESizeInt;const Replacement:PPAnsiChar;const ReplacementLength:PFLRESizeInt):TFLREInt32; {$ifdef win32}{$ifdef cpu386}stdcall;{$endif}{$endif}
 
      PPFLRENode=^PFLRENode;
      PFLRENode=^TFLRENode;
      TFLRENode=record
-      NodeType:longint;
-      Value:longint;
-      Flags:longword;
-      Group:longint;
+      NodeType:TFLREInt32;
+      Value:TFLREInt32;
+      Flags:TFLREUInt32;
+      Group:TFLREInt32;
       Left:PFLRENode;
       Right:PFLRENode;
-      Index:longint;
+      Index:TFLREInt32;
       Name:TFLRERawByteString;
      end;
 
@@ -315,7 +505,7 @@ type EFLRE=class(Exception);
      PPFLREInstructionsStatic=^TPFLREInstructionsStatic;
      TPFLREInstructionsStatic=array[0..65535] of PFLREInstruction;
 
-     TFLRECapturesToSubMatchesMap=array of longint;
+     TFLRECapturesToSubMatchesMap=array of TFLREInt32;
 
      PFLRENativeCodeMemoryManagerBlock=^TFLRENativeCodeMemoryManagerBlock;
      TFLRENativeCodeMemoryManagerBlock=packed record
@@ -353,16 +543,16 @@ type EFLRE=class(Exception);
      end;
 
      PFLREParallelNFAStateItem=^TFLREParallelNFAStateItem;
-     TFLREParallelNFAStateItem=longint;
+     TFLREParallelNFAStateItem=TFLRESizeInt;
 
      TFLREParallelNFAStateItems=array of TFLREParallelNFAStateItem;
 
      PFLREParallelNFAState=^TFLREParallelNFAState;
      TFLREParallelNFAState=record
       Next:PFLREParallelNFAState;
-      ReferenceCounter:longint;
-      Count:longint;
-      SubMatchesBitmap:longword;
+      ReferenceCounter:TFLREInt32;
+      Count:TFLREInt32;
+      SubMatchesBitmap:TFLREUInt32;
       SubMatches:TFLREParallelNFAStateItems;
      end;
 
@@ -374,12 +564,10 @@ type EFLRE=class(Exception);
 
      TFLREParallelNFAThreads=array of TFLREParallelNFAThread;
 
-     PFLREParallelNFASparseArray=array of longint;
-
      PFLREParallelNFAThreadList=^TFLREParallelNFAThreadList;
      TFLREParallelNFAThreadList=record
       Threads:TFLREParallelNFAThreads;
-      CountThreads:longint;
+      CountThreads:TFLREInt32;
      end;
 
      TFLREParallelNFAThreadLists=array[0..1] of TFLREParallelNFAThreadList;
@@ -400,33 +588,35 @@ type EFLRE=class(Exception);
       AllNext:PFLREOnePassNFAStateCharClassAction;
       Next:PFLREOnePassNFAStateCharClassAction;
       CharClass:PFLRECharClass;
-      Condition:longword;
+      Condition:TFLREUInt32;
      end;
 
      PFLREOnePassNFAState=^TFLREOnePassNFAState;
      TFLREOnePassNFAState=record
-      MatchCondition,NoAction:longword;
+      MatchCondition,NoAction:TFLREUInt32;
       CharClassAction:PFLREOnePassNFAStateCharClassAction;
-      Action:array[0..0] of longword;
+      Action:array[0..0] of TFLREUInt32;
      end;
 
-     TFLREOnePassNFASubMatches=array of longint;
+     TFLREOnePassNFASubMatches=array of TFLRESizeInt;
 
      PFLREBitStateNFAJob=^TFLREBitStateNFAJob;
      TFLREBitStateNFAJob=record
       Instruction:PFLREInstruction;
-      Position:longint;
-      Argument:longint;
+      Position:TFLRESizeInt;
+      Argument:TFLREInt32;
 {$ifndef cpu64}
-      Dummy:longint;
+      Dummy:TFLREInt32;
 {$endif}
      end;
 
      TFLREBitStateNFAJobs=array of TFLREBitStateNFAJob;
 
-     TFLREBitStateNFAVisited=array[0..(32768 div SizeOf(longword))-1] of longword;
+     TFLREBitStateNFAVisited=array[0..(32768 div SizeOf(TFLREUInt32))-1] of TFLREUInt32;
+     
+     PFLREBitStateNFAVisited=^TFLREBitStateNFAVisited;     
 
-     TFLREBitStateNFASubMatches=array of longint;
+     TFLREBitStateNFASubMatches=array of TFLRESizeInt;
 
      PPFLREDFAState=^PFLREDFAState;
      PFLREDFAState=^TFLREDFAState;
@@ -436,12 +626,10 @@ type EFLRE=class(Exception);
      PPFLREDFANextStatesByteBlock=^TPFLREDFANextStatesByteBlock;
      TPFLREDFANextStatesByteBlock=array[0..256] of PFLREDFAState;
 
-     TFLREDFAWorkQueueItems=array of longint;
-
      TFLREDFAState=record
-      Flags:longword;
+      Flags:TFLREUInt32;
       Instructions:TPFLREInstructions;
-      CountInstructions:longint;
+      CountInstructions:TFLREInt32;
       NextStates:TPFLREDFANextStatesByteBlock;
      end;
 
@@ -456,22 +644,22 @@ type EFLRE=class(Exception);
      PFLREDFAStateHashMapEntity=^TFLREDFAStateHashMapEntity;
      TFLREDFAStateHashMapEntity=record
       Key:PFLREDFAState;
-      Value:int64;
+      Value:TFLREInt64;
      end;
 
      TFLREDFAStateHashMapEntities=array of TFLREDFAStateHashMapEntity;
 
-     TFLREDFAStateHashMapEntityIndices=array of longint;
+     TFLREDFAStateHashMapEntityIndices=array of TFLREInt32;
 
      TFLREDFAStateHashMap=class
       private
-       RealSize:longint;
-       LogSize:longint;
-       Size:longint;
+       RealSize:TFLRESizeInt;
+       LogSize:TFLRESizeInt;
+       Size:TFLRESizeInt;
        Entities:TFLREDFAStateHashMapEntities;
        EntityToCellIndex:TFLREDFAStateHashMapEntityIndices;
        CellToEntityIndex:TFLREDFAStateHashMapEntityIndices;
-       function FindCell(const Key:PFLREDFAState):longword;
+       function FindCell(const Key:PFLREDFAState):TFLREUInt32;
        procedure Resize;
       public
        constructor Create;
@@ -483,33 +671,33 @@ type EFLRE=class(Exception);
        property Keys[const Key:PFLREDFAState]:PFLREDFAState read Get; default;
      end;
 
-     TFLRESparseSetIntegerArray=array of longint;
+     TFLRESparseSetIntegerArray=array of TFLREInt32;
 
      TFLRESparseSet=class
       public
-       Size:longint;
-       MaxSize:longint;
+       Size:TFLREInt32;
+       MaxSize:TFLREInt32;
        SparseToDense:TFLRESparseSetIntegerArray;
        Dense:TFLRESparseSetIntegerArray;
-       constructor Create(MaximumSize:longint=0);
+       constructor Create(MaximumSize:TFLREInt32=0);
        destructor Destroy; override;
        procedure Clear;
-       procedure Resize(NewMaximumSize:longint);
-       function Contains(const Value:longint):boolean;
-       procedure Add(const Value:longint);
-       procedure AddNew(const Value:longint);
+       procedure Resize(NewMaximumSize:TFLREInt32);
+       function Contains(const Value:TFLREInt32):boolean;
+       procedure Add(const Value:TFLREInt32);
+       procedure AddNew(const Value:TFLREInt32);
      end;
 
      TFLREDFAWorkQueue=class
       public
        Instructions:TPFLREInstructions;
-       CountInstructions:longint;
+       CountInstructions:TFLREInt32;
        SparseToDenseIDs:TFLRESparseSetIntegerArray;
        DenseIDs:TFLRESparseSetIntegerArray;
-       CountIDs:longint;
-       AllocatedIDs:longint;
+       CountIDs:TFLREInt32;
+       AllocatedIDs:TFLREInt32;
        LastWasMark:longbool;
-       constructor Create(Preallocated:longint=16);
+       constructor Create(Preallocated:TFLREInt32=16);
        destructor Destroy; override;
        procedure Clear;
        procedure Mark;
@@ -522,47 +710,72 @@ type EFLRE=class(Exception);
      TFLREDFAWorkQueues=array[0..1] of TFLREDFAWorkQueue;
 
      PFLRECharPatternBitMasks=^TFLRECharPatternBitMasks;
-     TFLRECharPatternBitMasks=array[TFLRERawByteChar] of longword;
+     TFLRECharPatternBitMasks=array[TFLRERawByteChar] of TFLREUInt32;
 
-     TFLREBoyerMooreNext=array of longint;
+     TFLREBoyerMooreNext=array of TFLREInt32;
 
      TFLREPrefixCharClasses=array of TFLRECharClass;
 
      PFLREIntegerArray=^TFLREIntegerArray;
-     TFLREIntegerArray=array[0..(2147483647 div sizeof(longint))-1] of longint;
+     TFLREIntegerArray=array[0..(2147483647 div sizeof(TFLREInt32))-1] of TFLREInt32;
 
      TFLREIntegerList=class
       private
        List:PFLREIntegerArray;
-       CountItems:longint;
-       Allocated:longint;
+       CountItems:TFLREInt32;
+       Allocated:TFLREInt32;
        IsSorted:boolean;
-       function GetItem(Index:longint):longint;
-       procedure SetItem(Index:longint;Value:longint);
-       function GetItemPointer(Index:longint):pointer;
+       function GetItem(Index:TFLREInt32):TFLREInt32;
+       procedure SetItem(Index:TFLREInt32;Value:TFLREInt32);
+       function GetItemPointer(Index:TFLREInt32):pointer;
       public
        constructor Create;
        destructor Destroy; override;
        procedure Clear;
-       function Add(Item:longint):longint;
-       procedure AddSorted(Item:longint);
-       procedure Insert(Index:longint;Item:longint);
-       procedure Delete(Index:longint);
-       function Remove(Item:longint):longint;
-       function Find(Item:longint):longint;
-       function IndexOf(Item:longint):longint;
-       procedure Exchange(Index1,Index2:longint);
-       procedure SetCapacity(NewCapacity:longint);
-       procedure SetCount(NewCount:longint);
+       function Add(Item:TFLREInt32):TFLREInt32;
+       procedure AddSorted(Item:TFLREInt32);
+       procedure Insert(Index:TFLREInt32;Item:TFLREInt32);
+       procedure Delete(Index:TFLREInt32);
+       function Remove(Item:TFLREInt32):TFLREInt32;
+       function Find(Item:TFLREInt32):TFLREInt32;
+       function IndexOf(Item:TFLREInt32):TFLREInt32;
+       procedure Exchange(Index1,Index2:TFLREInt32);
+       procedure SetCapacity(NewCapacity:TFLREInt32);
+       procedure SetCount(NewCount:TFLREInt32);
        procedure Sort;
-       property Count:longint read CountItems;
-       property Capacity:longint read Allocated write SetCapacity;
-       property Item[Index:longint]:longint read GetItem write SetItem; default;
-       property Items[Index:longint]:longint read GetItem write SetItem;
-       property PItems[Index:longint]:pointer read GetItemPointer;
+       property Count:TFLREInt32 read CountItems;
+       property Capacity:TFLREInt32 read Allocated write SetCapacity;
+       property Item[Index:TFLREInt32]:TFLREInt32 read GetItem write SetItem; default;
+       property Items[Index:TFLREInt32]:TFLREInt32 read GetItem write SetItem;
+       property PItems[Index:TFLREInt32]:pointer read GetItemPointer;
      end;
 
-     TFLREStringIntegerPairHashMapData=int64;
+     TFLRENodeHashSetEntities=array of PFLRENode;
+
+     TFLRENodeHashSetEntityIndices=array of TFLREInt32;
+
+     TFLRENodeHashSet=class
+      private
+       function FindCell(const Key:PFLRENode):TFLREUInt32;
+       procedure Resize;
+       procedure Toggle(const Key:PFLRENode;aInclude:boolean);
+      public
+       RealSize:TFLREInt32;
+       LogSize:TFLREInt32;
+       Size:TFLREInt32;
+       Entities:TFLRENodeHashSetEntities;
+       EntityToCellIndex:TFLRENodeHashSetEntityIndices;
+       CellToEntityIndex:TFLRENodeHashSetEntityIndices;
+       constructor Create;
+       destructor Destroy; override;
+       procedure Clear;
+       procedure Add(const Key:PFLRENode);
+       function Contains(const Key:PFLRENode):boolean;
+       function Delete(const Key:PFLRENode):boolean;
+       property Values[const Key:PFLRENode]:Boolean read Contains write Toggle; default;
+     end;
+
+     TFLREStringIntegerPairHashMapData=TFLREInt64;
 
      PFLREStringIntegerPairHashMapEntity=^TFLREStringIntegerPairHashMapEntity;
      TFLREStringIntegerPairHashMapEntity=record
@@ -572,19 +785,19 @@ type EFLRE=class(Exception);
 
      TFLREStringIntegerPairHashMapEntities=array of TFLREStringIntegerPairHashMapEntity;
 
-     TFLREStringIntegerPairHashMapEntityIndices=array of longint;
+     TFLREStringIntegerPairHashMapEntityIndices=array of TFLREInt32;
 
      TFLREStringIntegerPairHashMap=class
       private
-       function FindCell(const Key:TFLRERawByteString):longword;
+       function FindCell(const Key:TFLRERawByteString):TFLREUInt32;
        procedure Resize;
       protected
        function GetValue(const Key:TFLRERawByteString):TFLREStringIntegerPairHashMapData;
        procedure SetValue(const Key:TFLRERawByteString;const Value:TFLREStringIntegerPairHashMapData);
       public
-       RealSize:longint;
-       LogSize:longint;
-       Size:longint;
+       RealSize:TFLREInt32;
+       LogSize:TFLREInt32;
+       Size:TFLREInt32;
        Entities:TFLREStringIntegerPairHashMapEntities;
        EntityToCellIndex:TFLREStringIntegerPairHashMapEntityIndices;
        CellToEntityIndex:TFLREStringIntegerPairHashMapEntityIndices;
@@ -598,7 +811,7 @@ type EFLRE=class(Exception);
        property Values[const Key:TFLRERawByteString]:TFLREStringIntegerPairHashMapData read GetValue write SetValue; default;
      end;
 
-     TFLRECharClassHashMapData=int64;
+     TFLRECharClassHashMapData=TFLREInt64;
 
      PFLRECharClassHashMapEntity=^TFLRECharClassHashMapEntity;
      TFLRECharClassHashMapEntity=record
@@ -608,19 +821,19 @@ type EFLRE=class(Exception);
 
      TFLRECharClassHashMapEntities=array of TFLRECharClassHashMapEntity;
 
-     TFLRECharClassHashMapEntityIndices=array of longint;
+     TFLRECharClassHashMapEntityIndices=array of TFLREInt32;
 
      TFLRECharClassHashMap=class
       private
-       function FindCell(const Key:TFLRECharClass):longword;
+       function FindCell(const Key:TFLRECharClass):TFLREUInt32;
        procedure Resize;
       protected
        function GetValue(const Key:TFLRECharClass):TFLRECharClassHashMapData;
        procedure SetValue(const Key:TFLRECharClass;const Value:TFLRECharClassHashMapData);
       public
-       RealSize:longint;
-       LogSize:longint;
-       Size:longint;
+       RealSize:TFLREInt32;
+       LogSize:TFLREInt32;
+       Size:TFLREInt32;
        Entities:TFLRECharClassHashMapEntities;
        EntityToCellIndex:TFLRECharClassHashMapEntityIndices;
        CellToEntityIndex:TFLRECharClassHashMapEntityIndices;
@@ -633,18 +846,18 @@ type EFLRE=class(Exception);
        property Values[const Key:TFLRECharClass]:TFLRECharClassHashMapData read GetValue write SetValue; default;
      end;
 
-     TFLREMultiSubMatches=array of longint;
+     TFLREMultiSubMatches=array of TFLRESizeInt;
 
-     TFLREInstructionGenerations=array of int64;
+     TFLREInstructionGenerations=array of TFLREInt64;
 
      TFLREPrefilterNode=class;
 
-     TFLREPrefilterNodeList=class(TList)
+     TFLREPrefilterNodeList=class(TFLREPointerList)
       protected
-       function GetNodeItem(Index:longint):TFLREPrefilterNode;
-       procedure SetNodeItem(Index:longint;Value:TFLREPrefilterNode);
+       function GetNodeItem(Index:TFLREInt32):TFLREPrefilterNode;
+       procedure SetNodeItem(Index:TFLREInt32;Value:TFLREPrefilterNode);
       public
-       property Items[Index:longint]:TFLREPrefilterNode read GetNodeItem write SetNodeItem; default;
+       property Items[Index:TFLREInt32]:TFLREPrefilterNode read GetNodeItem write SetNodeItem; default;
      end;
 
      TFLREPrefilterNodeOperation=(FLREpfnoANY,FLREpfnoATOM,FLREpfnoAND,FLREpfnoOR);
@@ -673,20 +886,20 @@ type EFLRE=class(Exception);
        MatchMode:TFLREMatchMode;
        ParallelNFAThreadLists:TFLREParallelNFAThreadLists;
        ParallelNFAStack:TFLREParallelNFAStack;
-       Generation:int64;
+       Generation:TFLREInt64;
        InstructionGenerations:TFLREInstructionGenerations;
        FreeStates:PFLREParallelNFAState;
-       AllStates:TList;
-       CurrentSatisfyFlags:longword;
+       AllStates:TFLREPointerList;
+       CurrentSatisfyFlags:TFLREUInt32;
        constructor Create(const AThreadLocalStorageInstance:TFLREThreadLocalStorageInstance);
        destructor Destroy; override;
-       function StateAllocate(const Count:longint;const SubMatchesBitmap:longword):PFLREParallelNFAState; {$ifdef caninline}inline;{$endif}
+       function StateAllocate(const Count:TFLREInt32;const SubMatchesBitmap:TFLREUInt32):PFLREParallelNFAState; {$ifdef caninline}inline;{$endif}
        function StateAcquire(const State:PFLREParallelNFAState):PFLREParallelNFAState; {$ifdef caninline}inline;{$endif}
        procedure StateRelease(const State:PFLREParallelNFAState); {$ifdef caninline}inline;{$endif}
-       function StateUpdate(const State:PFLREParallelNFAState;const Index,Position:longint):PFLREParallelNFAState;  {$ifndef cpu386}{$ifdef caninline}inline;{$endif}{$endif}
-       function BackReferenceAssertion(const State:PFLREParallelNFAState;const CaptureSubMatch,BackReferenceSubMatch:longint;const IgnoreCase:boolean):boolean;
-       procedure AddThread(const ThreadList:PFLREParallelNFAThreadList;Instruction:PFLREInstruction;State:PFLREParallelNFAState;const Position:longint);
-       function SearchMatch(var Captures:TFLRECaptures;const StartPosition,UntilExcludingPosition:longint;const UnanchoredStart:boolean):boolean;
+       function StateUpdate(const State:PFLREParallelNFAState;const Index:TFLREInt32;const Position:TFLRESizeInt):PFLREParallelNFAState; //{$ifdef fpc}{$ifndef cpu386}{$ifdef caninline}inline;{$endif}{$endif}{$endif}
+       function BackReferenceAssertion(const State:PFLREParallelNFAState;const CaptureSubMatch,BackReferenceSubMatch:TFLREInt32;const IgnoreCase:boolean):boolean;
+       procedure AddThread(const ThreadList:PFLREParallelNFAThreadList;Instruction:PFLREInstruction;State:PFLREParallelNFAState;const Position:TFLRESizeInt);
+       function SearchMatch(var Captures:TFLRECaptures;const StartPosition,UntilExcludingPosition:TFLRESizeInt;const UnanchoredStart:boolean):boolean;
      end;
 
      TFLREOnePassNFA=class
@@ -698,7 +911,7 @@ type EFLRE=class(Exception);
        MatchSubMatches:TFLREOnePassNFASubMatches;
        constructor Create(const AThreadLocalStorageInstance:TFLREThreadLocalStorageInstance);
        destructor Destroy; override;
-       function SearchMatch(var Captures:TFLRECaptures;const StartPosition,UntilExcludingPosition:longint):boolean;
+       function SearchMatch(var Captures:TFLRECaptures;const StartPosition,UntilExcludingPosition:TFLRESizeInt):boolean;
      end;
 
      TFLREBitStateNFA=class
@@ -707,21 +920,21 @@ type EFLRE=class(Exception);
        ThreadLocalStorageInstance:TFLREThreadLocalStorageInstance;
        MatchMode:TFLREMatchMode;
        Visited:TFLREBitStateNFAVisited;
-       CountVisited:longint;
+       CountVisited:TFLREInt32;
        Jobs:TFLREBitStateNFAJobs;
-       CountJobs:longint;
-       MaxJob:longint;
+       CountJobs:TFLREInt32;
+       MaxJob:TFLREInt32;
        WorkSubMatches:TFLREBitStateNFASubMatches;
-       MatchSubMatches:TFLREBitStateNFASubMatches;
+       MatchSubMatches:TFLREBitStateNFASubMatches;       
        constructor Create(const AThreadLocalStorageInstance:TFLREThreadLocalStorageInstance);
        destructor Destroy; override;
-       function SearchMatch(var Captures:TFLRECaptures;const StartPosition,UntilExcludingPosition:longint;const UnanchoredStart:boolean):longint;
+       function SearchMatch(var Captures:TFLRECaptures;const StartPosition,UntilExcludingPosition:TFLRESizeInt;const UnanchoredStart:boolean):TFLREInt32;
      end;
 
      PFLREDFAByteMap=^TFLREDFAByteMap;
-     TFLREDFAByteMap=array[0..256] of longword;
+     TFLREDFAByteMap=array[0..256] of TFLREUInt32;
 
-     TFLREDFASearchMatch=function(const StartPosition,UntilExcludingPosition:longint;out MatchEnd:longint;const UnanchoredStart:longbool):longint of object; {$ifdef cpu386}stdcall;{$endif}
+     TFLREDFASearchMatch=function(const StartPosition,UntilExcludingPosition:TFLRESizeInt;out MatchEnd:TFLRESizeInt;const UnanchoredStart:longbool):TFLREInt32 of object; {$ifdef cpu386}stdcall;{$endif}
 
      TFLREDFA=class
       public
@@ -730,7 +943,7 @@ type EFLRE=class(Exception);
 
        ThreadLocalStorageInstance:TFLREThreadLocalStorageInstance;
 
-       CountInstructions:longint;
+       CountInstructions:TFLREInt32;
 
        MatchMode:TFLREMatchMode;
 
@@ -742,7 +955,7 @@ type EFLRE=class(Exception);
 
        DoFastDFA:longbool;
 
-       Generation:int64;
+       Generation:TFLREInt64;
 
        InstructionGenerations:TFLREInstructionGenerations;
 
@@ -760,7 +973,7 @@ type EFLRE=class(Exception);
 
        NewState:TFLREDFAState;
 
-       CountStatesCached:longint;
+       CountStatesCached:TFLREInt32;
 
        NextStatesSize:TFLREPtrInt;
 
@@ -777,11 +990,11 @@ type EFLRE=class(Exception);
 
        SearchMatch:TFLREDFASearchMatch;
 
-       MaximalDFAStates:longint;
+       MaximalDFAStates:TFLREInt32;
 
        HadReset:longbool;
 
-       constructor Create(const AThreadLocalStorageInstance:TFLREThreadLocalStorageInstance;const AReversed:boolean;const AMaximalDFAStates:longint);
+       constructor Create(const AThreadLocalStorageInstance:TFLREThreadLocalStorageInstance;const AReversed:boolean;const AMaximalDFAStates:TFLREInt32);
        destructor Destroy; override;
 
        function CacheState(const State:PFLREDFAState):PFLREDFAState; {$ifdef caninline}inline;{$endif}
@@ -795,19 +1008,19 @@ type EFLRE=class(Exception);
 
        procedure FastAddInstructionThread(const State:PFLREDFAState;Instruction:PFLREInstruction); {$ifdef cpu386}register;{$endif}
        function FastProcessNextState(State:PFLREDFAState;const CurrentChar:TFLRERawByteChar):PFLREDFAState; {$ifdef cpu386}register;{$endif}
-       function SearchMatchFast(const StartPosition,UntilExcludingPosition:longint;out MatchEnd:longint;const UnanchoredStart:longbool):longint; {$ifdef cpu386}stdcall;{$endif}
-       function SearchMatchFastReversed(const StartPosition,UntilIncludingPosition:longint;out MatchBegin:longint;const UnanchoredStart:longbool):longint; {$ifdef cpu386}stdcall;{$endif}
+       function SearchMatchFast(const StartPosition,UntilExcludingPosition:TFLRESizeInt;out MatchEnd:TFLRESizeInt;const UnanchoredStart:longbool):TFLREInt32; {$ifdef cpu386}stdcall;{$endif}
+       function SearchMatchFastReversed(const StartPosition,UntilIncludingPosition:TFLRESizeInt;out MatchBegin:TFLRESizeInt;const UnanchoredStart:longbool):TFLREInt32; {$ifdef cpu386}stdcall;{$endif}
 
-       function WorkQueueToCachedState(const WorkQueue:TFLREDFAWorkQueue;Flags:longword):PFLREDFAState;
+       function WorkQueueToCachedState(const WorkQueue:TFLREDFAWorkQueue;Flags:TFLREUInt32):PFLREDFAState;
        procedure StateToWorkQueue(const DFAState:PFLREDFAState;const WorkQueue:TFLREDFAWorkQueue);
-       procedure AddToWorkQueue(const WorkQueue:TFLREDFAWorkQueue;Instruction:PFLREInstruction;Flags:longword);
-       procedure ProcessWorkQueueOnZeroWidthString(const OldWorkQueue,NewWorkQueue:TFLREDFAWorkQueue;Flags:longword);
-       procedure ProcessWorkQueueOnByte(const OldWorkQueue,NewWorkQueue:TFLREDFAWorkQueue;CurrentChar,Flags:longword;var IsMatch:boolean);
-       function RunStateOnByte(State:PFLREDFAState;const Position:longint;const CurrentChar:longword):PFLREDFAState;
-       function InitializeStartState(const StartPosition:longint;const UnanchoredStart:boolean):PFLREDFAState;
+       procedure AddToWorkQueue(const WorkQueue:TFLREDFAWorkQueue;Instruction:PFLREInstruction;Flags:TFLREUInt32);
+       procedure ProcessWorkQueueOnZeroWidthString(const OldWorkQueue,NewWorkQueue:TFLREDFAWorkQueue;Flags:TFLREUInt32);
+       procedure ProcessWorkQueueOnByte(const OldWorkQueue,NewWorkQueue:TFLREDFAWorkQueue;CurrentChar,Flags:TFLREUInt32;var IsMatch:boolean);
+       function RunStateOnByte(State:PFLREDFAState;const Position:TFLRESizeInt;const CurrentChar:TFLREUInt32):PFLREDFAState;
+       function InitializeStartState(const StartPosition:TFLRESizeInt;const UnanchoredStart:boolean):PFLREDFAState;
 
-       function SearchMatchFull(const StartPosition,UntilExcludingPosition:longint;out MatchEnd:longint;const UnanchoredStart:longbool):longint; {$ifdef cpu386}stdcall;{$endif}
-       function SearchMatchFullReversed(const StartPosition,UntilExcludingPosition:longint;out MatchEnd:longint;const UnanchoredStart:longbool):longint; {$ifdef cpu386}stdcall;{$endif}
+       function SearchMatchFull(const StartPosition,UntilExcludingPosition:TFLRESizeInt;out MatchEnd:TFLRESizeInt;const UnanchoredStart:longbool):TFLREInt32; {$ifdef cpu386}stdcall;{$endif}
+       function SearchMatchFullReversed(const StartPosition,UntilExcludingPosition:TFLRESizeInt;out MatchEnd:TFLRESizeInt;const UnanchoredStart:longbool):TFLREInt32; {$ifdef cpu386}stdcall;{$endif}
 
      end;
 
@@ -820,7 +1033,7 @@ type EFLRE=class(Exception);
        Instance:TFLRE;
 
        Input:PFLRERawByteChar;
-       InputLength:longint;
+       InputLength:TFLRESizeInt;
 
        MatchMode:TFLREMatchMode;
 
@@ -837,9 +1050,9 @@ type EFLRE=class(Exception);
 
        constructor Create(AInstance:TFLRE);
        destructor Destroy; override;
-       function GetSatisfyFlags(const Position:longint):longword;
-       function LookAssertion(const Position,WhichLookAssertionString:longint;const LookBehind,Negative:boolean):boolean;
-       function BackReferenceAssertion(const CaptureStart,CaptureEnd,BackReferenceStart,BackReferenceEnd:longint;const IgnoreCase:boolean):boolean;
+       function GetSatisfyFlags(const Position:TFLRESizeInt):TFLREUInt32;
+       function LookAssertion(const Position,WhichLookAssertionString:TFLRESizeInt;const LookBehind,Negative:boolean):boolean;
+       function BackReferenceAssertion(const CaptureStart,CaptureEnd,BackReferenceStart,BackReferenceEnd:TFLRESizeInt;const IgnoreCase:boolean):boolean;
      end;
 
      TFLRE=class
@@ -859,62 +1072,62 @@ type EFLRE=class(Exception);
 
        RegularExpressionHasCharClasses:longbool;
 
-       Nodes:TList;
+       Nodes:TFLREPointerList;
 
-       CountCaptures:longint;
+       CountCaptures:TFLREInt32;
 
-       CountInternalCaptures:longint;
+       CountInternalCaptures:TFLREInt32;
 
-       CountSubMatches:longint;
+       CountSubMatches:TFLREInt32;
 
-       CountMultiSubMatches:longint;
+       CountMultiSubMatches:TFLREInt32;
 
        CapturesToSubMatchesMap:TFLRECapturesToSubMatchesMap;
 
        ForwardInstructions:TFLREInstructions;
-       CountForwardInstructions:longint;
+       CountForwardInstructions:TFLREInt32;
 
        BackwardInstructions:TFLREInstructions;
-       CountBackwardInstructions:longint;
+       CountBackwardInstructions:TFLREInt32;
 
        AnchoredStartInstruction:PFLREInstruction;
        UnanchoredStartInstruction:PFLREInstruction;
        ReversedStartInstruction:PFLREInstruction;
 
        CharClasses:TPFLRECharClasses;
-       CountCharClasses:longint;
+       CountCharClasses:TFLREInt32;
 
        CharClassHashMap:TFLRECharClassHashMap;
 
        LookAssertionStrings:TFLRELookAssertionStrings;
-       CountLookAssertionStrings:longint;
+       CountLookAssertionStrings:TFLREInt32;
 
        FixedString:TFLRERawByteString;
        FixedStringIsWholeRegExp:longbool;
-       FixedStringLength:longint;  
+       FixedStringLength:TFLRESizeInt;
        FixedStringPatternBitMasks:PFLRECharPatternBitMasks;
        FixedStringBoyerMooreSkip:PFLRECharPatternBitMasks;
        FixedStringBoyerMooreNext:TFLREBoyerMooreNext;
 
        FirstPrefixCharClass:PFLRECharClass;
-       FirstPrefixCharClassSize:longint;
-       FirstPrefixCharClassRepeatedCount:longint;
+       FirstPrefixCharClassSize:TFLREInt32;
+       FirstPrefixCharClassRepeatedCount:TFLREInt32;
        FirstPrefixCharRanges:TFLRECharRanges;
-       CountFirstPrefixCharRanges:longint;
+       CountFirstPrefixCharRanges:TFLREInt32;
        FirstPrefixCharClassChars:TFLRECharClassChars;
-       CountPrefixCharClasses:longint;
-       AveragePrefixCharClassesVariance:longint;
+       CountPrefixCharClasses:TFLREInt32;
+       AveragePrefixCharClassesVariance:TFLREInt32;
        PrefixPatternBitMasks:PFLRECharPatternBitMasks;
 
        ByteMap:TFLREByteMap;
        UnByteMap:TFLREByteMap;
        ByteCharSetMap:TFLRECharClass;
-       ByteMapCount:longint;
+       ByteMapCount:TFLREInt32;
 
        OnePassNFANodes:PFLREOnePassNFAState;
-       OnePassNFANodesCount:longint;
+       OnePassNFANodesCount:TFLREInt32;
        OnePassNFAStart:PFLREOnePassNFAState;
-       OnePassNFAStateSize:longint;
+       OnePassNFAStateSize:TFLREInt32;
        OnePassNFACharClassActions:PFLREOnePassNFAStateCharClassAction;
 
        NamedGroupStringList:TStringList;
@@ -931,11 +1144,13 @@ type EFLRE=class(Exception);
        RangeHigh:TFLRERawByteString;
 
        PrefilterRootNode:TFLREPrefilterNode;
+       
+       MaxBitStateNFATextSize:TFLRESizeInt;
 
-       function NewCharClass(const CharClass:TFLRECharClass;const FromRegularExpression:boolean):longint;
-       function GetCharClass(const CharClass:longint):TFLRECharClass;
+       function NewCharClass(const CharClass:TFLRECharClass;const FromRegularExpression:boolean):TFLREInt32;
+       function GetCharClass(const CharClass:TFLREInt32):TFLRECharClass;
 
-       function NewNode(const NodeType:longint;const Left,Right:PFLRENode;const Value:longint):PFLRENode;
+       function NewNode(const NodeType:TFLREInt32;const Left,Right:PFLRENode;const Value:TFLREInt32):PFLRENode;
        procedure FreeNode(var Node:PFLRENode);
        function CopyNode(Node:PFLRENode):PFLRENode;
        procedure FreeUnusedNodes(RootNode:PFLRENode);
@@ -949,12 +1164,12 @@ type EFLRE=class(Exception);
        function Concat(NodeLeft,NodeRight:PFLRENode):PFLRENode;
 
        function NewEmptyMatch:PFLRENode;
-       
+
        function NewAlt(NodeLeft,NodeRight:PFLRENode):PFLRENode;
-       function NewPlus(Node:PFLRENode;Kind:longint):PFLRENode;
-       function NewStar(Node:PFLRENode;Kind:longint):PFLRENode;
-       function NewQuest(Node:PFLRENode;Kind:longint):PFLRENode;
-       function NewExact(Node:PFLRENode;MinCount,MaxCount,Kind:longint):PFLRENode;
+       function NewPlus(Node:PFLRENode;Kind:TFLREInt32):PFLRENode;
+       function NewStar(Node:PFLRENode;Kind:TFLREInt32):PFLRENode;
+       function NewQuest(Node:PFLRENode;Kind:TFLREInt32):PFLRENode;
+       function NewExact(Node:PFLRENode;MinCount,MaxCount,Kind:TFLREInt32):PFLRENode;
 
        function OptimizeNode(StartNodeEx:PPFLRENode):boolean;
 
@@ -973,57 +1188,62 @@ type EFLRE=class(Exception);
        function PrefilterOptimize(Node:TFLREPrefilterNode):TFLREPrefilterNode;
        function CompilePrefilterTree(RootNode:PFLRENode):TFLREPrefilterNode;
 
-       function IsWordChar(const CharValue:longword):boolean; {$ifdef caninline}inline;{$endif}
+       function IsWordChar(const CharValue:TFLREUInt32):boolean; //{$ifdef caninline}inline;{$endif}
 
        function AcquireThreadLocalStorageInstance:TFLREThreadLocalStorageInstance;
        procedure ReleaseThreadLocalStorageInstance(const ThreadLocalStorageInstance:TFLREThreadLocalStorageInstance);
 
-       function SearchNextPossibleStart(const Input:PFLRERawByteChar;const InputLength:longint):longint; {$ifdef cpu386}register;{$endif}
+       function SearchNextPossibleStart(const Input:PFLRERawByteChar;const InputLength:TFLRESizeInt):TFLRESizeInt; {$ifdef cpu386}register;{$endif}
 
-       function SearchNextPossibleStartForDFA(const Input:PFLRERawByteChar;const InputLength:longint):longint; {$ifdef cpu386}register;{$endif}
+       function SearchNextPossibleStartForDFA(const Input:PFLRERawByteChar;const InputLength:TFLRESizeInt):TFLRESizeInt; {$ifdef cpu386}register;{$endif}
 
-       function SearchMatch(ThreadLocalStorageInstance:TFLREThreadLocalStorageInstance;var Captures:TFLRECaptures;StartPosition,UntilExcludingPosition:longint;UnanchoredStart:boolean):boolean;
+       function SearchMatch(ThreadLocalStorageInstance:TFLREThreadLocalStorageInstance;var Captures:TFLRECaptures;StartPosition,UntilExcludingPosition:TFLRESizeInt;UnanchoredStart:boolean):boolean;
+
+       function DumpRegularExpressionNode(StartNode:PFLRENode):TFLRERawByteString;
 
       public
 
-       MaximalDFAStates:longint;
+       MaximalDFAStates:TFLREInt32;
 
        constructor Create(const ARegularExpression:TFLRERawByteString;const AFlags:TFLREFlags=[rfDELIMITERS]); overload;
        constructor Create(const ARegularExpressions:array of TFLRERawByteString;const AFlags:TFLREFlags=[]); overload;
        destructor Destroy; override;
 
-       function PtrMatch(const Input:pointer;const InputLength:longint;var Captures:TFLRECaptures;const StartPosition:longint=0):boolean;
-       function PtrMatchNext(const Input:pointer;const InputLength:longint;var Captures:TFLRECaptures;const StartPosition:longint=0):boolean;
-       function PtrMatchAll(const Input:pointer;const InputLength:longint;var MultiCaptures:TFLREMultiCaptures;const StartPosition:longint=0;Limit:longint=-1):boolean;
-       function PtrExtractAll(const Input:pointer;const InputLength:longint;var MultiExtractions:TFLREMultiStrings;const StartPosition:longint=0;Limit:longint=-1):boolean;
-       function PtrReplace(const Input:pointer;const InputLength:longint;const Replacement:pointer;const ReplacementLength:longint;const StartPosition:longint=0;Limit:longint=-1):TFLRERawByteString;
-       function PtrReplaceCallback(const Input:pointer;const InputLength:longint;const ReplacementCallback:TFLREReplacementCallback;const StartPosition:longint=0;Limit:longint=-1):TFLRERawByteString;
-       function PtrSplit(const Input:pointer;const InputLength:longint;var SplittedStrings:TFLREStrings;const StartPosition:longint=0;Limit:longint=-1;const WithEmpty:boolean=true):boolean;
-       function PtrTest(const Input:pointer;const InputLength:longint;const StartPosition:longint=0):boolean;
-       function PtrTestAll(const Input:pointer;const InputLength:longint;const StartPosition:longint=0):boolean;
-       function PtrFind(const Input:pointer;const InputLength:longint;const StartPosition:longint=0):longint;
+       function PtrMatch(const Input:pointer;const InputLength:TFLRESizeInt;var Captures:TFLRECaptures;const StartPosition:TFLRESizeInt=0):boolean;
+       function PtrMatchNext(const Input:pointer;const InputLength:TFLRESizeInt;var Captures:TFLRECaptures;const StartPosition:TFLRESizeInt=0):boolean;
+       function PtrMatchAll(const Input:pointer;const InputLength:TFLRESizeInt;var MultiCaptures:TFLREMultiCaptures;const StartPosition:TFLRESizeInt=0;Limit:TFLRESizeInt=-1):boolean;
+       function PtrExtractAll(const Input:pointer;const InputLength:TFLRESizeInt;var MultiExtractions:TFLREMultiStrings;const StartPosition:TFLRESizeInt=0;Limit:TFLRESizeInt=-1):boolean;
+       function PtrReplace(const Input:pointer;const InputLength:TFLRESizeInt;const Replacement:pointer;const ReplacementLength:TFLRESizeInt;const StartPosition:TFLRESizeInt=0;Limit:TFLRESizeInt=-1):TFLRERawByteString;
+       function PtrReplaceCallback(const Input:pointer;const InputLength:TFLRESizeInt;const ReplacementCallbackData:pointer;const ReplacementCallback:TFLREReplacementCallback;const StartPosition:TFLRESizeInt=0;Limit:TFLRESizeInt=-1):TFLRERawByteString; overload;
+       function PtrReplaceCallback(const Input:pointer;const InputLength:TFLRESizeInt;const ReplacementCallback:TFLREReplacementObjectCallback;const StartPosition:TFLRESizeInt=0;Limit:TFLRESizeInt=-1):TFLRERawByteString; overload;
+       function PtrSplit(const Input:pointer;const InputLength:TFLRESizeInt;var SplittedStrings:TFLREStrings;const StartPosition:TFLRESizeInt=0;Limit:TFLRESizeInt=-1;const WithEmpty:boolean=true):boolean;
+       function PtrTest(const Input:pointer;const InputLength:TFLRESizeInt;const StartPosition:TFLRESizeInt=0):boolean;
+       function PtrTestAll(const Input:pointer;const InputLength:TFLRESizeInt;const StartPosition:TFLRESizeInt=0):boolean;
+       function PtrFind(const Input:pointer;const InputLength:TFLRESizeInt;const StartPosition:TFLRESizeInt=0):TFLRESizeInt;
 
-       function Match(const Input:TFLRERawByteString;var Captures:TFLRECaptures;const StartPosition:longint=1):boolean;
-       function MatchNext(const Input:TFLRERawByteString;var Captures:TFLRECaptures;const StartPosition:longint=1):boolean;
-       function MatchAll(const Input:TFLRERawByteString;var MultiCaptures:TFLREMultiCaptures;const StartPosition:longint=1;Limit:longint=-1):boolean;
-       function ExtractAll(const Input:TFLRERawByteString;var MultiExtractions:TFLREMultiStrings;const StartPosition:longint=1;Limit:longint=-1):boolean;
-       function Replace(const Input,Replacement:TFLRERawByteString;const StartPosition:longint=1;Limit:longint=-1):TFLRERawByteString;
-       function ReplaceCallback(const Input:TFLRERawByteString;const ReplacementCallback:TFLREReplacementCallback;const StartPosition:longint=1;Limit:longint=-1):TFLRERawByteString;
-       function Split(const Input:TFLRERawByteString;var SplittedStrings:TFLREStrings;const StartPosition:longint=1;Limit:longint=-1;const WithEmpty:boolean=true):boolean;
-       function Test(const Input:TFLRERawByteString;const StartPosition:longint=1):boolean;
-       function TestAll(const Input:TFLRERawByteString;const StartPosition:longint=1):boolean;
-       function Find(const Input:TFLRERawByteString;const StartPosition:longint=1):longint;
+       function Match(const Input:TFLRERawByteString;var Captures:TFLRECaptures;const StartPosition:TFLRESizeInt=1):boolean;
+       function MatchNext(const Input:TFLRERawByteString;var Captures:TFLRECaptures;const StartPosition:TFLRESizeInt=1):boolean;
+       function MatchAll(const Input:TFLRERawByteString;var MultiCaptures:TFLREMultiCaptures;const StartPosition:TFLRESizeInt=1;Limit:TFLRESizeInt=-1):boolean;
+       function ExtractAll(const Input:TFLRERawByteString;var MultiExtractions:TFLREMultiStrings;const StartPosition:TFLRESizeInt=1;Limit:TFLRESizeInt=-1):boolean;
+       function Replace(const Input,Replacement:TFLRERawByteString;const StartPosition:TFLRESizeInt=1;Limit:TFLRESizeInt=-1):TFLRERawByteString;
+       function ReplaceCallback(const Input:TFLRERawByteString;const ReplacementCallbackData:pointer;const ReplacementCallback:TFLREReplacementCallback;const StartPosition:TFLRESizeInt=1;Limit:TFLRESizeInt=-1):TFLRERawByteString; overload;
+       function ReplaceCallback(const Input:TFLRERawByteString;const ReplacementCallback:TFLREReplacementObjectCallback;const StartPosition:TFLRESizeInt=1;Limit:TFLRESizeInt=-1):TFLRERawByteString; overload;
+       function Split(const Input:TFLRERawByteString;var SplittedStrings:TFLREStrings;const StartPosition:TFLRESizeInt=1;Limit:TFLRESizeInt=-1;const WithEmpty:boolean=true):boolean;
+       function Test(const Input:TFLRERawByteString;const StartPosition:TFLRESizeInt=1):boolean;
+       function TestAll(const Input:TFLRERawByteString;const StartPosition:TFLRESizeInt=1):boolean;
+       function Find(const Input:TFLRERawByteString;const StartPosition:TFLRESizeInt=1):TFLRESizeInt;
 
-       function UTF8Match(const Input:TFLREUTF8String;var Captures:TFLRECaptures;const StartPosition:longint=1):boolean;
-       function UTF8MatchNext(const Input:TFLREUTF8String;var Captures:TFLRECaptures;const StartPosition:longint=1):boolean;
-       function UTF8MatchAll(const Input:TFLREUTF8String;var MultiCaptures:TFLREMultiCaptures;const StartPosition:longint=1;Limit:longint=-1):boolean;
-       function UTF8ExtractAll(const Input:TFLREUTF8String;var MultiExtractions:TFLREMultiStrings;const StartPosition:longint=1;Limit:longint=-1):boolean;
-       function UTF8Replace(const Input,Replacement:TFLREUTF8String;const StartPosition:longint=1;Limit:longint=-1):TFLREUTF8String;
-       function UTF8ReplaceCallback(const Input:TFLREUTF8String;const ReplacementCallback:TFLREReplacementCallback;const StartPosition:longint=1;Limit:longint=-1):TFLRERawByteString;
-       function UTF8Split(const Input:TFLREUTF8String;var SplittedStrings:TFLREStrings;const StartPosition:longint=1;Limit:longint=-1;const WithEmpty:boolean=true):boolean;
-       function UTF8Test(const Input:TFLREUTF8String;const StartPosition:longint=1):boolean;
-       function UTF8TestAll(const Input:TFLREUTF8String;const StartPosition:longint=1):boolean;
-       function UTF8Find(const Input:TFLREUTF8String;const StartPosition:longint=1):longint;
+       function UTF8Match(const Input:TFLREUTF8String;var Captures:TFLRECaptures;const StartPosition:TFLRESizeInt=1):boolean;
+       function UTF8MatchNext(const Input:TFLREUTF8String;var Captures:TFLRECaptures;const StartPosition:TFLRESizeInt=1):boolean;
+       function UTF8MatchAll(const Input:TFLREUTF8String;var MultiCaptures:TFLREMultiCaptures;const StartPosition:TFLRESizeInt=1;Limit:TFLRESizeInt=-1):boolean;
+       function UTF8ExtractAll(const Input:TFLREUTF8String;var MultiExtractions:TFLREMultiStrings;const StartPosition:TFLRESizeInt=1;Limit:TFLRESizeInt=-1):boolean;
+       function UTF8Replace(const Input,Replacement:TFLREUTF8String;const StartPosition:TFLRESizeInt=1;Limit:TFLRESizeInt=-1):TFLREUTF8String;
+       function UTF8ReplaceCallback(const Input:TFLREUTF8String;const ReplacementCallbackData:pointer;const ReplacementCallback:TFLREReplacementCallback;const StartPosition:TFLRESizeInt=1;Limit:TFLRESizeInt=-1):TFLRERawByteString; overload;
+       function UTF8ReplaceCallback(const Input:TFLREUTF8String;const ReplacementCallback:TFLREReplacementObjectCallback;const StartPosition:TFLRESizeInt=1;Limit:TFLRESizeInt=-1):TFLRERawByteString; overload;
+       function UTF8Split(const Input:TFLREUTF8String;var SplittedStrings:TFLREStrings;const StartPosition:TFLRESizeInt=1;Limit:TFLRESizeInt=-1;const WithEmpty:boolean=true):boolean;
+       function UTF8Test(const Input:TFLREUTF8String;const StartPosition:TFLRESizeInt=1):boolean;
+       function UTF8TestAll(const Input:TFLREUTF8String;const StartPosition:TFLRESizeInt=1):boolean;
+       function UTF8Find(const Input:TFLREUTF8String;const StartPosition:TFLRESizeInt=1):TFLRESizeInt;
 
        function GetRange(var LowRange,HighRange:TFLRERawByteString):boolean;
 
@@ -1055,19 +1275,19 @@ type EFLRE=class(Exception);
 
      TFLRECacheHashMapEntities=array of TFLRECacheHashMapEntity;
 
-     TFLRECacheHashMapEntityIndices=array of longint;
+     TFLRECacheHashMapEntityIndices=array of TFLREInt32;
 
      TFLRECacheHashMap=class
       private
-       function FindCell(const Key:TFLRERawByteString):longword;
+       function FindCell(const Key:TFLRERawByteString):TFLREUInt32;
        procedure Resize;
       protected
        function GetValue(const Key:TFLRERawByteString):TFLRECacheHashMapData;
        procedure SetValue(const Key:TFLRERawByteString;const Value:TFLRECacheHashMapData);
       public
-       RealSize:longint;
-       LogSize:longint;
-       Size:longint;
+       RealSize:TFLREInt32;
+       LogSize:TFLREInt32;
+       Size:TFLREInt32;
        Entities:TFLRECacheHashMapEntities;
        EntityToCellIndex:TFLRECacheHashMapEntityIndices;
        CellToEntityIndex:TFLRECacheHashMapEntityIndices;
@@ -1083,7 +1303,7 @@ type EFLRE=class(Exception);
      TFLRECache=class
       private
        ParallelLock:TFLREParallelLock;
-       List:TList;
+       List:TFLREPointerList;
        HashMap:TFLRECacheHashMap;
       public
        constructor Create;
@@ -1093,33 +1313,39 @@ type EFLRE=class(Exception);
        function Get(const ARegularExpressions:array of TFLRERawByteString;const AFlags:TFLREFlags=[]):TFLRE; overload;
      end;
 
-var FLREMaximalRepetitionCount:longint=4096;
+var FLREMaximalRepetitionCount:TFLREInt32=4096;
 
-function FLREPtrCopy(const Src:PFLRERawByteChar;const From,Len:longint):TFLRERawByteString;
+function FLREPtrCopy(const Src:PFLRERawByteChar;const From,Len:TFLRESizeInt):TFLRERawByteString;
 
-function FLREGetVersion:longword; {$ifdef win32}{$ifdef cpu386}stdcall;{$endif}{$endif}
+function FLREGetVersion:TFLREUInt32; {$ifdef win32}{$ifdef cpu386}stdcall;{$endif}{$endif}
 function FLREGetVersionString:PFLRERawByteChar; {$ifdef win32}{$ifdef cpu386}stdcall;{$endif}{$endif}
-function FLRECreate(const RegularExpression:PFLRERawByteChar;const RegularExpressionLength:longint;const Flags:longword;const Error:PPAnsiChar):pointer; {$ifdef win32}{$ifdef cpu386}stdcall;{$endif}{$endif}
+function FLRECreate(const RegularExpression:PFLRERawByteChar;const RegularExpressionLength:TFLRESizeInt;const Flags:TFLREUInt32;const Error:PPAnsiChar):pointer; {$ifdef win32}{$ifdef cpu386}stdcall;{$endif}{$endif}
 procedure FLREDestroy(const Instance:pointer); {$ifdef win32}{$ifdef cpu386}stdcall;{$endif}{$endif}
+function FLREAlloc(const Size:TFLRESizeInt):pointer; {$ifdef win32}{$ifdef cpu386}stdcall;{$endif}{$endif}
 procedure FLREFree(const Data:pointer); {$ifdef win32}{$ifdef cpu386}stdcall;{$endif}{$endif}
-function FLREGetCountCaptures(const Instance:pointer):longint; {$ifdef win32}{$ifdef cpu386}stdcall;{$endif}{$endif}
-function FLREGetNamedGroupIndex(const Instance:pointer;const GroupName:PFLRERawByteChar):longint; {$ifdef win32}{$ifdef cpu386}stdcall;{$endif}{$endif}
-function FLREDumpRegularExpression(const Instance:pointer;const RegularExpression,Error:ppansichar):longint; {$ifdef win32}{$ifdef cpu386}stdcall;{$endif}{$endif}
-function FLREGetPrefilterExpression(const Instance:pointer;const Expression,Error:ppansichar):longint; {$ifdef win32}{$ifdef cpu386}stdcall;{$endif}{$endif}
-function FLREGetPrefilterShortExpression(const Instance:pointer;const ShortExpression,Error:ppansichar):longint; {$ifdef win32}{$ifdef cpu386}stdcall;{$endif}{$endif}
-function FLREGetPrefilterSQLBooleanFullTextExpression(const Instance:pointer;const SQLBooleanFullTextExpression,Error:ppansichar):longint; {$ifdef win32}{$ifdef cpu386}stdcall;{$endif}{$endif}
-function FLREGetPrefilterSQLExpression(const Instance:pointer;const Field:PFLRERawByteChar;SQLExpression,Error:ppansichar):longint; {$ifdef win32}{$ifdef cpu386}stdcall;{$endif}{$endif}
-function FLREGetRange(const Instance:pointer;const LowRange,HighRange:PPAnsiChar;const LowRangeLength,HighRangeLength:PLongint;const Error:PPAnsiChar):longint; {$ifdef win32}{$ifdef cpu386}stdcall;{$endif}{$endif}
-function FLREMatch(const Instance:pointer;const Input:pointer;const InputLength:longint;const Captures:PPointer;const MaxCaptures:longint;const CountCaptures:PLongint;const StartPosition:longint;const Error:PPAnsiChar):longint;
-function FLREMatchNext(const Instance:pointer;const Input:pointer;const InputLength:longint;const Captures:PPointer;const MaxCaptures:longint;const CountCaptures:PLongint;const StartPosition:longint;const Error:PPAnsiChar):longint;
-function FLREMatchAll(const Instance:pointer;const Input:pointer;const InputLength:longint;const MultiCaptures:PPointer;const MaxMultiCaptures:longint;const CountMultiCaptures,CountCaptures:PLongint;const StartPosition,Limit:longint;const Error:PPAnsiChar):longint;
-function FLREReplaceAll(const Instance:pointer;const Input:pointer;const InputLength:longint;const Replacement:pointer;const ReplacementLength:longint;const ResultString:PPointer;const ResultStringLength:PLongint;const StartPosition,Limit:longint;const Error:PPAnsiChar):longint;
+function FLREGetCountCaptures(const Instance:pointer):TFLREInt32; {$ifdef win32}{$ifdef cpu386}stdcall;{$endif}{$endif}
+function FLREGetNamedGroupIndex(const Instance:pointer;const GroupName:PFLRERawByteChar):TFLREInt32; {$ifdef win32}{$ifdef cpu386}stdcall;{$endif}{$endif}
+function FLREDumpRegularExpression(const Instance:pointer;const RegularExpression,Error:ppansichar):TFLREInt32; {$ifdef win32}{$ifdef cpu386}stdcall;{$endif}{$endif}
+function FLREGetPrefilterExpression(const Instance:pointer;const Expression,Error:ppansichar):TFLREInt32; {$ifdef win32}{$ifdef cpu386}stdcall;{$endif}{$endif}
+function FLREGetPrefilterShortExpression(const Instance:pointer;const ShortExpression,Error:ppansichar):TFLREInt32; {$ifdef win32}{$ifdef cpu386}stdcall;{$endif}{$endif}
+function FLREGetPrefilterSQLBooleanFullTextExpression(const Instance:pointer;const SQLBooleanFullTextExpression,Error:ppansichar):TFLREInt32; {$ifdef win32}{$ifdef cpu386}stdcall;{$endif}{$endif}
+function FLREGetPrefilterSQLExpression(const Instance:pointer;const Field:PFLRERawByteChar;SQLExpression,Error:ppansichar):TFLREInt32; {$ifdef win32}{$ifdef cpu386}stdcall;{$endif}{$endif}
+function FLREGetRange(const Instance:pointer;const LowRange,HighRange:PPAnsiChar;const LowRangeLength,HighRangeLength:PFLRESizeInt;const Error:PPAnsiChar):TFLREInt32; {$ifdef win32}{$ifdef cpu386}stdcall;{$endif}{$endif}
+function FLREMatch(const Instance:pointer;const Input:pointer;const InputLength:TFLRESizeInt;const Captures:PPointer;const MaxCaptures:TFLRESizeInt;const CountCaptures:PFLRESizeInt;const StartPosition:TFLRESizeInt;const Error:PPAnsiChar):TFLREInt32;
+function FLREMatchNext(const Instance:pointer;const Input:pointer;const InputLength:TFLRESizeInt;const Captures:PPointer;const MaxCaptures:TFLRESizeInt;const CountCaptures:PFLRESizeInt;const StartPosition:TFLRESizeInt;const Error:PPAnsiChar):TFLREInt32;
+function FLREMatchAll(const Instance:pointer;const Input:pointer;const InputLength:TFLRESizeInt;const MultiCaptures:PPointer;const MaxMultiCaptures:TFLRESizeInt;const CountMultiCaptures,CountCaptures:PFLRESizeInt;const StartPosition,Limit:TFLRESizeInt;const Error:PPAnsiChar):TFLREInt32;
+function FLREReplaceAll(const Instance:pointer;const Input:pointer;const InputLength:TFLRESizeInt;const Replacement:pointer;const ReplacementLength:TFLRESizeInt;const ResultString:PPointer;const ResultStringLength:PFLREInt32;const StartPosition,Limit:TFLRESizeInt;const Error:PPAnsiChar):TFLREInt32;
+function FLREReplaceCallback(const Instance:pointer;const Input:pointer;const InputLength:TFLRESizeInt;const ReplacementCallbackData:pointer;const ReplacementCallback:TFLREReplacementExternalCallback;const ResultString:PPointer;const ResultStringLength:PFLREInt32;const StartPosition,Limit:TFLRESizeInt;const Error:PPAnsiChar):TFLREInt32;
+function FLRESplit(const Instance:pointer;const Input:pointer;const InputLength:TFLRESizeInt;SplittedStrings:PPointer;const CountSplittedStrings:PFLRESizeInt;const StartPosition:TFLRESizeInt;const Limit:TFLRESizeInt;const WithEmpty:TFLREInt32;const Error:PPAnsiChar):TFLREInt32;
+function FLRETest(const Instance:pointer;const Input:pointer;const InputLength:TFLRESizeInt;const StartPosition:TFLRESizeInt;const Error:PPAnsiChar):TFLREInt32;
+function FLRETestAll(const Instance:pointer;const Input:pointer;const InputLength:TFLRESizeInt;const StartPosition:TFLRESizeInt;const Error:PPAnsiChar):TFLREInt32;
+function FLREFind(const Instance:pointer;const Input:pointer;const InputLength:TFLRESizeInt;const StartPosition:TFLRESizeInt;const Error:PPAnsiChar):TFLRESizeInt;
 
 procedure InitializeFLRE;
 
 implementation
 
-const MaxGeneration=int64($4000000000000000);
+const MaxGeneration=TFLREInt64($4000000000000000);
 
       Mark=nil;
 
@@ -1151,7 +1377,7 @@ const MaxGeneration=int64($4000000000000000);
       sfDFAFullMatch=1 shl (sfEmptyShift+3);
       sfDFAStart=1 shl (sfEmptyShift+4);
       sfDFANeedShift=16;
-      sfDFACacheMask=longword(longword($ffffffff) and not sfDFAStart);
+      sfDFACacheMask=TFLREUInt32(TFLREUInt32($ffffffff) and not sfDFAStart);
 
       // Default state kind
       dskDead=0;
@@ -1255,7 +1481,7 @@ const MaxGeneration=int64($4000000000000000);
       npMultiMatch=6;
       npTopLevel=7;
 
-      NodePrecedences:array[ntALT..ntBACKREFERENCEIGNORECASE] of longint=
+      NodePrecedences:array[ntALT..ntBACKREFERENCEIGNORECASE] of TFLREInt32=
        (
         npAlternate,   // ntALT=0;
         npConcat,      // ntCAT=1;
@@ -1276,28 +1502,9 @@ const MaxGeneration=int64($4000000000000000);
 
       FLREInitialized:longbool=false;
 
-{$ifndef fpc}
-{$if Declared(CompilerVersion) and (CompilerVersion>=23.0)}
-type qword=uint64;
+type TUTF8Chars=array[TFLRERawByteChar] of TFLREUInt8;
 
-     ptruint=NativeUInt;
-     ptrint=NativeInt;
-{$else}
-type qword=int64;
-
-{$ifdef cpu64}
-     ptruint=qword;
-     ptrint=int64;
-{$else}
-     ptruint=longword;
-     ptrint=longint;
-{$endif}
-{$ifend}
-{$endif}
-
-type TUTF8Chars=array[TFLRERawByteChar] of byte;
-
-     TUTF8Bytes=array[byte] of byte;
+     TUTF8Bytes=array[TFLREUInt8] of TFLREUInt8;
 
 {$ifdef FLREStrictUTF8}
                               //0 1 2 3 4 5 6 7 8 9 a b c d e f
@@ -1419,7 +1626,7 @@ const UTF8CharSteps:TUTF8Chars=(1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,  // 0
 var NativeCodeMemoryManager:TFLRENativeCodeMemoryManager;
 {$ifdef HasJIT}
 {$ifdef unix}
-    fpmprotect:function(__addr:pointer;__len:cardinal;__prot:longint):longint; cdecl;// external 'c' name 'mprotect';
+    fpmprotect:function(__addr:pointer;__len:cardinal;__prot:TFLREInt32):TFLREInt32; cdecl;// external 'c' name 'mprotect';
 {$endif}
 {$endif}
 
@@ -1428,7 +1635,7 @@ var NativeCodeMemoryManager:TFLRENativeCodeMemoryManager;
     UTF8DFATransitions:TUTF8Bytes;
 {$endif}
 
-function RoundUpToPowerOfTwo(x:ptruint):ptruint; {$ifdef caninline}inline;{$endif}
+function RoundUpToPowerOfTwo(x:TFLREPtrUInt):TFLREPtrUInt; {$ifdef caninline}inline;{$endif}
 begin
  dec(x);
  x:=x or (x shr 1);
@@ -1442,7 +1649,7 @@ begin
  result:=x+1;
 end;
 
-function RoundUpToMask(x,m:ptruint):ptruint; {$ifdef caninline}inline;{$endif}
+function RoundUpToMask(x,m:TFLREPtrUInt):TFLREPtrUInt; {$ifdef caninline}inline;{$endif}
 begin
  if (x and (m-1))<>0 then begin
   result:=(x+m) and not (m-1);
@@ -1451,9 +1658,9 @@ begin
  end;
 end;
 
-procedure GetMemAligned(var p;Size:longint;Align:longint=16);
+procedure GetMemAligned(var p;Size:TFLRESizeInt;Align:TFLRESizeInt=16);
 var Original,Aligned:pointer;
-    Mask:ptruint;
+    Mask:TFLREPtrUInt;
 begin
  if (Align and (Align-1))<>0 then begin
   Align:=RoundUpToPowerOfTwo(Align);
@@ -1462,11 +1669,11 @@ begin
  inc(Size,((Align shl 1)+sizeof(pointer)));
  GetMem(Original,Size);
  FillChar(Original^,Size,#0);
- Aligned:=pointer(ptruint(ptruint(Original)+sizeof(pointer)));
- if (Align>1) and ((ptruint(Aligned) and Mask)<>0) then begin
-  inc(ptruint(Aligned),ptruint(ptruint(Align)-(ptruint(Aligned) and Mask)));
+ Aligned:=pointer(TFLREPtrUInt(TFLREPtrUInt(Original)+sizeof(pointer)));
+ if (Align>1) and ((TFLREPtrUInt(Aligned) and Mask)<>0) then begin
+  inc(TFLREPtrUInt(Aligned),TFLREPtrUInt(TFLREPtrUInt(Align)-(TFLREPtrUInt(Aligned) and Mask)));
  end;
- pointer(pointer(ptruint(ptruint(Aligned)-sizeof(pointer)))^):=Original;
+ pointer(pointer(TFLREPtrUInt(TFLREPtrUInt(Aligned)-sizeof(pointer)))^):=Original;
  pointer(pointer(@p)^):=Aligned;
 end;
 
@@ -1475,15 +1682,15 @@ var pp:pointer;
 begin
  pp:=pointer(pointer(@p)^);
  if assigned(pp) then begin
-  pp:=pointer(pointer(ptruint(ptruint(pp)-sizeof(pointer)))^);
+  pp:=pointer(pointer(TFLREPtrUInt(TFLREPtrUInt(pp)-sizeof(pointer)))^);
   FreeMem(pp);
  end;
 end;
 
-function CompareInstruction(const a,b:pointer):longint;
+function CompareInstruction(const a,b:pointer):TFLRESizeInt;
 begin
  if assigned(a) and assigned(b) then begin
-  result:=longint(PFLREInstruction(a)^.IDandOpcode shr 8)-longint(PFLREInstruction(b)^.IDandOpcode shr 8);
+  result:=TFLRESizeInt(PFLREInstruction(a)^.IDandOpcode shr 8)-TFLRESizeInt(PFLREInstruction(b)^.IDandOpcode shr 8);
  end else if assigned(a) then begin
   result:=1;
  end else if assigned(b) then begin
@@ -1493,9 +1700,9 @@ begin
  end;
 end;
 
-type TSortCompareFunction=function(const a,b:pointer):longint;
+type TSortCompareFunction=function(const a,b:pointer):TFLRESizeInt;
 
-function IntLog2(x:longword):longword; {$ifdef cpu386}assembler; register;
+function IntLog2(x:TFLREUInt32):TFLREUInt32; {$ifdef cpu386}assembler; register;
 asm
  test eax,eax
  jz @Done
@@ -1519,35 +1726,35 @@ begin
 end;
 {$endif}
 
-procedure MemorySwap(a,b:pointer;Size:longint);
-var Temp:longint;
+procedure MemorySwap(a,b:pointer;Size:TFLRESizeInt);
+var Temp:TFLREInt32;
 begin
- while Size>=SizeOf(longint) do begin
-  Temp:=longword(a^);
-  longword(a^):=longword(b^);
-  longword(b^):=Temp;
-  inc(PtrUInt(a),SizeOf(longword));
-  inc(PtrUInt(b),SizeOf(longword));
-  dec(Size,SizeOf(longword));
+ while Size>=SizeOf(TFLREInt32) do begin
+  Temp:=TFLREUInt32(a^);
+  TFLREUInt32(a^):=TFLREUInt32(b^);
+  TFLREUInt32(b^):=Temp;
+  inc(TFLREPtrUInt(a),SizeOf(TFLREUInt32));
+  inc(TFLREPtrUInt(b),SizeOf(TFLREUInt32));
+  dec(Size,SizeOf(TFLREUInt32));
  end;
- while Size>=SizeOf(byte) do begin
-  Temp:=byte(a^);
-  byte(a^):=byte(b^);
-  byte(b^):=Temp;
-  inc(PtrUInt(a),SizeOf(byte));
-  inc(PtrUInt(b),SizeOf(byte));
-  dec(Size,SizeOf(byte));
+ while Size>=SizeOf(TFLREUInt8) do begin
+  Temp:=TFLREUInt8(a^);
+  TFLREUInt8(a^):=TFLREUInt8(b^);
+  TFLREUInt8(b^):=Temp;
+  inc(TFLREPtrUInt(a),SizeOf(TFLREUInt8));
+  inc(TFLREPtrUInt(b),SizeOf(TFLREUInt8));
+  dec(Size,SizeOf(TFLREUInt8));
  end;
 end;
 
-procedure DirectIntroSort(Items:pointer;Left,Right,ElementSize:longint;CompareFunc:TSortCompareFunction);
+procedure DirectIntroSort(Items:pointer;Left,Right,ElementSize:TFLRESizeInt;CompareFunc:TSortCompareFunction);
 type PByteArray=^TByteArray;
-     TByteArray=array[0..$3fffffff] of byte;
+     TByteArray=array[0..$3fffffff] of TFLREUInt8;
      PStackItem=^TStackItem;
      TStackItem=record
-      Left,Right,Depth:longint;
+      Left,Right,Depth:TFLRESizeInt;
      end;
-var Depth,i,j,Middle,Size,Parent,Child,Pivot,iA,iB,iC:longint;
+var Depth,i,j,Middle,Size,Parent,Child,Pivot,iA,iB,iC:TFLRESizeInt;
     StackItem:PStackItem;
     Stack:array[0..31] of TStackItem;
 begin
@@ -1557,7 +1764,7 @@ begin
   StackItem^.Right:=Right;
   StackItem^.Depth:=IntLog2((Right-Left)+1) shl 1;
   inc(StackItem);
-  while ptruint(pointer(StackItem))>ptruint(pointer(@Stack[0])) do begin
+  while TFLREPtrUInt(pointer(StackItem))>TFLREPtrUInt(pointer(@Stack[0])) do begin
    dec(StackItem);
    Left:=StackItem^.Left;
    Right:=StackItem^.Right;
@@ -1580,7 +1787,7 @@ begin
      inc(iB);
     end;
    end else begin
-    if (Depth=0) or (ptruint(pointer(StackItem))>=ptruint(pointer(@Stack[high(Stack)-1]))) then begin
+    if (Depth=0) or (TFLREPtrUInt(pointer(StackItem))>=TFLREPtrUInt(pointer(@Stack[high(Stack)-1]))) then begin
      // Heap sort
      i:=Size div 2;
      repeat
@@ -1667,14 +1874,14 @@ begin
  end;
 end;
 
-procedure IndirectIntroSort(Items:pointer;Left,Right:longint;CompareFunc:TSortCompareFunction);
+procedure IndirectIntroSort(Items:pointer;Left,Right:TFLRESizeInt;CompareFunc:TSortCompareFunction);
 type PPointers=^TPointers;
      TPointers=array[0..$ffff] of pointer;
      PStackItem=^TStackItem;
      TStackItem=record
-      Left,Right,Depth:longint;
+      Left,Right,Depth:TFLRESizeInt;
      end;
-var Depth,i,j,Middle,Size,Parent,Child:longint;
+var Depth,i,j,Middle,Size,Parent,Child:TFLRESizeInt;
     Pivot,Temp:pointer;
     StackItem:PStackItem;
     Stack:array[0..31] of TStackItem;
@@ -1685,7 +1892,7 @@ begin
   StackItem^.Right:=Right;
   StackItem^.Depth:=IntLog2((Right-Left)+1) shl 1;
   inc(StackItem);
-  while ptruint(pointer(StackItem))>ptruint(pointer(@Stack[0])) do begin
+  while TFLREPtrUInt(pointer(StackItem))>TFLREPtrUInt(pointer(@Stack[0])) do begin
    dec(StackItem);
    Left:=StackItem^.Left;
    Right:=StackItem^.Right;
@@ -1705,7 +1912,7 @@ begin
      end;
     end;
    end else begin
-    if (Depth=0) or (ptruint(pointer(StackItem))>=ptruint(pointer(@Stack[high(Stack)-1]))) then begin
+    if (Depth=0) or (TFLREPtrUInt(pointer(StackItem))>=TFLREPtrUInt(pointer(@Stack[high(Stack)-1]))) then begin
      // Heap sort
      i:=Size div 2;
      Temp:=nil;
@@ -1845,7 +2052,7 @@ asm
  pop ebx
 end;
 
-function InterlockedCompareExchange64(var Target:int64;NewValue:int64;Comperand:int64):int64; assembler; register;
+function InterlockedCompareExchange64(var Target:TFLREInt64;NewValue:TFLREInt64;Comperand:TFLREInt64):TFLREInt64; assembler; register;
 asm
  push ebx
  push edi
@@ -1863,7 +2070,7 @@ end;
 
 {$ifndef fpc}
 {$ifdef cpu386}
-function InterlockedDecrement(var Target:longint):longint; assembler; register;
+function InterlockedDecrement(var Target:TFLREInt32):TFLREInt32; assembler; register;
 asm
  mov edx,$ffffffff
  xchg eax,edx
@@ -1871,7 +2078,7 @@ asm
  dec eax
 end;
 
-function InterlockedIncrement(var Target:longint):longint; assembler; register;
+function InterlockedIncrement(var Target:TFLREInt32):TFLREInt32; assembler; register;
 asm
  mov edx,1
  xchg eax,edx
@@ -1879,71 +2086,71 @@ asm
  inc eax
 end;
 
-function InterlockedExchange(var Target:longint;Source:longint):longint; assembler; register;
+function InterlockedExchange(var Target:TFLREInt32;Source:TFLREInt32):TFLREInt32; assembler; register;
 asm
  lock xchg dword ptr [eax],edx
  mov eax,edx
 end;
 
-function InterlockedExchangeAdd(var Target:longint;Source:longint):longint; assembler; register;
+function InterlockedExchangeAdd(var Target:TFLREInt32;Source:TFLREInt32):TFLREInt32; assembler; register;
 asm
  xchg edx,eax
  lock xadd dword ptr [edx],eax
 end;
 
-function InterlockedCompareExchange(var Target:longint;NewValue,Comperand:longint):longint; assembler; register;
+function InterlockedCompareExchange(var Target:TFLREInt32;NewValue,Comperand:TFLREInt32):TFLREInt32; assembler; register;
 asm
  xchg ecx,eax
  lock cmpxchg dword ptr [ecx],edx
 end;
 {$else}
-function InterlockedDecrement(var Target:longint):longint; {$ifdef caninline}inline;{$endif}
+function InterlockedDecrement(var Target:TFLREInt32):TFLREInt32; {$ifdef caninline}inline;{$endif}
 begin
  result:=Windows.InterlockedDecrement(Target);
 end;
 
-function InterlockedIncrement(var Target:longint):longint; {$ifdef caninline}inline;{$endif}
+function InterlockedIncrement(var Target:TFLREInt32):TFLREInt32; {$ifdef caninline}inline;{$endif}
 begin
  result:=Windows.InterlockedIncrement(Target);
 end;
 
-function InterlockedExchange(var Target:longint;Source:longint):longint; {$ifdef caninline}inline;{$endif}
+function InterlockedExchange(var Target:TFLREInt32;Source:TFLREInt32):TFLREInt32; {$ifdef caninline}inline;{$endif}
 begin
  result:=Windows.InterlockedExchange(Target,Source);
 end;
 
-function InterlockedExchangeAdd(var Target:longint;Source:longint):longint; {$ifdef caninline}inline;{$endif}
+function InterlockedExchangeAdd(var Target:TFLREInt32;Source:TFLREInt32):TFLREInt32; {$ifdef caninline}inline;{$endif}
 begin
  result:=Windows.InterlockedExchangeAdd(Target,Source);
 end;
 
-function InterlockedCompareExchange(var Target:longint;NewValue,Comperand:longint):longint; {$ifdef caninline}inline;{$endif}
+function InterlockedCompareExchange(var Target:TFLREInt32;NewValue,Comperand:TFLREInt32):TFLREInt32; {$ifdef caninline}inline;{$endif}
 begin
  result:=Windows.InterlockedCompareExchange(Target,NewValue,Comperand);
 end;
 {$endif}
 {$else}
-function InterlockedDecrement(var Target:longint):longint; {$ifdef caninline}inline;{$endif}
+function InterlockedDecrement(var Target:TFLREInt32):TFLREInt32; {$ifdef caninline}inline;{$endif}
 begin
  result:=System.InterlockedDecrement(Target);
 end;
 
-function InterlockedIncrement(var Target:longint):longint; {$ifdef caninline}inline;{$endif}
+function InterlockedIncrement(var Target:TFLREInt32):TFLREInt32; {$ifdef caninline}inline;{$endif}
 begin
  result:=System.InterlockedIncrement(Target);
 end;
 
-function InterlockedExchange(var Target:longint;Source:longint):longint; {$ifdef caninline}inline;{$endif}
+function InterlockedExchange(var Target:TFLREInt32;Source:TFLREInt32):TFLREInt32; {$ifdef caninline}inline;{$endif}
 begin
  result:=System.InterlockedExchange(Target,Source);
 end;
 
-function InterlockedExchangeAdd(var Target:longint;Source:longint):longint; {$ifdef caninline}inline;{$endif}
+function InterlockedExchangeAdd(var Target:TFLREInt32;Source:TFLREInt32):TFLREInt32; {$ifdef caninline}inline;{$endif}
 begin
  result:=System.InterlockedExchangeAdd(Target,Source);
 end;
 
-function InterlockedCompareExchange(var Target:longint;NewValue,Comperand:longint):longint; {$ifdef caninline}inline;{$endif}
+function InterlockedCompareExchange(var Target:TFLREInt32;NewValue,Comperand:TFLREInt32):TFLREInt32; {$ifdef caninline}inline;{$endif}
 begin
  result:=System.InterlockedCompareExchange(Target,NewValue,Comperand);
 end;
@@ -1997,6 +2204,7 @@ end;
 {$else}
 {$undef HasDCAS}
 begin
+ result:=false;
 end;
 {$endif}
 {$endif}
@@ -2071,7 +2279,7 @@ end;
 {$endif}
 {$endif}
 
-function Max(const a,b:int64):int64;
+function Max(const a,b:TFLREInt64):TFLREInt64;
 begin
  if a<b then begin
   result:=b;
@@ -2080,8 +2288,8 @@ begin
  end;
 end;
 
-function UnicodeGetCategoryFromTable(c:longword):longword; {$ifdef caninline}inline;{$endif}
-var Index:longword;
+function UnicodeGetCategoryFromTable(c:TFLREUInt32):TFLREUInt32; {$ifdef caninline}inline;{$endif}
+var Index:TFLREUInt32;
 begin
  if c<=$10ffff then begin
   Index:=c shr PUCUUnicodeCategoryArrayBlockBits;
@@ -2091,8 +2299,8 @@ begin
  end;
 end;
 
-function UnicodeGetScriptFromTable(c:longword):longword; {$ifdef caninline}inline;{$endif}
-var Index:longword;
+function UnicodeGetScriptFromTable(c:TFLREUInt32):TFLREUInt32; {$ifdef caninline}inline;{$endif}
+var Index:TFLREUInt32;
 begin
  if c<=$10ffff then begin
   Index:=c shr PUCUUnicodeScriptArrayBlockBits;
@@ -2102,8 +2310,8 @@ begin
  end;
 end;
 
-function UnicodeGetUpperCaseDeltaFromTable(c:longword):longint; {$ifdef caninline}inline;{$endif}
-var Index:longword;
+function UnicodeGetUpperCaseDeltaFromTable(c:TFLREUInt32):TFLREInt32; {$ifdef caninline}inline;{$endif}
+var Index:TFLREUInt32;
 begin
  if c<=$10ffff then begin
   Index:=c shr PUCUUnicodeUpperCaseDeltaArrayBlockBits;
@@ -2113,8 +2321,8 @@ begin
  end;
 end;
 
-function UnicodeGetLowerCaseDeltaFromTable(c:longword):longint; {$ifdef caninline}inline;{$endif}
-var Index:longword;
+function UnicodeGetLowerCaseDeltaFromTable(c:TFLREUInt32):TFLREInt32; {$ifdef caninline}inline;{$endif}
+var Index:TFLREUInt32;
 begin
  if c<=$10ffff then begin
   Index:=c shr PUCUUnicodeLowerCaseDeltaArrayBlockBits;
@@ -2124,8 +2332,8 @@ begin
  end;
 end;
 
-function UnicodeGetTitleCaseDeltaFromTable(c:longword):longint; {$ifdef caninline}inline;{$endif}
-var Index:longword;
+function UnicodeGetTitleCaseDeltaFromTable(c:TFLREUInt32):TFLREInt32; {$ifdef caninline}inline;{$endif}
+var Index:TFLREUInt32;
 begin
  if c<=$10ffff then begin
   Index:=c shr PUCUUnicodeTitleCaseDeltaArrayBlockBits;
@@ -2135,61 +2343,61 @@ begin
  end;
 end;
 
-function UnicodeIsWord(c:longword):boolean; {$ifdef caninline}inline;{$endif}
+function UnicodeIsWord(c:TFLREUInt32):boolean; {$ifdef caninline}inline;{$endif}
 begin
  result:=(UnicodeGetCategoryFromTable(c) in [PUCUUnicodeCategoryLu,PUCUUnicodeCategoryLl,PUCUUnicodeCategoryLt,PUCUUnicodeCategoryLm,PUCUUnicodeCategoryLo,PUCUUnicodeCategoryNd,PUCUUnicodeCategoryNl,PUCUUnicodeCategoryNo,PUCUUnicodeCategoryPc]) or (c=ord('_'));
 end;
 
-function UnicodeIsIDBegin(c:longword):boolean; {$ifdef caninline}inline;{$endif}
+function UnicodeIsIDBegin(c:TFLREUInt32):boolean; {$ifdef caninline}inline;{$endif}
 begin
  result:=(UnicodeGetCategoryFromTable(c) in [PUCUUnicodeCategoryLu,PUCUUnicodeCategoryLl,PUCUUnicodeCategoryLt,PUCUUnicodeCategoryLm,PUCUUnicodeCategoryLo,PUCUUnicodeCategoryNl,PUCUUnicodeCategoryNo,PUCUUnicodeCategoryPc]) or (c=ord('_'));
 end;
 
-function UnicodeIsIDPart(c:longword):boolean; {$ifdef caninline}inline;{$endif}
+function UnicodeIsIDPart(c:TFLREUInt32):boolean; {$ifdef caninline}inline;{$endif}
 begin
  result:=(UnicodeGetCategoryFromTable(c) in [PUCUUnicodeCategoryLu,PUCUUnicodeCategoryLl,PUCUUnicodeCategoryLt,PUCUUnicodeCategoryLm,PUCUUnicodeCategoryLo,PUCUUnicodeCategoryNd,PUCUUnicodeCategoryNl,PUCUUnicodeCategoryNo,PUCUUnicodeCategoryPc]) or (c=ord('_'));
 end;
 
-function UnicodeIsWhiteSpace(c:longword):boolean; {$ifdef caninline}inline;{$endif}
+function UnicodeIsWhiteSpace(c:TFLREUInt32):boolean; {$ifdef caninline}inline;{$endif}
 begin
 //result:=UnicodeGetCategoryFromTable(c) in [PUCUUnicodeCategoryZs,PUCUUnicodeCategoryZp,PUCUUnicodeCategoryZl];
  result:=((c>=$0009) and (c<=$000d)) or (c=$0020) or (c=$00a0) or (c=$1680) or (c=$180e) or ((c>=$2000) and (c<=$200b)) or (c=$2028) or (c=$2029) or (c=$202f) or (c=$205f) or (c=$3000) or (c=$feff) or (c=$fffe);
 end;
 
-function UnicodeToUpper(c:longword):longword; {$ifdef caninline}inline;{$endif}
+function UnicodeToUpper(c:TFLREUInt32):TFLREUInt32; {$ifdef caninline}inline;{$endif}
 begin
- result:=longword(longint(longint(c)+UnicodeGetUpperCaseDeltaFromTable(c)));
+ result:=TFLREUInt32(TFLREInt32(TFLREInt32(c)+UnicodeGetUpperCaseDeltaFromTable(c)));
 end;
 
-function UnicodeToLower(c:longword):longword; {$ifdef caninline}inline;{$endif}
+function UnicodeToLower(c:TFLREUInt32):TFLREUInt32; {$ifdef caninline}inline;{$endif}
 begin
- result:=longword(longint(longint(c)+UnicodeGetLowerCaseDeltaFromTable(c)));
+ result:=TFLREUInt32(TFLREInt32(TFLREInt32(c)+UnicodeGetLowerCaseDeltaFromTable(c)));
 end;
 
-function UnicodeToTitle(c:longword):longword; {$ifdef caninline}inline;{$endif}
+function UnicodeToTitle(c:TFLREUInt32):TFLREUInt32; {$ifdef caninline}inline;{$endif}
 begin
- result:=longword(longint(longint(c)+UnicodeGetTitleCaseDeltaFromTable(c)));
+ result:=TFLREUInt32(TFLREInt32(TFLREInt32(c)+UnicodeGetTitleCaseDeltaFromTable(c)));
 end;
 
-function UTF32CharToUTF8(CharValue:longword):TFLRERawByteString;
+function UTF32CharToUTF8(CharValue:TFLREUInt32):TFLRERawByteString;
 var Data:array[0..{$ifdef FLREStrictUTF8}3{$else}5{$endif}] of TFLRERawByteChar;
-    ResultLen:longint;
+    ResultLen:TFLRESizeInt;
 begin
  if CharValue=0 then begin
   result:=#0;
  end else begin
   if CharValue<=$7f then begin
-   Data[0]:=TFLRERawByteChar(byte(CharValue));
+   Data[0]:=TFLRERawByteChar(TFLREUInt8(CharValue));
    ResultLen:=1;
   end else if CharValue<=$7ff then begin
-   Data[0]:=TFLRERawByteChar(byte($c0 or ((CharValue shr 6) and $1f)));
-   Data[1]:=TFLRERawByteChar(byte($80 or (CharValue and $3f)));
+   Data[0]:=TFLRERawByteChar(TFLREUInt8($c0 or ((CharValue shr 6) and $1f)));
+   Data[1]:=TFLRERawByteChar(TFLREUInt8($80 or (CharValue and $3f)));
    ResultLen:=2;
 {$ifdef FLREStrictUTF8}
   end else if CharValue<=$d7ff then begin
-   Data[0]:=TFLRERawByteChar(byte($e0 or ((CharValue shr 12) and $0f)));
-   Data[1]:=TFLRERawByteChar(byte($80 or ((CharValue shr 6) and $3f)));
-   Data[2]:=TFLRERawByteChar(byte($80 or (CharValue and $3f)));
+   Data[0]:=TFLRERawByteChar(TFLREUInt8($e0 or ((CharValue shr 12) and $0f)));
+   Data[1]:=TFLRERawByteChar(TFLREUInt8($80 or ((CharValue shr 6) and $3f)));
+   Data[2]:=TFLRERawByteChar(TFLREUInt8($80 or (CharValue and $3f)));
    ResultLen:=3;
   end else if CharValue<=$dfff then begin
    Data[0]:=#$ef; // $fffd
@@ -2198,31 +2406,31 @@ begin
    ResultLen:=3;
 {$endif}
   end else if CharValue<=$ffff then begin
-   Data[0]:=TFLRERawByteChar(byte($e0 or ((CharValue shr 12) and $0f)));
-   Data[1]:=TFLRERawByteChar(byte($80 or ((CharValue shr 6) and $3f)));
-   Data[2]:=TFLRERawByteChar(byte($80 or (CharValue and $3f)));
+   Data[0]:=TFLRERawByteChar(TFLREUInt8($e0 or ((CharValue shr 12) and $0f)));
+   Data[1]:=TFLRERawByteChar(TFLREUInt8($80 or ((CharValue shr 6) and $3f)));
+   Data[2]:=TFLRERawByteChar(TFLREUInt8($80 or (CharValue and $3f)));
    ResultLen:=3;
   end else if CharValue<=$1fffff then begin
-   Data[0]:=TFLRERawByteChar(byte($f0 or ((CharValue shr 18) and $07)));
-   Data[1]:=TFLRERawByteChar(byte($80 or ((CharValue shr 12) and $3f)));
-   Data[2]:=TFLRERawByteChar(byte($80 or ((CharValue shr 6) and $3f)));
-   Data[3]:=TFLRERawByteChar(byte($80 or (CharValue and $3f)));
+   Data[0]:=TFLRERawByteChar(TFLREUInt8($f0 or ((CharValue shr 18) and $07)));
+   Data[1]:=TFLRERawByteChar(TFLREUInt8($80 or ((CharValue shr 12) and $3f)));
+   Data[2]:=TFLRERawByteChar(TFLREUInt8($80 or ((CharValue shr 6) and $3f)));
+   Data[3]:=TFLRERawByteChar(TFLREUInt8($80 or (CharValue and $3f)));
    ResultLen:=4;
 {$ifndef FLREStrictUTF8}
   end else if CharValue<=$3ffffff then begin
-   Data[0]:=TFLRERawByteChar(byte($f8 or ((CharValue shr 24) and $03)));
-   Data[1]:=TFLRERawByteChar(byte($80 or ((CharValue shr 18) and $3f)));
-   Data[2]:=TFLRERawByteChar(byte($80 or ((CharValue shr 12) and $3f)));
-   Data[3]:=TFLRERawByteChar(byte($80 or ((CharValue shr 6) and $3f)));
-   Data[4]:=TFLRERawByteChar(byte($80 or (CharValue and $3f)));
+   Data[0]:=TFLRERawByteChar(TFLREUInt8($f8 or ((CharValue shr 24) and $03)));
+   Data[1]:=TFLRERawByteChar(TFLREUInt8($80 or ((CharValue shr 18) and $3f)));
+   Data[2]:=TFLRERawByteChar(TFLREUInt8($80 or ((CharValue shr 12) and $3f)));
+   Data[3]:=TFLRERawByteChar(TFLREUInt8($80 or ((CharValue shr 6) and $3f)));
+   Data[4]:=TFLRERawByteChar(TFLREUInt8($80 or (CharValue and $3f)));
    ResultLen:=5;
   end else if CharValue<=$7fffffff then begin
-   Data[0]:=TFLRERawByteChar(byte($fc or ((CharValue shr 30) and $01)));
-   Data[1]:=TFLRERawByteChar(byte($80 or ((CharValue shr 24) and $3f)));
-   Data[2]:=TFLRERawByteChar(byte($80 or ((CharValue shr 18) and $3f)));
-   Data[3]:=TFLRERawByteChar(byte($80 or ((CharValue shr 12) and $3f)));
-   Data[4]:=TFLRERawByteChar(byte($80 or ((CharValue shr 6) and $3f)));
-   Data[5]:=TFLRERawByteChar(byte($80 or (CharValue and $3f)));
+   Data[0]:=TFLRERawByteChar(TFLREUInt8($fc or ((CharValue shr 30) and $01)));
+   Data[1]:=TFLRERawByteChar(TFLREUInt8($80 or ((CharValue shr 24) and $3f)));
+   Data[2]:=TFLRERawByteChar(TFLREUInt8($80 or ((CharValue shr 18) and $3f)));
+   Data[3]:=TFLRERawByteChar(TFLREUInt8($80 or ((CharValue shr 12) and $3f)));
+   Data[4]:=TFLRERawByteChar(TFLREUInt8($80 or ((CharValue shr 6) and $3f)));
+   Data[5]:=TFLRERawByteChar(TFLREUInt8($80 or (CharValue and $3f)));
    ResultLen:=6;
 {$endif}
   end else begin
@@ -2235,7 +2443,7 @@ begin
  end;
 end;
 
-function FLREUTF32CharToUTF8Len(CharValue:longword):longint;
+function FLREUTF32CharToUTF8Len(CharValue:TFLREUInt32):TFLRESizeInt;
 begin
  if CharValue<=$7f then begin
   result:=1;
@@ -2257,8 +2465,8 @@ begin
 end;
 
 function FLREIsUTF8(const s:TFLRERawByteString):boolean;
-var CodeUnit,CodePoints:longint;
-    State:longword;
+var CodeUnit,CodePoints:TFLRESizeInt;
+    State:TFLREUInt32;
 begin
  State:=ucACCEPT;
  CodePoints:=0;
@@ -2278,8 +2486,8 @@ begin
 end;
 
 function UTF8Validate(const s:TFLRERawByteString):boolean;
-var CodeUnit:longint;
-    State:longword;
+var CodeUnit:TFLRESizeInt;
+    State:TFLREUInt32;
 begin
  State:=ucACCEPT;
  for CodeUnit:=1 to length(s) do begin
@@ -2292,9 +2500,9 @@ begin
  result:=State=ucACCEPT;
 end;
 
-function UTF8Get(const s:TFLRERawByteString):longint;
-var CodeUnit,CodePoints:longint;
-    State:longword;
+function UTF8Get(const s:TFLRERawByteString):TFLRESizeInt;
+var CodeUnit,CodePoints:TFLRESizeInt;
+    State:TFLREUInt32;
 begin
  State:=ucACCEPT;
  CodePoints:=0;
@@ -2321,9 +2529,9 @@ begin
  end;
 end;
 
-function UTF8PtrGet(const s:PFLRERawByteChar;Len:longint):longint;
-var CodeUnit,CodePoints:longint;
-    State:longword;
+function UTF8PtrGet(const s:PFLRERawByteChar;Len:TFLRESizeInt):TFLRESizeInt;
+var CodeUnit,CodePoints:TFLRESizeInt;
+    State:TFLREUInt32;
 begin
  State:=ucACCEPT;
  CodePoints:=0;
@@ -2350,9 +2558,9 @@ begin
  end;
 end;
 
-procedure UTF8SafeInc(const s:TFLRERawByteString;var CodeUnit:longint);
-var Len:longint;
-    StartCodeUnit,State:longword;
+procedure UTF8SafeInc(const s:TFLRERawByteString;var CodeUnit:TFLRESizeInt);
+var Len:TFLRESizeInt;
+    StartCodeUnit,State:TFLREUInt32;
 begin
  Len:=length(s);
  if CodeUnit>0 then begin
@@ -2371,8 +2579,9 @@ begin
  end;
 end;
 
-procedure UTF8PtrSafeInc(const s:PFLRERawByteChar;var Len,CodeUnit:longint);
-var StartCodeUnit,State:longword;
+procedure UTF8PtrSafeInc(const s:PFLRERawByteChar;var Len,CodeUnit:TFLRESizeInt);
+var StartCodeUnit:TFLRESizeInt;
+    State:TFLREUInt32;
 begin
  if CodeUnit>=0 then begin
   StartCodeUnit:=CodeUnit;
@@ -2390,21 +2599,21 @@ begin
  end;
 end;
 
-procedure UTF8Inc(const s:TFLRERawByteString;var CodeUnit:longint);
+procedure UTF8Inc(const s:TFLRERawByteString;var CodeUnit:TFLRESizeInt);
 begin
  if (CodeUnit>0) and (CodeUnit<=length(s)) then begin
   inc(CodeUnit,UTF8CharSteps[s[CodeUnit]]);
  end;
 end;
 
-procedure UTF8PtrInc(const s:PFLRERawByteChar;Len:longint;var CodeUnit:longint);
+procedure UTF8PtrInc(const s:PFLRERawByteChar;Len:TFLRESizeInt;var CodeUnit:TFLRESizeInt);
 begin
  if (CodeUnit>=0) and (CodeUnit<Len) then begin
   inc(CodeUnit,UTF8CharSteps[s[CodeUnit]]);
  end;
 end;
 
-procedure UTF8Dec(const s:TFLRERawByteString;var CodeUnit:longint);
+procedure UTF8Dec(const s:TFLRERawByteString;var CodeUnit:TFLRESizeInt);
 begin
  if (CodeUnit>=1) and (CodeUnit<=(length(s)+1)) then begin
   dec(CodeUnit);
@@ -2418,7 +2627,7 @@ begin
  end;
 end;
 
-procedure UTF8PtrDec(const s:PFLRERawByteChar;Len:longint;var CodeUnit:longint);
+procedure UTF8PtrDec(const s:PFLRERawByteChar;Len:TFLRESizeInt;var CodeUnit:TFLRESizeInt);
 begin
  if (CodeUnit>0) and (CodeUnit<=Len) then begin
   dec(CodeUnit);
@@ -2432,7 +2641,7 @@ begin
  end;
 end;
 
-procedure UTF8Delete(var s:TFLRERawByteString;CodeUnit:longint);
+procedure UTF8Delete(var s:TFLRERawByteString;CodeUnit:TFLRESizeInt);
 begin
  if (CodeUnit>=1) and (CodeUnit<=length(s)) then begin
   Delete(s,CodeUnit,1);
@@ -2442,7 +2651,7 @@ begin
  end;
 end;
 
-function UTF8Length(const s:TFLRERawByteString):longint; {$ifdef cpu386} assembler; register;
+function UTF8Length(const s:TFLRERawByteString):TFLRESizeInt; {$ifdef cpu386} assembler; register;
 asm
  test eax,eax
  jz @End
@@ -2468,18 +2677,18 @@ asm
  @End:
 end;
 {$else}
-var CodeUnit:longint;
+var CodeUnit:TFLRESizeInt;
 begin
  result:=0;
  for CodeUnit:=1 to length(s) do begin
-  if (byte(s[CodeUnit]) and $c0)<>$80 then begin
+  if (TFLREUInt8(s[CodeUnit]) and $c0)<>$80 then begin
    inc(result);
   end;
  end;
 end;
 {$endif}
 
-function UTF8PtrLength(const s:TFLRERawByteString;Len:longint):longint;
+function UTF8PtrLength(const s:TFLRERawByteString;Len:TFLRESizeInt):TFLRESizeInt;
 {$ifdef cpu386} assembler; register;
 asm
  test eax,eax
@@ -2506,20 +2715,20 @@ asm
  @End:
 end;
 {$else}
-var CodeUnit:longint;
+var CodeUnit:TFLRESizeInt;
 begin
  result:=0;
  for CodeUnit:=0 to Len-1 do begin
-  if (byte(s[CodeUnit]) and $c0)<>$80 then begin
+  if (TFLREUInt8(s[CodeUnit]) and $c0)<>$80 then begin
    inc(result);
   end;
  end;
 end;
 {$endif}
 
-function UTF8LengthEx(const s:TFLRERawByteString):longint;
-var State:longword;
-    CodeUnit:longint;
+function UTF8LengthEx(const s:TFLRERawByteString):TFLRESizeInt;
+var State:TFLREUInt32;
+    CodeUnit:TFLRESizeInt;
 begin
  result:=0;
  State:=ucACCEPT;
@@ -2540,8 +2749,8 @@ begin
  end;
 end;
 
-function UTF8GetCodePoint(const s:TFLRERawByteString;CodeUnit:longint):longint;
-var CurrentCodeUnit,Len:longint;
+function UTF8GetCodePoint(const s:TFLRERawByteString;CodeUnit:TFLRESizeInt):TFLRESizeInt;
+var CurrentCodeUnit,Len:TFLRESizeInt;
 begin
  if CodeUnit<1 then begin
   result:=-1;
@@ -2556,8 +2765,8 @@ begin
  end;
 end;
 
-function UTF8PtrGetCodePoint(const s:PFLRERawByteChar;Len,CodeUnit:longint):longint;
-var CurrentCodeUnit:longint;
+function UTF8PtrGetCodePoint(const s:PFLRERawByteChar;Len,CodeUnit:TFLRESizeInt):TFLRESizeInt;
+var CurrentCodeUnit:TFLRESizeInt;
 begin
  result:=-1;
  if CodeUnit<0 then begin
@@ -2569,8 +2778,8 @@ begin
  end;
 end;
 
-function UTF8GetCodeUnit(const s:TFLRERawByteString;CodePoint:longint):longint;
-var CurrentCodePoint,Len:longint;
+function UTF8GetCodeUnit(const s:TFLRERawByteString;CodePoint:TFLRESizeInt):TFLRESizeInt;
+var CurrentCodePoint,Len:TFLRESizeInt;
 begin
  if CodePoint<0 then begin
   result:=0;
@@ -2585,8 +2794,8 @@ begin
  end;
 end;
 
-function UTF8PtrGetCodeUnit(const s:TFLRERawByteString;Len,CodePoint:longint):longint;
-var CurrentCodePoint:longint;
+function UTF8PtrGetCodeUnit(const s:TFLRERawByteString;Len,CodePoint:TFLRESizeInt):TFLRESizeInt;
+var CurrentCodePoint:TFLRESizeInt;
 begin
  result:=-1;
  if CodePoint>=0 then begin
@@ -2600,14 +2809,14 @@ begin
  end;
 end;
 
-function UTF8CodeUnitGetChar(const s:TFLRERawByteString;CodeUnit:longint):longword;
-var Value,CharClass,State:longword;
+function UTF8CodeUnitGetChar(const s:TFLRERawByteString;CodeUnit:TFLRESizeInt):TFLREUInt32;
+var Value,CharClass,State:TFLREUInt32;
 begin
  result:=0;
  if (CodeUnit>0) and (CodeUnit<=length(s)) then begin
   State:=ucACCEPT;
   for CodeUnit:=CodeUnit to length(s) do begin
-   Value:=byte(TFLRERawByteChar(s[CodeUnit]));
+   Value:=TFLREUInt8(TFLRERawByteChar(s[CodeUnit]));
    CharClass:=UTF8DFACharClasses[TFLRERawByteChar(Value)];
    if State=ucACCEPT then begin
     result:=Value and ($ff shr CharClass);
@@ -2625,14 +2834,14 @@ begin
  end;
 end;
 
-function UTF8PtrCodeUnitGetChar(const s:PFLRERawByteChar;Len,CodeUnit:longint):longword;
-var Value,CharClass,State:longword;
+function UTF8PtrCodeUnitGetChar(const s:PFLRERawByteChar;Len,CodeUnit:TFLRESizeInt):TFLREUInt32;
+var Value,CharClass,State:TFLREUInt32;
 begin
  result:=0;
  if (CodeUnit>=0) and (CodeUnit<Len) then begin
   State:=ucACCEPT;
   for CodeUnit:=CodeUnit to Len-1 do begin
-   Value:=byte(TFLRERawByteChar(s[CodeUnit]));
+   Value:=TFLREUInt8(TFLRERawByteChar(s[CodeUnit]));
    CharClass:=UTF8DFACharClasses[TFLRERawByteChar(Value)];
    if State=ucACCEPT then begin
     result:=Value and ($ff shr CharClass);
@@ -2650,16 +2859,16 @@ begin
  end;
 end;
 
-function UTF8PtrCodeUnitGetCharFallback(const s:PFLRERawByteChar;Len,CodeUnit:longint):longword;
-var Value,CharClass,State:longword;
-    StartCodeUnit:longint;
+function UTF8PtrCodeUnitGetCharFallback(const s:PFLRERawByteChar;Len,CodeUnit:TFLRESizeInt):TFLREUInt32;
+var Value,CharClass,State:TFLREUInt32;
+    StartCodeUnit:TFLRESizeInt;
 begin
  result:=0;
  if (CodeUnit>=0) and (CodeUnit<Len) then begin
   StartCodeUnit:=CodeUnit;
   State:=ucACCEPT;
   for CodeUnit:=CodeUnit to Len-1 do begin
-   Value:=byte(TFLRERawByteChar(s[CodeUnit]));
+   Value:=TFLREUInt8(TFLRERawByteChar(s[CodeUnit]));
    CharClass:=UTF8DFACharClasses[TFLRERawByteChar(Value)];
    if State=ucACCEPT then begin
     result:=Value and ($ff shr CharClass);
@@ -2672,21 +2881,21 @@ begin
    end;
   end;
   if State<>ucACCEPT then begin
-   result:=byte(TFLRERawByteChar(s[StartCodeUnit]));
+   result:=TFLREUInt8(TFLRERawByteChar(s[StartCodeUnit]));
   end;
  end;
 end;
 
-function UTF8CodeUnitGetCharAndInc(const s:TFLRERawByteString;var CodeUnit:longint):longword;
-var Len:longint;
-    Value,CharClass,State:longword;
+function UTF8CodeUnitGetCharAndInc(const s:TFLRERawByteString;var CodeUnit:TFLRESizeInt):TFLREUInt32;
+var Len:TFLRESizeInt;
+    Value,CharClass,State:TFLREUInt32;
 begin
  result:=0;
  Len:=length(s);
  if (CodeUnit>0) and (CodeUnit<=Len) then begin
   State:=ucACCEPT;
   while CodeUnit<=Len do begin
-   Value:=byte(TFLRERawByteChar(s[CodeUnit]));
+   Value:=TFLREUInt8(TFLRERawByteChar(s[CodeUnit]));
    inc(CodeUnit);
    CharClass:=UTF8DFACharClasses[TFLRERawByteChar(Value)];
    if State=ucACCEPT then begin
@@ -2705,14 +2914,14 @@ begin
  end;
 end;
 
-function UTF8PtrCodeUnitGetCharAndInc(const s:PFLRERawByteChar;Len:longint;var CodeUnit:longint):longword;
-var Value,CharClass,State:longword;
+function UTF8PtrCodeUnitGetCharAndInc(const s:PFLRERawByteChar;Len:TFLRESizeInt;var CodeUnit:TFLRESizeInt):TFLREUInt32;
+var Value,CharClass,State:TFLREUInt32;
 begin
  result:=0;
  if (CodeUnit>=0) and (CodeUnit<Len) then begin
   State:=ucACCEPT;
   while CodeUnit<Len do begin
-   Value:=byte(TFLRERawByteChar(s[CodeUnit]));
+   Value:=TFLREUInt8(TFLRERawByteChar(s[CodeUnit]));
    inc(CodeUnit);
    CharClass:=UTF8DFACharClasses[TFLRERawByteChar(Value)];
    if State=ucACCEPT then begin
@@ -2731,9 +2940,9 @@ begin
  end;
 end;
 
-function UTF8CodeUnitGetCharFallback(const s:TFLRERawByteString;CodeUnit:longint):longword;
-var Len:longint;
-    StartCodeUnit,Value,CharClass,State:longword;
+function UTF8CodeUnitGetCharFallback(const s:TFLRERawByteString;CodeUnit:TFLRESizeInt):TFLREUInt32;
+var Len:TFLRESizeInt;
+    StartCodeUnit,Value,CharClass,State:TFLREUInt32;
 begin
  result:=0;
  Len:=length(s);
@@ -2741,7 +2950,7 @@ begin
   StartCodeUnit:=CodeUnit;
   State:=ucACCEPT;
   while CodeUnit<=Len do begin
-   Value:=byte(TFLRERawByteChar(s[CodeUnit]));
+   Value:=TFLREUInt8(TFLRERawByteChar(s[CodeUnit]));
    inc(CodeUnit);
    CharClass:=UTF8DFACharClasses[TFLRERawByteChar(Value)];
    if State=ucACCEPT then begin
@@ -2755,14 +2964,14 @@ begin
    end;
   end;
   if State<>ucACCEPT then begin
-   result:=byte(TFLRERawByteChar(s[StartCodeUnit]));
+   result:=TFLREUInt8(TFLRERawByteChar(s[StartCodeUnit]));
   end;
  end;
 end;
 
-function UTF8CodeUnitGetCharAndIncFallback(const s:TFLRERawByteString;var CodeUnit:longint):longword;
-var Len:longint;
-    StartCodeUnit,Value,CharClass,State:longword;
+function UTF8CodeUnitGetCharAndIncFallback(const s:TFLRERawByteString;var CodeUnit:TFLRESizeInt):TFLREUInt32;
+var Len:TFLRESizeInt;
+    StartCodeUnit,Value,CharClass,State:TFLREUInt32;
 begin
  result:=0;
  Len:=length(s);
@@ -2770,7 +2979,7 @@ begin
   StartCodeUnit:=CodeUnit;
   State:=ucACCEPT;
   while CodeUnit<=Len do begin
-   Value:=byte(TFLRERawByteChar(s[CodeUnit]));
+   Value:=TFLREUInt8(TFLRERawByteChar(s[CodeUnit]));
    inc(CodeUnit);
    CharClass:=UTF8DFACharClasses[TFLRERawByteChar(Value)];
    if State=ucACCEPT then begin
@@ -2784,21 +2993,21 @@ begin
    end;
   end;
   if State<>ucACCEPT then begin
-   result:=byte(TFLRERawByteChar(s[StartCodeUnit]));
+   result:=TFLREUInt8(TFLRERawByteChar(s[StartCodeUnit]));
    CodeUnit:=StartCodeUnit+1;
   end;
  end;
 end;
 
-function UTF8PtrCodeUnitGetCharAndIncFallback(const s:PFLRERawByteChar;const Len:longint;var CodeUnit:longint):longword;
-var StartCodeUnit,Value,CharClass,State:longword;
+function UTF8PtrCodeUnitGetCharAndIncFallback(const s:PFLRERawByteChar;const Len:TFLRESizeInt;var CodeUnit:TFLRESizeInt):TFLREUInt32;
+var StartCodeUnit,Value,CharClass,State:TFLREUInt32;
 begin
  result:=0;
  if (CodeUnit>=0) and (CodeUnit<Len) then begin
   StartCodeUnit:=CodeUnit;
   State:=ucACCEPT;
   while CodeUnit<Len do begin
-   Value:=byte(TFLRERawByteChar(s[CodeUnit]));
+   Value:=TFLREUInt8(TFLRERawByteChar(s[CodeUnit]));
    inc(CodeUnit);
    CharClass:=UTF8DFACharClasses[TFLRERawByteChar(Value)];
    if State=ucACCEPT then begin
@@ -2812,18 +3021,18 @@ begin
    end;
   end;
   if State<>ucACCEPT then begin
-   result:=byte(TFLRERawByteChar(s[StartCodeUnit]));
+   result:=TFLREUInt8(TFLRERawByteChar(s[StartCodeUnit]));
    CodeUnit:=StartCodeUnit+1;
   end;
  end;
 end;
 
-function UTF8CodePointGetChar(const s:TFLRERawByteString;CodePoint:longint;Fallback:boolean=false):longword;
+function UTF8CodePointGetChar(const s:TFLRERawByteString;CodePoint:TFLRESizeInt;Fallback:boolean=false):TFLREUInt32;
 begin
  result:=UTF8CodeUnitGetChar(s,UTF8GetCodeUnit(s,CodePoint));
 end;
 
-function UTF8GetCharLen(const s:TFLRERawByteString;i:longint):longword;
+function UTF8GetCharLen(const s:TFLRERawByteString;i:TFLRESizeInt):TFLREUInt32;
 begin
  if (i>0) and (i<=length(s)) then begin
   result:=UTF8CharSteps[s[i]];
@@ -2832,8 +3041,8 @@ begin
  end;
 end;
 
-function UTF8Pos(const FindStr,InStr:TFLRERawByteString):longint;
-var i,j,l:longint;
+function UTF8Pos(const FindStr,InStr:TFLRERawByteString):TFLRESizeInt;
+var i,j,l:TFLRESizeInt;
     ok:boolean;
 begin
  result:=0;
@@ -2858,8 +3067,8 @@ begin
  end;
 end;
 
-function UTF8Copy(const Str:TFLRERawByteString;Start,Len:longint):TFLRERawByteString;
-var CodeUnit:longint;
+function UTF8Copy(const Str:TFLRERawByteString;Start,Len:TFLRESizeInt):TFLRERawByteString;
+var CodeUnit:TFLRESizeInt;
 begin
  result:='';
  CodeUnit:=1;
@@ -2880,8 +3089,8 @@ begin
 end;
 
 function UTF8UpperCase(const Str:TFLRERawByteString):TFLRERawByteString;
-var CodeUnit,Len,ResultLen:longint;
-    StartCodeUnit,Value,CharClass,State,CharValue:longword;
+var CodeUnit,Len,ResultLen:TFLRESizeInt;
+    StartCodeUnit,Value,CharClass,State,CharValue:TFLREUInt32;
     Data:PFLRERawByteChar;
 begin
  result:='';
@@ -2896,7 +3105,7 @@ begin
    State:=ucACCEPT;
    CharValue:=0;
    while CodeUnit<=Len do begin
-    Value:=byte(TFLRERawByteChar(Str[CodeUnit]));
+    Value:=TFLREUInt8(TFLRERawByteChar(Str[CodeUnit]));
     inc(CodeUnit);
     CharClass:=UTF8DFACharClasses[TFLRERawByteChar(Value)];
     if State=ucACCEPT then begin
@@ -2910,25 +3119,25 @@ begin
     end;
    end;
    if State<>ucACCEPT then begin
-    CharValue:=byte(TFLRERawByteChar(Str[StartCodeUnit]));
+    CharValue:=TFLREUInt8(TFLRERawByteChar(Str[StartCodeUnit]));
     CodeUnit:=StartCodeUnit+1;
    end;
    if CharValue<=$10ffff then begin
     Value:=CharValue shr PUCUUnicodeUpperCaseDeltaArrayBlockBits;
-    CharValue:=longword(longint(longint(CharValue)+PUCUUnicodeUpperCaseDeltaArrayBlockData[PUCUUnicodeUpperCaseDeltaArrayIndexBlockData[PUCUUnicodeUpperCaseDeltaArrayIndexIndexData[Value shr PUCUUnicodeUpperCaseDeltaArrayIndexBlockBits],Value and PUCUUnicodeUpperCaseDeltaArrayIndexBlockMask],CharValue and PUCUUnicodeUpperCaseDeltaArrayBlockMask]));
+    CharValue:=TFLREUInt32(TFLREInt32(TFLREInt32(CharValue)+PUCUUnicodeUpperCaseDeltaArrayBlockData[PUCUUnicodeUpperCaseDeltaArrayIndexBlockData[PUCUUnicodeUpperCaseDeltaArrayIndexIndexData[Value shr PUCUUnicodeUpperCaseDeltaArrayIndexBlockBits],Value and PUCUUnicodeUpperCaseDeltaArrayIndexBlockMask],CharValue and PUCUUnicodeUpperCaseDeltaArrayBlockMask]));
    end;
    if CharValue<=$7f then begin
-    Data[ResultLen]:=TFLRERawByteChar(byte(CharValue));
+    Data[ResultLen]:=TFLRERawByteChar(TFLREUInt8(CharValue));
     inc(ResultLen);
    end else if CharValue<=$7ff then begin
-    Data[ResultLen]:=TFLRERawByteChar(byte($c0 or ((CharValue shr 6) and $1f)));
-    Data[ResultLen+1]:=TFLRERawByteChar(byte($80 or (CharValue and $3f)));
+    Data[ResultLen]:=TFLRERawByteChar(TFLREUInt8($c0 or ((CharValue shr 6) and $1f)));
+    Data[ResultLen+1]:=TFLRERawByteChar(TFLREUInt8($80 or (CharValue and $3f)));
     inc(ResultLen,2);
 {$ifdef FLREStrictUTF8}
    end else if CharValue<=$d7ff then begin
-    Data[ResultLen]:=TFLRERawByteChar(byte($e0 or ((CharValue shr 12) and $0f)));
-    Data[ResultLen+1]:=TFLRERawByteChar(byte($80 or ((CharValue shr 6) and $3f)));
-    Data[ResultLen+2]:=TFLRERawByteChar(byte($80 or (CharValue and $3f)));
+    Data[ResultLen]:=TFLRERawByteChar(TFLREUInt8($e0 or ((CharValue shr 12) and $0f)));
+    Data[ResultLen+1]:=TFLRERawByteChar(TFLREUInt8($80 or ((CharValue shr 6) and $3f)));
+    Data[ResultLen+2]:=TFLRERawByteChar(TFLREUInt8($80 or (CharValue and $3f)));
     inc(ResultLen,3);
    end else if CharValue<=$dfff then begin
     Data[ResultLen]:=#$ef; // $fffd
@@ -2937,31 +3146,31 @@ begin
     inc(ResultLen,3);
 {$endif}
    end else if CharValue<=$ffff then begin
-    Data[ResultLen]:=TFLRERawByteChar(byte($e0 or ((CharValue shr 12) and $0f)));
-    Data[ResultLen+1]:=TFLRERawByteChar(byte($80 or ((CharValue shr 6) and $3f)));
-    Data[ResultLen+2]:=TFLRERawByteChar(byte($80 or (CharValue and $3f)));
+    Data[ResultLen]:=TFLRERawByteChar(TFLREUInt8($e0 or ((CharValue shr 12) and $0f)));
+    Data[ResultLen+1]:=TFLRERawByteChar(TFLREUInt8($80 or ((CharValue shr 6) and $3f)));
+    Data[ResultLen+2]:=TFLRERawByteChar(TFLREUInt8($80 or (CharValue and $3f)));
     inc(ResultLen,3);
    end else if CharValue<=$1fffff then begin
-    Data[ResultLen]:=TFLRERawByteChar(byte($f0 or ((CharValue shr 18) and $07)));
-    Data[ResultLen+1]:=TFLRERawByteChar(byte($80 or ((CharValue shr 12) and $3f)));
-    Data[ResultLen+2]:=TFLRERawByteChar(byte($80 or ((CharValue shr 6) and $3f)));
-    Data[ResultLen+3]:=TFLRERawByteChar(byte($80 or (CharValue and $3f)));
+    Data[ResultLen]:=TFLRERawByteChar(TFLREUInt8($f0 or ((CharValue shr 18) and $07)));
+    Data[ResultLen+1]:=TFLRERawByteChar(TFLREUInt8($80 or ((CharValue shr 12) and $3f)));
+    Data[ResultLen+2]:=TFLRERawByteChar(TFLREUInt8($80 or ((CharValue shr 6) and $3f)));
+    Data[ResultLen+3]:=TFLRERawByteChar(TFLREUInt8($80 or (CharValue and $3f)));
     inc(ResultLen,4);
 {$ifndef FLREStrictUTF8}
    end else if CharValue<=$3ffffff then begin
-    Data[ResultLen]:=TFLRERawByteChar(byte($f8 or ((CharValue shr 24) and $03)));
-    Data[ResultLen+1]:=TFLRERawByteChar(byte($80 or ((CharValue shr 18) and $3f)));
-    Data[ResultLen+2]:=TFLRERawByteChar(byte($80 or ((CharValue shr 12) and $3f)));
-    Data[ResultLen+3]:=TFLRERawByteChar(byte($80 or ((CharValue shr 6) and $3f)));
-    Data[ResultLen+4]:=TFLRERawByteChar(byte($80 or (CharValue and $3f)));
+    Data[ResultLen]:=TFLRERawByteChar(TFLREUInt8($f8 or ((CharValue shr 24) and $03)));
+    Data[ResultLen+1]:=TFLRERawByteChar(TFLREUInt8($80 or ((CharValue shr 18) and $3f)));
+    Data[ResultLen+2]:=TFLRERawByteChar(TFLREUInt8($80 or ((CharValue shr 12) and $3f)));
+    Data[ResultLen+3]:=TFLRERawByteChar(TFLREUInt8($80 or ((CharValue shr 6) and $3f)));
+    Data[ResultLen+4]:=TFLRERawByteChar(TFLREUInt8($80 or (CharValue and $3f)));
     inc(ResultLen,5);
    end else if CharValue<=$7fffffff then begin
-    Data[ResultLen]:=TFLRERawByteChar(byte($fc or ((CharValue shr 30) and $01)));
-    Data[ResultLen+1]:=TFLRERawByteChar(byte($80 or ((CharValue shr 24) and $3f)));
-    Data[ResultLen+2]:=TFLRERawByteChar(byte($80 or ((CharValue shr 18) and $3f)));
-    Data[ResultLen+3]:=TFLRERawByteChar(byte($80 or ((CharValue shr 12) and $3f)));
-    Data[ResultLen+4]:=TFLRERawByteChar(byte($80 or ((CharValue shr 6) and $3f)));
-    Data[ResultLen+5]:=TFLRERawByteChar(byte($80 or (CharValue and $3f)));
+    Data[ResultLen]:=TFLRERawByteChar(TFLREUInt8($fc or ((CharValue shr 30) and $01)));
+    Data[ResultLen+1]:=TFLRERawByteChar(TFLREUInt8($80 or ((CharValue shr 24) and $3f)));
+    Data[ResultLen+2]:=TFLRERawByteChar(TFLREUInt8($80 or ((CharValue shr 18) and $3f)));
+    Data[ResultLen+3]:=TFLRERawByteChar(TFLREUInt8($80 or ((CharValue shr 12) and $3f)));
+    Data[ResultLen+4]:=TFLRERawByteChar(TFLREUInt8($80 or ((CharValue shr 6) and $3f)));
+    Data[ResultLen+5]:=TFLRERawByteChar(TFLREUInt8($80 or (CharValue and $3f)));
     inc(ResultLen,6);
 {$endif}
    end else begin
@@ -2976,8 +3185,8 @@ begin
 end;
 
 function UTF8LowerCase(const Str:TFLRERawByteString):TFLRERawByteString;
-var CodeUnit,Len,ResultLen:longint;
-    StartCodeUnit,Value,CharClass,State,CharValue:longword;
+var CodeUnit,Len,ResultLen:TFLRESizeInt;
+    StartCodeUnit,Value,CharClass,State,CharValue:TFLREUInt32;
     Data:PFLRERawByteChar;
 begin
  result:='';
@@ -2992,7 +3201,7 @@ begin
    State:=ucACCEPT;
    CharValue:=0;
    while CodeUnit<=Len do begin
-    Value:=byte(TFLRERawByteChar(Str[CodeUnit]));
+    Value:=TFLREUInt8(TFLRERawByteChar(Str[CodeUnit]));
     inc(CodeUnit);
     CharClass:=UTF8DFACharClasses[TFLRERawByteChar(Value)];
     if State=ucACCEPT then begin
@@ -3006,25 +3215,25 @@ begin
     end;
    end;
    if State<>ucACCEPT then begin
-    CharValue:=byte(TFLRERawByteChar(Str[StartCodeUnit]));
+    CharValue:=TFLREUInt8(TFLRERawByteChar(Str[StartCodeUnit]));
     CodeUnit:=StartCodeUnit+1;
    end;
    if CharValue<=$10ffff then begin
     Value:=CharValue shr PUCUUnicodeLowerCaseDeltaArrayBlockBits;
-    CharValue:=longword(longint(longint(CharValue)+PUCUUnicodeLowerCaseDeltaArrayBlockData[PUCUUnicodeLowerCaseDeltaArrayIndexBlockData[PUCUUnicodeLowerCaseDeltaArrayIndexIndexData[Value shr PUCUUnicodeLowerCaseDeltaArrayIndexBlockBits],Value and PUCUUnicodeLowerCaseDeltaArrayIndexBlockMask],CharValue and PUCUUnicodeLowerCaseDeltaArrayBlockMask]));
+    CharValue:=TFLREUInt32(TFLREInt32(TFLREInt32(CharValue)+PUCUUnicodeLowerCaseDeltaArrayBlockData[PUCUUnicodeLowerCaseDeltaArrayIndexBlockData[PUCUUnicodeLowerCaseDeltaArrayIndexIndexData[Value shr PUCUUnicodeLowerCaseDeltaArrayIndexBlockBits],Value and PUCUUnicodeLowerCaseDeltaArrayIndexBlockMask],CharValue and PUCUUnicodeLowerCaseDeltaArrayBlockMask]));
    end;
    if CharValue<=$7f then begin
-    Data[ResultLen]:=TFLRERawByteChar(byte(CharValue));
+    Data[ResultLen]:=TFLRERawByteChar(TFLREUInt8(CharValue));
     inc(ResultLen);
    end else if CharValue<=$7ff then begin
-    Data[ResultLen]:=TFLRERawByteChar(byte($c0 or ((CharValue shr 6) and $1f)));
-    Data[ResultLen+1]:=TFLRERawByteChar(byte($80 or (CharValue and $3f)));
+    Data[ResultLen]:=TFLRERawByteChar(TFLREUInt8($c0 or ((CharValue shr 6) and $1f)));
+    Data[ResultLen+1]:=TFLRERawByteChar(TFLREUInt8($80 or (CharValue and $3f)));
     inc(ResultLen,2);
 {$ifdef FLREStrictUTF8}
    end else if CharValue<=$d7ff then begin
-    Data[ResultLen]:=TFLRERawByteChar(byte($e0 or ((CharValue shr 12) and $0f)));
-    Data[ResultLen+1]:=TFLRERawByteChar(byte($80 or ((CharValue shr 6) and $3f)));
-    Data[ResultLen+2]:=TFLRERawByteChar(byte($80 or (CharValue and $3f)));
+    Data[ResultLen]:=TFLRERawByteChar(TFLREUInt8($e0 or ((CharValue shr 12) and $0f)));
+    Data[ResultLen+1]:=TFLRERawByteChar(TFLREUInt8($80 or ((CharValue shr 6) and $3f)));
+    Data[ResultLen+2]:=TFLRERawByteChar(TFLREUInt8($80 or (CharValue and $3f)));
     inc(ResultLen,3);
    end else if CharValue<=$dfff then begin
     Data[ResultLen]:=#$ef; // $fffd
@@ -3033,31 +3242,31 @@ begin
     inc(ResultLen,3);
 {$endif}
    end else if CharValue<=$ffff then begin
-    Data[ResultLen]:=TFLRERawByteChar(byte($e0 or ((CharValue shr 12) and $0f)));
-    Data[ResultLen+1]:=TFLRERawByteChar(byte($80 or ((CharValue shr 6) and $3f)));
-    Data[ResultLen+2]:=TFLRERawByteChar(byte($80 or (CharValue and $3f)));
+    Data[ResultLen]:=TFLRERawByteChar(TFLREUInt8($e0 or ((CharValue shr 12) and $0f)));
+    Data[ResultLen+1]:=TFLRERawByteChar(TFLREUInt8($80 or ((CharValue shr 6) and $3f)));
+    Data[ResultLen+2]:=TFLRERawByteChar(TFLREUInt8($80 or (CharValue and $3f)));
     inc(ResultLen,3);
    end else if CharValue<=$1fffff then begin
-    Data[ResultLen]:=TFLRERawByteChar(byte($f0 or ((CharValue shr 18) and $07)));
-    Data[ResultLen+1]:=TFLRERawByteChar(byte($80 or ((CharValue shr 12) and $3f)));
-    Data[ResultLen+2]:=TFLRERawByteChar(byte($80 or ((CharValue shr 6) and $3f)));
-    Data[ResultLen+3]:=TFLRERawByteChar(byte($80 or (CharValue and $3f)));
+    Data[ResultLen]:=TFLRERawByteChar(TFLREUInt8($f0 or ((CharValue shr 18) and $07)));
+    Data[ResultLen+1]:=TFLRERawByteChar(TFLREUInt8($80 or ((CharValue shr 12) and $3f)));
+    Data[ResultLen+2]:=TFLRERawByteChar(TFLREUInt8($80 or ((CharValue shr 6) and $3f)));
+    Data[ResultLen+3]:=TFLRERawByteChar(TFLREUInt8($80 or (CharValue and $3f)));
     inc(ResultLen,4);
 {$ifndef FLREStrictUTF8}
    end else if CharValue<=$3ffffff then begin
-    Data[ResultLen]:=TFLRERawByteChar(byte($f8 or ((CharValue shr 24) and $03)));
-    Data[ResultLen+1]:=TFLRERawByteChar(byte($80 or ((CharValue shr 18) and $3f)));
-    Data[ResultLen+2]:=TFLRERawByteChar(byte($80 or ((CharValue shr 12) and $3f)));
-    Data[ResultLen+3]:=TFLRERawByteChar(byte($80 or ((CharValue shr 6) and $3f)));
-    Data[ResultLen+4]:=TFLRERawByteChar(byte($80 or (CharValue and $3f)));
+    Data[ResultLen]:=TFLRERawByteChar(TFLREUInt8($f8 or ((CharValue shr 24) and $03)));
+    Data[ResultLen+1]:=TFLRERawByteChar(TFLREUInt8($80 or ((CharValue shr 18) and $3f)));
+    Data[ResultLen+2]:=TFLRERawByteChar(TFLREUInt8($80 or ((CharValue shr 12) and $3f)));
+    Data[ResultLen+3]:=TFLRERawByteChar(TFLREUInt8($80 or ((CharValue shr 6) and $3f)));
+    Data[ResultLen+4]:=TFLRERawByteChar(TFLREUInt8($80 or (CharValue and $3f)));
     inc(ResultLen,5);
    end else if CharValue<=$7fffffff then begin
-    Data[ResultLen]:=TFLRERawByteChar(byte($fc or ((CharValue shr 30) and $01)));
-    Data[ResultLen+1]:=TFLRERawByteChar(byte($80 or ((CharValue shr 24) and $3f)));
-    Data[ResultLen+2]:=TFLRERawByteChar(byte($80 or ((CharValue shr 18) and $3f)));
-    Data[ResultLen+3]:=TFLRERawByteChar(byte($80 or ((CharValue shr 12) and $3f)));
-    Data[ResultLen+4]:=TFLRERawByteChar(byte($80 or ((CharValue shr 6) and $3f)));
-    Data[ResultLen+5]:=TFLRERawByteChar(byte($80 or (CharValue and $3f)));
+    Data[ResultLen]:=TFLRERawByteChar(TFLREUInt8($fc or ((CharValue shr 30) and $01)));
+    Data[ResultLen+1]:=TFLRERawByteChar(TFLREUInt8($80 or ((CharValue shr 24) and $3f)));
+    Data[ResultLen+2]:=TFLRERawByteChar(TFLREUInt8($80 or ((CharValue shr 18) and $3f)));
+    Data[ResultLen+3]:=TFLRERawByteChar(TFLREUInt8($80 or ((CharValue shr 12) and $3f)));
+    Data[ResultLen+4]:=TFLRERawByteChar(TFLREUInt8($80 or ((CharValue shr 6) and $3f)));
+    Data[ResultLen+5]:=TFLRERawByteChar(TFLREUInt8($80 or (CharValue and $3f)));
     inc(ResultLen,6);
 {$endif}
    end else begin
@@ -3072,7 +3281,7 @@ begin
 end;
 
 function UTF8Trim(const Str:TFLRERawByteString):TFLRERawByteString;
-var i,j:longint;
+var i,j:TFLRESizeInt;
 begin
  i:=1;
  while UnicodeIsWhiteSpace(UTF8CodeUnitGetChar(Str,i)) do begin
@@ -3084,7 +3293,7 @@ begin
   UTF8Dec(Str,j);
  end;
  if (j<=length(Str)) and (Str[j]>=#80) then begin
-  inc(j,longint(UTF8GetCharLen(Str,j))-1);
+  inc(j,TFLRESizeInt(UTF8GetCharLen(Str,j))-1);
  end;
  if i<=j then begin
   result:=copy(Str,i,(j-i)+1);
@@ -3094,8 +3303,8 @@ begin
 end;
 
 function UTF8Correct(const Str:TFLRERawByteString):TFLRERawByteString;
-var CodeUnit,Len,ResultLen:longint;
-    StartCodeUnit,Value,CharClass,State,CharValue:longword;
+var CodeUnit,Len,ResultLen:TFLRESizeInt;
+    StartCodeUnit,Value,CharClass,State,CharValue:TFLREUInt32;
     Data:PFLRERawByteChar;
 begin
  if (length(Str)=0) or UTF8Validate(Str) then begin
@@ -3112,7 +3321,7 @@ begin
    State:=ucACCEPT;
    CharValue:=0;
    while CodeUnit<=Len do begin
-    Value:=byte(TFLRERawByteChar(Str[CodeUnit]));
+    Value:=TFLREUInt8(TFLRERawByteChar(Str[CodeUnit]));
     inc(CodeUnit);
     CharClass:=UTF8DFACharClasses[TFLRERawByteChar(Value)];
     if State=ucACCEPT then begin
@@ -3126,21 +3335,21 @@ begin
     end;
    end;
    if State<>ucACCEPT then begin
-    CharValue:=byte(TFLRERawByteChar(Str[StartCodeUnit]));
+    CharValue:=TFLREUInt8(TFLRERawByteChar(Str[StartCodeUnit]));
     CodeUnit:=StartCodeUnit+1;
    end;
    if CharValue<=$7f then begin
-    Data[ResultLen]:=TFLRERawByteChar(byte(CharValue));
+    Data[ResultLen]:=TFLRERawByteChar(TFLREUInt8(CharValue));
     inc(ResultLen);
    end else if CharValue<=$7ff then begin
-    Data[ResultLen]:=TFLRERawByteChar(byte($c0 or ((CharValue shr 6) and $1f)));
-    Data[ResultLen+1]:=TFLRERawByteChar(byte($80 or (CharValue and $3f)));
+    Data[ResultLen]:=TFLRERawByteChar(TFLREUInt8($c0 or ((CharValue shr 6) and $1f)));
+    Data[ResultLen+1]:=TFLRERawByteChar(TFLREUInt8($80 or (CharValue and $3f)));
     inc(ResultLen,2);
 {$ifdef FLREStrictUTF8}
    end else if CharValue<=$d7ff then begin
-    Data[ResultLen]:=TFLRERawByteChar(byte($e0 or ((CharValue shr 12) and $0f)));
-    Data[ResultLen+1]:=TFLRERawByteChar(byte($80 or ((CharValue shr 6) and $3f)));
-    Data[ResultLen+2]:=TFLRERawByteChar(byte($80 or (CharValue and $3f)));
+    Data[ResultLen]:=TFLRERawByteChar(TFLREUInt8($e0 or ((CharValue shr 12) and $0f)));
+    Data[ResultLen+1]:=TFLRERawByteChar(TFLREUInt8($80 or ((CharValue shr 6) and $3f)));
+    Data[ResultLen+2]:=TFLRERawByteChar(TFLREUInt8($80 or (CharValue and $3f)));
     inc(ResultLen,3);
    end else if CharValue<=$dfff then begin
     Data[ResultLen]:=#$ef; // $fffd
@@ -3149,31 +3358,31 @@ begin
     inc(ResultLen,3);
 {$endif}
    end else if CharValue<=$ffff then begin
-    Data[ResultLen]:=TFLRERawByteChar(byte($e0 or ((CharValue shr 12) and $0f)));
-    Data[ResultLen+1]:=TFLRERawByteChar(byte($80 or ((CharValue shr 6) and $3f)));
-    Data[ResultLen+2]:=TFLRERawByteChar(byte($80 or (CharValue and $3f)));
+    Data[ResultLen]:=TFLRERawByteChar(TFLREUInt8($e0 or ((CharValue shr 12) and $0f)));
+    Data[ResultLen+1]:=TFLRERawByteChar(TFLREUInt8($80 or ((CharValue shr 6) and $3f)));
+    Data[ResultLen+2]:=TFLRERawByteChar(TFLREUInt8($80 or (CharValue and $3f)));
     inc(ResultLen,3);
    end else if CharValue<=$1fffff then begin
-    Data[ResultLen]:=TFLRERawByteChar(byte($f0 or ((CharValue shr 18) and $07)));
-    Data[ResultLen+1]:=TFLRERawByteChar(byte($80 or ((CharValue shr 12) and $3f)));
-    Data[ResultLen+2]:=TFLRERawByteChar(byte($80 or ((CharValue shr 6) and $3f)));
-    Data[ResultLen+3]:=TFLRERawByteChar(byte($80 or (CharValue and $3f)));
+    Data[ResultLen]:=TFLRERawByteChar(TFLREUInt8($f0 or ((CharValue shr 18) and $07)));
+    Data[ResultLen+1]:=TFLRERawByteChar(TFLREUInt8($80 or ((CharValue shr 12) and $3f)));
+    Data[ResultLen+2]:=TFLRERawByteChar(TFLREUInt8($80 or ((CharValue shr 6) and $3f)));
+    Data[ResultLen+3]:=TFLRERawByteChar(TFLREUInt8($80 or (CharValue and $3f)));
     inc(ResultLen,4);
 {$ifndef FLREStrictUTF8}
    end else if CharValue<=$3ffffff then begin
-    Data[ResultLen]:=TFLRERawByteChar(byte($f8 or ((CharValue shr 24) and $03)));
-    Data[ResultLen+1]:=TFLRERawByteChar(byte($80 or ((CharValue shr 18) and $3f)));
-    Data[ResultLen+2]:=TFLRERawByteChar(byte($80 or ((CharValue shr 12) and $3f)));
-    Data[ResultLen+3]:=TFLRERawByteChar(byte($80 or ((CharValue shr 6) and $3f)));
-    Data[ResultLen+4]:=TFLRERawByteChar(byte($80 or (CharValue and $3f)));
+    Data[ResultLen]:=TFLRERawByteChar(TFLREUInt8($f8 or ((CharValue shr 24) and $03)));
+    Data[ResultLen+1]:=TFLRERawByteChar(TFLREUInt8($80 or ((CharValue shr 18) and $3f)));
+    Data[ResultLen+2]:=TFLRERawByteChar(TFLREUInt8($80 or ((CharValue shr 12) and $3f)));
+    Data[ResultLen+3]:=TFLRERawByteChar(TFLREUInt8($80 or ((CharValue shr 6) and $3f)));
+    Data[ResultLen+4]:=TFLRERawByteChar(TFLREUInt8($80 or (CharValue and $3f)));
     inc(ResultLen,5);            
    end else if CharValue<=$7fffffff then begin
-    Data[ResultLen]:=TFLRERawByteChar(byte($fc or ((CharValue shr 30) and $01)));
-    Data[ResultLen+1]:=TFLRERawByteChar(byte($80 or ((CharValue shr 24) and $3f)));
-    Data[ResultLen+2]:=TFLRERawByteChar(byte($80 or ((CharValue shr 18) and $3f)));
-    Data[ResultLen+3]:=TFLRERawByteChar(byte($80 or ((CharValue shr 12) and $3f)));
-    Data[ResultLen+4]:=TFLRERawByteChar(byte($80 or ((CharValue shr 6) and $3f)));
-    Data[ResultLen+5]:=TFLRERawByteChar(byte($80 or (CharValue and $3f)));
+    Data[ResultLen]:=TFLRERawByteChar(TFLREUInt8($fc or ((CharValue shr 30) and $01)));
+    Data[ResultLen+1]:=TFLRERawByteChar(TFLREUInt8($80 or ((CharValue shr 24) and $3f)));
+    Data[ResultLen+2]:=TFLRERawByteChar(TFLREUInt8($80 or ((CharValue shr 18) and $3f)));
+    Data[ResultLen+3]:=TFLRERawByteChar(TFLREUInt8($80 or ((CharValue shr 12) and $3f)));
+    Data[ResultLen+4]:=TFLRERawByteChar(TFLREUInt8($80 or ((CharValue shr 6) and $3f)));
+    Data[ResultLen+5]:=TFLRERawByteChar(TFLREUInt8($80 or (CharValue and $3f)));
     inc(ResultLen,6);
 {$endif}
    end else begin
@@ -3188,22 +3397,22 @@ begin
 end;
 
 function UTF8FromLatin1(const Str:TFLRERawByteString):TFLRERawByteString;
-var CodeUnit:longint;
+var CodeUnit:TFLRESizeInt;
 begin
  if UTF8Validate(Str) then begin
   result:=Str;
  end else begin
   result:='';
   for CodeUnit:=1 to length(Str) do begin
-   result:=result+UTF32CharToUTF8(byte(TFLRERawByteChar(Str[CodeUnit])));
+   result:=result+UTF32CharToUTF8(TFLREUInt8(TFLRERawByteChar(Str[CodeUnit])));
   end;
  end;
 end;
 
-function UTF8LevenshteinDistance(const s,t:TFLRERawByteString):longint;
-var d:array of array of longint;
-    n,m,i,j,ci,cj,oi,oj,Deletion,Insertion,Substitution:longint;
-    si,tj:longword;
+function UTF8LevenshteinDistance(const s,t:TFLRERawByteString):TFLRESizeInt;
+var d:array of array of TFLRESizeInt;
+    n,m,i,j,ci,cj,oi,oj,Deletion,Insertion,Substitution:TFLRESizeInt;
+    si,tj:TFLRESizeUInt;
 begin
  n:=UTF8LengthEx(s);
  m:=UTF8LengthEx(t);
@@ -3281,10 +3490,10 @@ begin
  end;
 end;
 
-function UTF8DamerauLevenshteinDistance(const s,t:TFLRERawByteString):longint;
-var d:array of array of longint;
-    n,m,i,j,ci,cj,oi,oj,Cost,Deletion,Insertion,Substitution,Transposition,Value:longint;
-    si,tj,lsi,ltj:longword;
+function UTF8DamerauLevenshteinDistance(const s,t:TFLRERawByteString):TFLRESizeInt;
+var d:array of array of TFLRESizeInt;
+    n,m,i,j,ci,cj,oi,oj,Cost,Deletion,Insertion,Substitution,Transposition,Value:TFLRESizeInt;
+    si,tj,lsi,ltj:TFLRESizeUInt;
 begin
  n:=UTF8LengthEx(s);
  m:=UTF8LengthEx(t);
@@ -3374,7 +3583,7 @@ begin
  end;
 end;
 
-function FLREStringLength(const s:TFLRERawByteString):longint;
+function FLREStringLength(const s:TFLRERawByteString):TFLRESizeInt;
 begin
  if FLREIsUTF8(s) then begin
   result:=UTF8Length(s);
@@ -3383,7 +3592,7 @@ begin
  end;
 end;
 
-function PopFirstOneBit(var Value:longword):longword;{$ifdef cpu386}assembler; register; {$ifdef fpc}nostackframe;{$endif}
+function PopFirstOneBit(var Value:TFLREUInt32):TFLREUInt32;{$ifdef cpu386}assembler; register; {$ifdef fpc}nostackframe;{$endif}
 asm
  push esi
  mov esi,Value
@@ -3441,10 +3650,12 @@ end;
 
 // Thanks to Jeffrey Lim
 
-function PtrPosCharSearch(const p:pointer;const v:TFLREQWord;const pEnd:pointer):ptrint; assembler; register;
+function PtrPosCharSearch(const p:pointer;const v:TFLREQWord;const pEnd:pointer):TFLREPtrInt; assembler; register;
 asm
 {$ifdef Windows}
  // Win64 ABI to System-V ABI wrapper
+ push rsi
+ push rdi
  mov rdi,rcx
  mov rsi,rdx
  mov rdx,r8
@@ -3504,23 +3715,40 @@ asm
  jc @Fail
  add rax,rdx
 @Done:
+{$ifdef Windows}
+ pop rdi
+ pop rsi
+{$endif}
 end;
 
-function PtrPosChar(const SearchChar:TFLRERawByteChar;const Text:PFLRERawByteChar;TextLength:longint;Offset:longint=0):ptrint;
+function PtrPosChar(const SearchChar:TFLRERawByteChar;const Text:PFLRERawByteChar;TextLength:TFLRESizeInt;Offset:TFLRESizeInt=0):TFLRESizeInt;
 begin
- result:=PtrPosCharSearch(@Text[Offset],byte(TFLRERawByteChar(SearchChar)),@Text[TextLength]);
- if result=0 then begin
-  result:=-1;
+ if Offset<TextLength then begin
+  result:=PtrPosCharSearch(@Text[Offset],TFLREUInt8(TFLRERawByteChar(SearchChar)),@Text[TextLength]);
+  if result=0 then begin
+   result:=-1;
+  end else begin
+   dec(result,TFLREPtrInt(pointer(@Text[Offset])));
+  end;
  end else begin
-  dec(result,ptrint(pointer(@Text[Offset])));
+  result:=-1;
  end;
 end;
 
-function PtrPosCharSetOf2Search(const p:pointer;const v:TFLREQWord;const pEnd:pointer):ptrint; assembler; register;
-const XMM1Constant:array[0..1] of TFLREQWord=(TFLREQWord($0101010101010101),TFLREQWord($0101010101010101));
+type TXMMValue=record
+      Lo:TFLREQWord;
+      Hi:TFLREQWord;
+     end{$ifndef fpc}{$if CompilerVersion>=28.0}align 16{$ifend}{$endif};
+
+function PtrPosCharSetOf2Search(const p:pointer;const v:TFLREQWord;const pEnd:pointer):TFLREPtrInt; assembler; register;
+{$if defined(fpc) and (fpc_version>=3)}{$push}{$codealign localmin=16}{$codealign varmin=16}{$codealign constmin=16}{$ifend}
+const XMM1Constant:TXMMValue=(Lo:TFLREQWord($0101010101010101);Hi:TFLREQWord($0101010101010101));
+{$if defined(fpc) and (fpc_version>=3)}{$pop}{$ifend}
 asm
 {$ifdef Windows}
  // Win64 ABI to System-V ABI wrapper
+ push rsi
+ push rdi
  mov rdi,rcx
  mov rsi,rdx
  mov rdx,r8
@@ -3530,7 +3758,11 @@ asm
  movq xmm0,rsi
  movq xmm1,rsi
  pxor xmm2,xmm2
- movdqa xmm3,[{$ifdef fpc}rip+{$else}rel {$endif}XMM1Constant]
+{$ifdef fpc}
+ movdqa xmm3,[rip+XMM1Constant]
+{$else}
+ movdqa xmm3,[rel XMM1Constant]
+{$endif}
  pshufb xmm0,xmm2
  pshufb xmm1,xmm3
 
@@ -3596,24 +3828,36 @@ asm
  jc @Fail
  add rax,rdx
 @Done:
+{$ifdef Windows}
+ pop rdi
+ pop rsi
+{$endif}
 end;
 
-function PtrPosCharSetOf2(const SearchChar0,SearchChar1:TFLRERawByteChar;const Text:PFLRERawByteChar;TextLength:longint;Offset:longint=0):ptrint;
+function PtrPosCharSetOf2(const SearchChar0,SearchChar1:TFLRERawByteChar;const Text:PFLRERawByteChar;TextLength:TFLRESizeInt;Offset:TFLRESizeInt=0):TFLRESizeInt;
 begin
- result:=PtrPosCharSetOf2Search(@Text[Offset],(TFLREQWord(byte(TFLRERawByteChar(SearchChar1))) shl 8) or TFLREQWord(byte(TFLRERawByteChar(SearchChar0))),@Text[TextLength]);
- if result=0 then begin
-  result:=-1;
+ if Offset<TextLength then begin
+  result:=PtrPosCharSetOf2Search(@Text[Offset],(TFLREQWord(TFLREUInt8(TFLRERawByteChar(SearchChar1))) shl 8) or TFLREQWord(TFLREUInt8(TFLRERawByteChar(SearchChar0))),@Text[TextLength]);
+  if result=0 then begin
+   result:=-1;
+  end else begin
+   dec(result,TFLREPtrInt(pointer(@Text[Offset])));
+  end;
  end else begin
-  dec(result,ptrint(pointer(@Text[Offset])));
+  result:=-1;
  end;
 end;
 
-function PtrPosCharSetOf3Search(const p:pointer;const v:TFLREQWord;const pEnd:pointer):ptrint; assembler; register;
-const XMM1Constant:array[0..1] of TFLREQWord=(TFLREQWord($0101010101010101),TFLREQWord($0101010101010101));
-      XMM2Constant:array[0..1] of TFLREQWord=(TFLREQWord($0202020202020202),TFLREQWord($0202020202020202));
+function PtrPosCharSetOf3Search(const p:pointer;const v:TFLREQWord;const pEnd:pointer):TFLREPtrInt; assembler; register;
+{$if defined(fpc) and (fpc_version>=3)}{$push}{$codealign localmin=16}{$codealign varmin=16}{$codealign constmin=16}{$ifend}
+const XMM1Constant:TXMMValue=(Lo:TFLREQWord($0101010101010101);Hi:TFLREQWord($0101010101010101));
+      XMM2Constant:TXMMValue=(Lo:TFLREQWord($0202020202020202);Hi:TFLREQWord($0202020202020202));
+{$if defined(fpc) and (fpc_version>=3)}{$pop}{$ifend}
 asm
 {$ifdef Windows}
  // Win64 ABI to System-V ABI wrapper
+ push rsi
+ push rdi
  mov rdi,rcx
  mov rsi,rdx
  mov rdx,r8
@@ -3630,8 +3874,13 @@ asm
  and ecx,31
 
  pxor xmm9,xmm9
- movdqa xmm10,[{$ifdef fpc}rip+{$else}rel {$endif}XMM1Constant]
- movdqa xmm11,[{$ifdef fpc}rip+{$else}rel {$endif}XMM2Constant]
+{$ifdef fpc}
+ movdqa xmm10,[rip+XMM1Constant]
+ movdqa xmm11,[rip+XMM2Constant]
+{$else}
+ movdqa xmm10,[rel XMM1Constant]
+ movdqa xmm11,[rel XMM2Constant]
+{$endif}
 
  movdqa xmm3,[rdi]
  movdqa xmm4,[rdi]
@@ -3710,29 +3959,41 @@ asm
  jc @Fail
  add rax,rdx
 @Done:
+{$ifdef Windows}
+ pop rdi
+ pop rsi
+{$endif}
 end;
 
-function PtrPosCharSetOf3(const SearchChar0,SearchChar1,SearchChar2:TFLRERawByteChar;const Text:PFLRERawByteChar;TextLength:longint;Offset:longint=0):ptrint;
+function PtrPosCharSetOf3(const SearchChar0,SearchChar1,SearchChar2:TFLRERawByteChar;const Text:PFLRERawByteChar;TextLength:TFLRESizeInt;Offset:TFLRESizeInt=0):TFLRESizeInt;
 begin
- result:=PtrPosCharSetOf3Search(@Text[Offset],
-                               (TFLREQWord(byte(TFLRERawByteChar(SearchChar2))) shl 16) or
-                               (TFLREQWord(byte(TFLRERawByteChar(SearchChar1))) shl 8) or
-                               TFLREQWord(byte(TFLRERawByteChar(SearchChar0))),
-                               @Text[TextLength]);
- if result=0 then begin
-  result:=-1;
+ if Offset<TextLength then begin
+  result:=PtrPosCharSetOf3Search(@Text[Offset],
+                                (TFLREQWord(TFLREUInt8(TFLRERawByteChar(SearchChar2))) shl 16) or
+                                (TFLREQWord(TFLREUInt8(TFLRERawByteChar(SearchChar1))) shl 8) or
+                                TFLREQWord(TFLREUInt8(TFLRERawByteChar(SearchChar0))),
+                                @Text[TextLength]);
+  if result=0 then begin
+   result:=-1;
+  end else begin
+   dec(result,TFLREPtrInt(pointer(@Text[Offset])));
+  end;
  end else begin
-  dec(result,ptrint(pointer(@Text[Offset])));
+  result:=-1;
  end;
 end;
 
-function PtrPosCharSetOf4Search(const p:pointer;const v:TFLREQWord;const pEnd:pointer):ptrint; assembler; register;
-const XMM1Constant:array[0..1] of TFLREQWord=(TFLREQWord($0101010101010101),TFLREQWord($0101010101010101));
-      XMM2Constant:array[0..1] of TFLREQWord=(TFLREQWord($0202020202020202),TFLREQWord($0202020202020202));
-      XMM3Constant:array[0..1] of TFLREQWord=(TFLREQWord($0303030303030303),TFLREQWord($0303030303030303));
+function PtrPosCharSetOf4Search(const p:pointer;const v:TFLREQWord;const pEnd:pointer):TFLREPtrInt; assembler; register;
+{$if defined(fpc) and (fpc_version>=3)}{$push}{$codealign localmin=16}{$codealign varmin=16}{$codealign constmin=16}{$ifend}
+const XMM1Constant:TXMMValue=(Lo:TFLREQWord($0101010101010101);Hi:TFLREQWord($0101010101010101));
+      XMM2Constant:TXMMValue=(Lo:TFLREQWord($0202020202020202);Hi:TFLREQWord($0202020202020202));
+      XMM3Constant:TXMMValue=(Lo:TFLREQWord($0303030303030303);Hi:TFLREQWord($0303030303030303));
+{$if defined(fpc) and (fpc_version>=3)}{$pop}{$ifend}
 asm
 {$ifdef Windows}
  // Win64 ABI to System-V ABI wrapper
+ push rsi
+ push rdi
  mov rdi,rcx
  mov rsi,rdx
  mov rdx,r8
@@ -3750,9 +4011,15 @@ asm
  and ecx,31
 
  pxor xmm12,xmm12
- movdqa xmm13,[{$ifdef fpc}rip+{$else}rel {$endif}XMM1Constant]
- movdqa xmm14,[{$ifdef fpc}rip+{$else}rel {$endif}XMM2Constant]
- movdqa xmm15,[{$ifdef fpc}rip+{$else}rel {$endif}XMM3Constant]
+{$ifdef fpc}
+ movdqa xmm13,[rip+XMM1Constant]
+ movdqa xmm14,[rip+XMM2Constant]
+ movdqa xmm15,[rip+XMM3Constant]
+{$else}
+ movdqa xmm13,[rel XMM1Constant]
+ movdqa xmm14,[rel XMM2Constant]
+ movdqa xmm15,[rel XMM3Constant]
+{$endif}
 
  movdqa xmm4,[rdi]
  movdqa xmm5,[rdi]
@@ -3844,31 +4111,43 @@ asm
  jc @Fail
  add rax,rdx
 @Done:
+{$ifdef Windows}
+ pop rdi
+ pop rsi
+{$endif}
 end;
 
-function PtrPosCharSetOf4(const SearchChar0,SearchChar1,SearchChar2,SearchChar3:TFLRERawByteChar;const Text:PFLRERawByteChar;TextLength:longint;Offset:longint=0):ptrint;
+function PtrPosCharSetOf4(const SearchChar0,SearchChar1,SearchChar2,SearchChar3:TFLRERawByteChar;const Text:PFLRERawByteChar;TextLength:TFLRESizeInt;Offset:TFLRESizeInt=0):TFLRESizeInt;
 begin
- result:=PtrPosCharSetOf4Search(@Text[Offset],
-                               (TFLREQWord(byte(TFLRERawByteChar(SearchChar3))) shl 24) or
-                               (TFLREQWord(byte(TFLRERawByteChar(SearchChar2))) shl 16) or
-                               (TFLREQWord(byte(TFLRERawByteChar(SearchChar1))) shl 8) or
-                               TFLREQWord(byte(TFLRERawByteChar(SearchChar0))),
-                               @Text[TextLength]);
- if result=0 then begin
-  result:=-1;
+ if Offset<TextLength then begin
+  result:=PtrPosCharSetOf4Search(@Text[Offset],
+                                (TFLREQWord(TFLREUInt8(TFLRERawByteChar(SearchChar3))) shl 24) or
+                                (TFLREQWord(TFLREUInt8(TFLRERawByteChar(SearchChar2))) shl 16) or
+                                (TFLREQWord(TFLREUInt8(TFLRERawByteChar(SearchChar1))) shl 8) or
+                                TFLREQWord(TFLREUInt8(TFLRERawByteChar(SearchChar0))),
+                                @Text[TextLength]);
+  if result=0 then begin
+   result:=-1;
+  end else begin
+   dec(result,TFLREPtrInt(pointer(@Text[Offset])));
+  end;
  end else begin
-  dec(result,ptrint(pointer(@Text[Offset])));
+  result:=-1;
  end;
 end;
 
-function PtrPosCharSetOf5Search(const p:pointer;const v:TFLREQWord;const pEnd:pointer):ptrint; assembler; register;
-const XMM1Constant:array[0..1] of TFLREQWord=(TFLREQWord($0101010101010101),TFLREQWord($0101010101010101));
-      XMM2Constant:array[0..1] of TFLREQWord=(TFLREQWord($0202020202020202),TFLREQWord($0202020202020202));
-      XMM3Constant:array[0..1] of TFLREQWord=(TFLREQWord($0303030303030303),TFLREQWord($0303030303030303));
-      XMM4Constant:array[0..1] of TFLREQWord=(TFLREQWord($0404040404040404),TFLREQWord($0404040404040404));
+function PtrPosCharSetOf5Search(const p:pointer;const v:TFLREQWord;const pEnd:pointer):TFLREPtrInt; assembler; register;
+{$if defined(fpc) and (fpc_version>=3)}{$push}{$codealign localmin=16}{$codealign varmin=16}{$codealign constmin=16}{$ifend}
+const XMM1Constant:TXMMValue=(Lo:TFLREQWord($0101010101010101);Hi:TFLREQWord($0101010101010101));
+      XMM2Constant:TXMMValue=(Lo:TFLREQWord($0202020202020202);Hi:TFLREQWord($0202020202020202));
+      XMM3Constant:TXMMValue=(Lo:TFLREQWord($0303030303030303);Hi:TFLREQWord($0303030303030303));
+      XMM4Constant:TXMMValue=(Lo:TFLREQWord($0404040404040404);Hi:TFLREQWord($0404040404040404));
+{$if defined(fpc) and (fpc_version>=3)}{$pop}{$ifend}
 asm
 {$ifdef Windows}
  // Win64 ABI to System-V ABI wrapper
+ push rsi
+ push rdi
  mov rdi,rcx
  mov rsi,rdx
  mov rdx,r8
@@ -3887,10 +4166,17 @@ asm
  and ecx,15
 
  pxor xmm11,xmm11
- movdqa xmm12,[{$ifdef fpc}rip+{$else}rel {$endif}XMM1Constant]
- movdqa xmm13,[{$ifdef fpc}rip+{$else}rel {$endif}XMM2Constant]
- movdqa xmm14,[{$ifdef fpc}rip+{$else}rel {$endif}XMM3Constant]
- movdqa xmm15,[{$ifdef fpc}rip+{$else}rel {$endif}XMM4Constant]
+{$ifdef fpc}
+ movdqa xmm12,[rip+XMM1Constant]
+ movdqa xmm13,[rip+XMM2Constant]
+ movdqa xmm14,[rip+XMM3Constant]
+ movdqa xmm15,[rip+XMM4Constant]
+{$else}
+ movdqa xmm12,[rel XMM1Constant]
+ movdqa xmm13,[rel XMM2Constant]
+ movdqa xmm14,[rel XMM3Constant]
+ movdqa xmm15,[rel XMM4Constant]
+{$endif}
 
  pshufb xmm0,xmm11
  pshufb xmm1,xmm12
@@ -3965,33 +4251,45 @@ asm
  jc @Fail
  add rax,rdx
 @Done:
+{$ifdef Windows}
+ pop rdi
+ pop rsi
+{$endif}
 end;
 
-function PtrPosCharSetOf5(const SearchChar0,SearchChar1,SearchChar2,SearchChar3,SearchChar4:TFLRERawByteChar;const Text:PFLRERawByteChar;TextLength:longint;Offset:longint=0):ptrint;
+function PtrPosCharSetOf5(const SearchChar0,SearchChar1,SearchChar2,SearchChar3,SearchChar4:TFLRERawByteChar;const Text:PFLRERawByteChar;TextLength:TFLRESizeInt;Offset:TFLRESizeInt=0):TFLRESizeInt;
 begin
- result:=PtrPosCharSetOf5Search(@Text[Offset],
-                               (TFLREQWord(byte(TFLRERawByteChar(SearchChar4))) shl 32) or
-                               (TFLREQWord(byte(TFLRERawByteChar(SearchChar3))) shl 24) or
-                               (TFLREQWord(byte(TFLRERawByteChar(SearchChar2))) shl 16) or
-                               (TFLREQWord(byte(TFLRERawByteChar(SearchChar1))) shl 8) or
-                               TFLREQWord(byte(TFLRERawByteChar(SearchChar0))),
-                               @Text[TextLength]);
- if result=0 then begin
-  result:=-1;
+ if Offset<TextLength then begin
+  result:=PtrPosCharSetOf5Search(@Text[Offset],
+                                (TFLREQWord(TFLREUInt8(TFLRERawByteChar(SearchChar4))) shl 32) or
+                                (TFLREQWord(TFLREUInt8(TFLRERawByteChar(SearchChar3))) shl 24) or
+                                (TFLREQWord(TFLREUInt8(TFLRERawByteChar(SearchChar2))) shl 16) or
+                                (TFLREQWord(TFLREUInt8(TFLRERawByteChar(SearchChar1))) shl 8) or
+                                TFLREQWord(TFLREUInt8(TFLRERawByteChar(SearchChar0))),
+                                @Text[TextLength]);
+  if result=0 then begin
+   result:=-1;
+  end else begin
+   dec(result,TFLREPtrInt(pointer(@Text[Offset])));
+  end;
  end else begin
-  dec(result,ptrint(pointer(@Text[Offset])));
+  result:=-1;
  end;
 end;
 
-function PtrPosCharSetOf6Search(const p:pointer;const v:TFLREQWord;const pEnd:pointer):ptrint; assembler; register;
-const XMM1Constant:array[0..1] of TFLREQWord=(TFLREQWord($0101010101010101),TFLREQWord($0101010101010101));
-      XMM2Constant:array[0..1] of TFLREQWord=(TFLREQWord($0202020202020202),TFLREQWord($0202020202020202));
-      XMM3Constant:array[0..1] of TFLREQWord=(TFLREQWord($0303030303030303),TFLREQWord($0303030303030303));
-      XMM4Constant:array[0..1] of TFLREQWord=(TFLREQWord($0404040404040404),TFLREQWord($0404040404040404));
-      XMM5Constant:array[0..1] of TFLREQWord=(TFLREQWord($0505050505050505),TFLREQWord($0505050505050505));
+function PtrPosCharSetOf6Search(const p:pointer;const v:TFLREQWord;const pEnd:pointer):TFLREPtrInt; assembler; register;
+{$if defined(fpc) and (fpc_version>=3)}{$push}{$codealign localmin=16}{$codealign varmin=16}{$codealign constmin=16}{$ifend}
+const XMM1Constant:TXMMValue=(Lo:TFLREQWord($0101010101010101);Hi:TFLREQWord($0101010101010101));
+      XMM2Constant:TXMMValue=(Lo:TFLREQWord($0202020202020202);Hi:TFLREQWord($0202020202020202));
+      XMM3Constant:TXMMValue=(Lo:TFLREQWord($0303030303030303);Hi:TFLREQWord($0303030303030303));
+      XMM4Constant:TXMMValue=(Lo:TFLREQWord($0404040404040404);Hi:TFLREQWord($0404040404040404));
+      XMM5Constant:TXMMValue=(Lo:TFLREQWord($0505050505050505);Hi:TFLREQWord($0505050505050505));
+{$if defined(fpc) and (fpc_version>=3)}{$pop}{$ifend}
 asm
 {$ifdef Windows}
  // Win64 ABI to System-V ABI wrapper
+ push rsi
+ push rdi
  mov rdi,rcx
  mov rsi,rdx
  mov rdx,r8
@@ -4011,11 +4309,19 @@ asm
  and ecx,15
 
  pxor xmm10,xmm10
- movdqa xmm11,[{$ifdef fpc}rip+{$else}rel {$endif}XMM1Constant]
- movdqa xmm12,[{$ifdef fpc}rip+{$else}rel {$endif}XMM2Constant]
- movdqa xmm13,[{$ifdef fpc}rip+{$else}rel {$endif}XMM3Constant]
- movdqa xmm14,[{$ifdef fpc}rip+{$else}rel {$endif}XMM4Constant]
- movdqa xmm15,[{$ifdef fpc}rip+{$else}rel {$endif}XMM5Constant]
+{$ifdef fpc}
+ movdqa xmm11,[rip+XMM1Constant]
+ movdqa xmm12,[rip+XMM2Constant]
+ movdqa xmm13,[rip+XMM3Constant]
+ movdqa xmm14,[rip+XMM4Constant]
+ movdqa xmm15,[rip+XMM5Constant]
+{$else}
+ movdqa xmm11,[rel XMM1Constant]
+ movdqa xmm12,[rel XMM2Constant]
+ movdqa xmm13,[rel XMM3Constant]
+ movdqa xmm14,[rel XMM4Constant]
+ movdqa xmm15,[rel XMM5Constant]
+{$endif}
 
  pshufb xmm0,xmm10
  pshufb xmm1,xmm11
@@ -4097,35 +4403,47 @@ asm
  jc @Fail
  add rax,rdx
 @Done:
+{$ifdef Windows}
+ pop rdi
+ pop rsi
+{$endif}
 end;
 
-function PtrPosCharSetOf6(const SearchChar0,SearchChar1,SearchChar2,SearchChar3,SearchChar4,SearchChar5:TFLRERawByteChar;const Text:PFLRERawByteChar;TextLength:longint;Offset:longint=0):ptrint;
+function PtrPosCharSetOf6(const SearchChar0,SearchChar1,SearchChar2,SearchChar3,SearchChar4,SearchChar5:TFLRERawByteChar;const Text:PFLRERawByteChar;TextLength:TFLRESizeInt;Offset:TFLRESizeInt=0):TFLRESizeInt;
 begin
- result:=PtrPosCharSetOf6Search(@Text[Offset],
-                               (TFLREQWord(byte(TFLRERawByteChar(SearchChar5))) shl 40) or
-                               (TFLREQWord(byte(TFLRERawByteChar(SearchChar4))) shl 32) or
-                               (TFLREQWord(byte(TFLRERawByteChar(SearchChar3))) shl 24) or
-                               (TFLREQWord(byte(TFLRERawByteChar(SearchChar2))) shl 16) or
-                               (TFLREQWord(byte(TFLRERawByteChar(SearchChar1))) shl 8) or
-                               TFLREQWord(byte(TFLRERawByteChar(SearchChar0))),
-                               @Text[TextLength]);
- if result=0 then begin
-  result:=-1;
+ if Offset<TextLength then begin
+  result:=PtrPosCharSetOf6Search(@Text[Offset],
+                                (TFLREQWord(TFLREUInt8(TFLRERawByteChar(SearchChar5))) shl 40) or
+                                (TFLREQWord(TFLREUInt8(TFLRERawByteChar(SearchChar4))) shl 32) or
+                                (TFLREQWord(TFLREUInt8(TFLRERawByteChar(SearchChar3))) shl 24) or
+                                (TFLREQWord(TFLREUInt8(TFLRERawByteChar(SearchChar2))) shl 16) or
+                                (TFLREQWord(TFLREUInt8(TFLRERawByteChar(SearchChar1))) shl 8) or
+                                TFLREQWord(TFLREUInt8(TFLRERawByteChar(SearchChar0))),
+                                @Text[TextLength]);
+  if result=0 then begin
+   result:=-1;
+  end else begin
+   dec(result,TFLREPtrInt(pointer(@Text[Offset])));
+  end;
  end else begin
-  dec(result,ptrint(pointer(@Text[Offset])));
+  result:=-1;
  end;
 end;
 
-function PtrPosCharSetOf7Search(const p:pointer;const v:TFLREQWord;const pEnd:pointer):ptrint; assembler; register;
-const XMM1Constant:array[0..1] of TFLREQWord=(TFLREQWord($0101010101010101),TFLREQWord($0101010101010101));
-      XMM2Constant:array[0..1] of TFLREQWord=(TFLREQWord($0202020202020202),TFLREQWord($0202020202020202));
-      XMM3Constant:array[0..1] of TFLREQWord=(TFLREQWord($0303030303030303),TFLREQWord($0303030303030303));
-      XMM4Constant:array[0..1] of TFLREQWord=(TFLREQWord($0404040404040404),TFLREQWord($0404040404040404));
-      XMM5Constant:array[0..1] of TFLREQWord=(TFLREQWord($0505050505050505),TFLREQWord($0505050505050505));
-      XMM6Constant:array[0..1] of TFLREQWord=(TFLREQWord($0606060606060606),TFLREQWord($0606060606060606));
+function PtrPosCharSetOf7Search(const p:pointer;const v:TFLREQWord;const pEnd:pointer):TFLREPtrInt; assembler; register;
+{$if defined(fpc) and (fpc_version>=3)}{$push}{$codealign localmin=16}{$codealign varmin=16}{$codealign constmin=16}{$ifend}
+const XMM1Constant:TXMMValue=(Lo:TFLREQWord($0101010101010101);Hi:TFLREQWord($0101010101010101));
+      XMM2Constant:TXMMValue=(Lo:TFLREQWord($0202020202020202);Hi:TFLREQWord($0202020202020202));
+      XMM3Constant:TXMMValue=(Lo:TFLREQWord($0303030303030303);Hi:TFLREQWord($0303030303030303));
+      XMM4Constant:TXMMValue=(Lo:TFLREQWord($0404040404040404);Hi:TFLREQWord($0404040404040404));
+      XMM5Constant:TXMMValue=(Lo:TFLREQWord($0505050505050505);Hi:TFLREQWord($0505050505050505));
+      XMM6Constant:TXMMValue=(Lo:TFLREQWord($0606060606060606);Hi:TFLREQWord($0606060606060606));
+{$if defined(fpc) and (fpc_version>=3)}{$pop}{$ifend}
 asm
 {$ifdef Windows}
  // Win64 ABI to System-V ABI wrapper
+ push rsi
+ push rdi
  mov rdi,rcx
  mov rsi,rdx
  mov rdx,r8
@@ -4146,12 +4464,21 @@ asm
  and ecx,15
 
  pxor xmm9,xmm9
- movdqa xmm10,[{$ifdef fpc}rip+{$else}rel {$endif}XMM1Constant]
- movdqa xmm11,[{$ifdef fpc}rip+{$else}rel {$endif}XMM2Constant]
- movdqa xmm12,[{$ifdef fpc}rip+{$else}rel {$endif}XMM3Constant]
- movdqa xmm13,[{$ifdef fpc}rip+{$else}rel {$endif}XMM4Constant]
- movdqa xmm14,[{$ifdef fpc}rip+{$else}rel {$endif}XMM5Constant]
- movdqa xmm15,[{$ifdef fpc}rip+{$else}rel {$endif}XMM6Constant]
+{$ifdef fpc}
+ movdqa xmm10,[rip+XMM1Constant]
+ movdqa xmm11,[rip+XMM2Constant]
+ movdqa xmm12,[rip+XMM3Constant]
+ movdqa xmm13,[rip+XMM4Constant]
+ movdqa xmm14,[rip+XMM5Constant]
+ movdqa xmm15,[rip+XMM6Constant]
+{$else}
+ movdqa xmm10,[rel XMM1Constant]
+ movdqa xmm11,[rel XMM2Constant]
+ movdqa xmm12,[rel XMM3Constant]
+ movdqa xmm13,[rel XMM4Constant]
+ movdqa xmm14,[rel XMM5Constant]
+ movdqa xmm15,[rel XMM6Constant]
+{$endif}
 
  pshufb xmm0,xmm9
  pshufb xmm1,xmm10
@@ -4240,37 +4567,49 @@ asm
  jc @Fail
  add rax,rdx
 @Done:
+{$ifdef Windows}
+ pop rdi
+ pop rsi
+{$endif}
 end;
 
-function PtrPosCharSetOf7(const SearchChar0,SearchChar1,SearchChar2,SearchChar3,SearchChar4,SearchChar5,SearchChar6:TFLRERawByteChar;const Text:PFLRERawByteChar;TextLength:longint;Offset:longint=0):ptrint;
+function PtrPosCharSetOf7(const SearchChar0,SearchChar1,SearchChar2,SearchChar3,SearchChar4,SearchChar5,SearchChar6:TFLRERawByteChar;const Text:PFLRERawByteChar;TextLength:TFLRESizeInt;Offset:TFLRESizeInt=0):TFLRESizeInt;
 begin
- result:=PtrPosCharSetOf7Search(@Text[Offset],
-                               (TFLREQWord(byte(TFLRERawByteChar(SearchChar6))) shl 48) or
-                               (TFLREQWord(byte(TFLRERawByteChar(SearchChar5))) shl 40) or
-                               (TFLREQWord(byte(TFLRERawByteChar(SearchChar4))) shl 32) or
-                               (TFLREQWord(byte(TFLRERawByteChar(SearchChar3))) shl 24) or
-                               (TFLREQWord(byte(TFLRERawByteChar(SearchChar2))) shl 16) or
-                               (TFLREQWord(byte(TFLRERawByteChar(SearchChar1))) shl 8) or
-                               TFLREQWord(byte(TFLRERawByteChar(SearchChar0))),
-                               @Text[TextLength]);
- if result=0 then begin
-  result:=-1;
+ if Offset<TextLength then begin
+  result:=PtrPosCharSetOf7Search(@Text[Offset],
+                                (TFLREQWord(TFLREUInt8(TFLRERawByteChar(SearchChar6))) shl 48) or
+                                (TFLREQWord(TFLREUInt8(TFLRERawByteChar(SearchChar5))) shl 40) or
+                                (TFLREQWord(TFLREUInt8(TFLRERawByteChar(SearchChar4))) shl 32) or
+                                (TFLREQWord(TFLREUInt8(TFLRERawByteChar(SearchChar3))) shl 24) or
+                                (TFLREQWord(TFLREUInt8(TFLRERawByteChar(SearchChar2))) shl 16) or
+                                (TFLREQWord(TFLREUInt8(TFLRERawByteChar(SearchChar1))) shl 8) or
+                                TFLREQWord(TFLREUInt8(TFLRERawByteChar(SearchChar0))),
+                                @Text[TextLength]);
+  if result=0 then begin
+   result:=-1;
+  end else begin
+   dec(result,TFLREPtrInt(pointer(@Text[Offset])));
+  end;
  end else begin
-  dec(result,ptrint(pointer(@Text[Offset])));
+  result:=-1;
  end;
 end;
 
-function PtrPosCharSetOf8Search(const p:pointer;const v:TFLREQWord;const pEnd:pointer):ptrint; assembler; register;
-const XMM1Constant:array[0..1] of TFLREQWord=(TFLREQWord($0101010101010101),TFLREQWord($0101010101010101));
-      XMM2Constant:array[0..1] of TFLREQWord=(TFLREQWord($0202020202020202),TFLREQWord($0202020202020202));
-      XMM3Constant:array[0..1] of TFLREQWord=(TFLREQWord($0303030303030303),TFLREQWord($0303030303030303));
-      XMM4Constant:array[0..1] of TFLREQWord=(TFLREQWord($0404040404040404),TFLREQWord($0404040404040404));
-      XMM5Constant:array[0..1] of TFLREQWord=(TFLREQWord($0505050505050505),TFLREQWord($0505050505050505));
-      XMM6Constant:array[0..1] of TFLREQWord=(TFLREQWord($0606060606060606),TFLREQWord($0606060606060606));
-      XMM7Constant:array[0..1] of TFLREQWord=(TFLREQWord($0707070707070707),TFLREQWord($0707070707070707));
+function PtrPosCharSetOf8Search(const p:pointer;const v:TFLREQWord;const pEnd:pointer):TFLREPtrInt; assembler; register;
+{$if defined(fpc) and (fpc_version>=3)}{$push}{$codealign localmin=16}{$codealign varmin=16}{$codealign constmin=16}{$ifend}
+const XMM1Constant:TXMMValue=(Lo:TFLREQWord($0101010101010101);Hi:TFLREQWord($0101010101010101));
+      XMM2Constant:TXMMValue=(Lo:TFLREQWord($0202020202020202);Hi:TFLREQWord($0202020202020202));
+      XMM3Constant:TXMMValue=(Lo:TFLREQWord($0303030303030303);Hi:TFLREQWord($0303030303030303));
+      XMM4Constant:TXMMValue=(Lo:TFLREQWord($0404040404040404);Hi:TFLREQWord($0404040404040404));
+      XMM5Constant:TXMMValue=(Lo:TFLREQWord($0505050505050505);Hi:TFLREQWord($0505050505050505));
+      XMM6Constant:TXMMValue=(Lo:TFLREQWord($0606060606060606);Hi:TFLREQWord($0606060606060606));
+      XMM7Constant:TXMMValue=(Lo:TFLREQWord($0707070707070707);Hi:TFLREQWord($0707070707070707));
+{$if defined(fpc) and (fpc_version>=3)}{$pop}{$ifend}
 asm
 {$ifdef Windows}
  // Win64 ABI to System-V ABI wrapper
+ push rsi
+ push rdi
  mov rdi,rcx
  mov rsi,rdx
  mov rdx,r8
@@ -4292,13 +4631,23 @@ asm
  and ecx,15
 
  pxor xmm8,xmm8
- movdqa xmm9,[{$ifdef fpc}rip+{$else}rel {$endif}XMM1Constant]
- movdqa xmm10,[{$ifdef fpc}rip+{$else}rel {$endif}XMM2Constant]
- movdqa xmm11,[{$ifdef fpc}rip+{$else}rel {$endif}XMM3Constant]
- movdqa xmm12,[{$ifdef fpc}rip+{$else}rel {$endif}XMM4Constant]
- movdqa xmm13,[{$ifdef fpc}rip+{$else}rel {$endif}XMM5Constant]
- movdqa xmm14,[{$ifdef fpc}rip+{$else}rel {$endif}XMM6Constant]
- movdqa xmm15,[{$ifdef fpc}rip+{$else}rel {$endif}XMM7Constant]
+{$ifdef fpc}
+ movdqa xmm9,[rip+XMM1Constant]
+ movdqa xmm10,[rip+XMM2Constant]
+ movdqa xmm11,[rip+XMM3Constant]
+ movdqa xmm12,[rip+XMM4Constant]
+ movdqa xmm13,[rip+XMM5Constant]
+ movdqa xmm14,[rip+XMM6Constant]
+ movdqa xmm15,[rip+XMM7Constant]
+{$else}
+ movdqa xmm9,[rel XMM1Constant]
+ movdqa xmm10,[rel XMM2Constant]
+ movdqa xmm11,[rel XMM3Constant]
+ movdqa xmm12,[rel XMM4Constant]
+ movdqa xmm13,[rel XMM5Constant]
+ movdqa xmm14,[rel XMM6Constant]
+ movdqa xmm15,[rel XMM7Constant]
+{$endif}
 
  pshufb xmm0,xmm8
  pshufb xmm1,xmm9
@@ -4394,32 +4743,44 @@ asm
  jc @Fail
  add rax,rdx
 @Done:
+{$ifdef Windows}
+ pop rdi
+ pop rsi
+{$endif}
 end;
 
-function PtrPosCharSetOf8(const SearchChar0,SearchChar1,SearchChar2,SearchChar3,SearchChar4,SearchChar5,SearchChar6,SearchChar7:TFLRERawByteChar;const Text:PFLRERawByteChar;TextLength:longint;Offset:longint=0):ptrint;
+function PtrPosCharSetOf8(const SearchChar0,SearchChar1,SearchChar2,SearchChar3,SearchChar4,SearchChar5,SearchChar6,SearchChar7:TFLRERawByteChar;const Text:PFLRERawByteChar;TextLength:TFLRESizeInt;Offset:TFLRESizeInt=0):TFLRESizeInt;
 begin
- result:=PtrPosCharSetOf8Search(@Text[Offset],
-                               (TFLREQWord(byte(TFLRERawByteChar(SearchChar7))) shl 56) or
-                               (TFLREQWord(byte(TFLRERawByteChar(SearchChar6))) shl 48) or
-                               (TFLREQWord(byte(TFLRERawByteChar(SearchChar5))) shl 40) or
-                               (TFLREQWord(byte(TFLRERawByteChar(SearchChar4))) shl 32) or
-                               (TFLREQWord(byte(TFLRERawByteChar(SearchChar3))) shl 24) or
-                               (TFLREQWord(byte(TFLRERawByteChar(SearchChar2))) shl 16) or
-                               (TFLREQWord(byte(TFLRERawByteChar(SearchChar1))) shl 8) or
-                               TFLREQWord(byte(TFLRERawByteChar(SearchChar0))),
-                               @Text[TextLength]);
- if result=0 then begin
-  result:=-1;
+ if Offset<TextLength then begin
+  result:=PtrPosCharSetOf8Search(@Text[Offset],
+                                (TFLREQWord(TFLREUInt8(TFLRERawByteChar(SearchChar7))) shl 56) or
+                                (TFLREQWord(TFLREUInt8(TFLRERawByteChar(SearchChar6))) shl 48) or
+                                (TFLREQWord(TFLREUInt8(TFLRERawByteChar(SearchChar5))) shl 40) or
+                                (TFLREQWord(TFLREUInt8(TFLRERawByteChar(SearchChar4))) shl 32) or
+                                (TFLREQWord(TFLREUInt8(TFLRERawByteChar(SearchChar3))) shl 24) or
+                                (TFLREQWord(TFLREUInt8(TFLRERawByteChar(SearchChar2))) shl 16) or
+                                (TFLREQWord(TFLREUInt8(TFLRERawByteChar(SearchChar1))) shl 8) or
+                                TFLREQWord(TFLREUInt8(TFLRERawByteChar(SearchChar0))),
+                                @Text[TextLength]);
+  if result=0 then begin
+   result:=-1;
+  end else begin
+   dec(result,TFLREPtrInt(pointer(@Text[Offset])));
+  end;
  end else begin
-  dec(result,ptrint(pointer(@Text[Offset])));
+  result:=-1;
  end;
 end;
 
-function PtrPosCharPairSearch(const p:pointer;const v:TFLREQWord;const pEnd:pointer):ptrint; assembler; register;
-const XMM1Constant:array[0..1] of TFLREQWord=(TFLREQWord($0101010101010101),TFLREQWord($0101010101010101));
+function PtrPosCharPairSearch(const p:pointer;const v:TFLREQWord;const pEnd:pointer):TFLREPtrInt; assembler; register;
+{$if defined(fpc) and (fpc_version>=3)}{$push}{$codealign localmin=16}{$codealign varmin=16}{$codealign constmin=16}{$ifend}
+const XMM1Constant:TXMMValue=(Lo:TFLREQWord($0101010101010101);Hi:TFLREQWord($0101010101010101));
+{$if defined(fpc) and (fpc_version>=3)}{$pop}{$ifend}
 asm
 {$ifdef Windows}
  // Win64 ABI to System-V ABI wrapper
+ push rsi
+ push rdi
  mov rdi,rcx
  mov rsi,rdx
  mov rdx,r8
@@ -4429,7 +4790,11 @@ asm
  movq xmm0,rsi
  movq xmm1,rsi
  pxor xmm2,xmm2
- movdqa xmm3,[{$ifdef fpc}rip+{$else}rel {$endif}XMM1Constant]
+{$ifdef fpc}
+ movdqa xmm3,[rip+XMM1Constant]
+{$else}
+ movdqa xmm3,[rel XMM1Constant]
+{$endif}
  pshufb xmm0,xmm2
  pshufb xmm1,xmm3
 
@@ -4512,27 +4877,37 @@ asm
  jc @Fail
  add rax,rdx
 @Done:
+{$ifdef Windows}
+ pop rdi
+ pop rsi
+{$endif}
 end;
 
-function PtrPosCharPair(const SearchChar0,SearchChar1:TFLRERawByteChar;const Text:PFLRERawByteChar;TextLength:longint;Offset:longint=0):ptrint;
-var Index:longint;
-    CurrentChar:TFLRERawByteChar;
+function PtrPosCharPair(const SearchChar0,SearchChar1:TFLRERawByteChar;const Text:PFLRERawByteChar;TextLength:TFLRESizeInt;Offset:TFLRESizeInt=0):TFLRESizeInt;
 begin
- result:=PtrPosCharPairSearch(@Text[Offset],(TFLREQWord(byte(TFLRERawByteChar(SearchChar1))) shl 8) or TFLREQWord(byte(TFLRERawByteChar(SearchChar0))),@Text[TextLength]);
- if result=0 then begin
-  result:=-1;
+ if Offset<TextLength then begin
+  result:=PtrPosCharPairSearch(@Text[Offset],(TFLREQWord(TFLREUInt8(TFLRERawByteChar(SearchChar1))) shl 8) or TFLREQWord(TFLREUInt8(TFLRERawByteChar(SearchChar0))),@Text[TextLength]);
+  if result=0 then begin
+   result:=-1;
+  end else begin
+   dec(result,TFLREPtrInt(pointer(@Text[Offset])));
+  end;
  end else begin
-  dec(result,ptrint(pointer(@Text[Offset])));
+  result:=-1;
  end;
 end;
 
-function PtrPosCharSetOf2Of2Search(const p:pointer;const v:TFLREQWord;const pEnd:pointer):ptrint; assembler; register;
-const XMM1Constant:array[0..1] of TFLREQWord=(TFLREQWord($0101010101010101),TFLREQWord($0101010101010101));
-      XMM2Constant:array[0..1] of TFLREQWord=(TFLREQWord($0202020202020202),TFLREQWord($0202020202020202));
-      XMM3Constant:array[0..1] of TFLREQWord=(TFLREQWord($0303030303030303),TFLREQWord($0303030303030303));
+function PtrPosCharSetOf2Of2Search(const p:pointer;const v:TFLREQWord;const pEnd:pointer):TFLREPtrInt; assembler; register;
+{$if defined(fpc) and (fpc_version>=3)}{$push}{$codealign localmin=16}{$codealign varmin=16}{$codealign constmin=16}{$ifend}
+const XMM1Constant:TXMMValue=(Lo:TFLREQWord($0101010101010101);Hi:TFLREQWord($0101010101010101));
+      XMM2Constant:TXMMValue=(Lo:TFLREQWord($0202020202020202);Hi:TFLREQWord($0202020202020202));
+      XMM3Constant:TXMMValue=(Lo:TFLREQWord($0303030303030303);Hi:TFLREQWord($0303030303030303));
+{$if defined(fpc) and (fpc_version>=3)}{$pop}{$ifend}
 asm
 {$ifdef Windows}
  // Win64 ABI to System-V ABI wrapper
+ push rsi
+ push rdi
  mov rdi,rcx
  mov rsi,rdx
  mov rdx,r8
@@ -4546,9 +4921,15 @@ asm
 
  mov ecx,edi
  pxor xmm4,xmm4
- movdqa xmm5,[{$ifdef fpc}rip+{$else}rel {$endif}XMM1Constant]
- movdqa xmm6,[{$ifdef fpc}rip+{$else}rel {$endif}XMM2Constant]
- movdqa xmm7,[{$ifdef fpc}rip+{$else}rel {$endif}XMM3Constant]
+{$ifdef fpc}
+ movdqa xmm5,[rip+XMM1Constant]
+ movdqa xmm6,[rip+XMM2Constant]
+ movdqa xmm7,[rip+XMM3Constant]
+{$else}
+ movdqa xmm5,[rel XMM1Constant]
+ movdqa xmm6,[rel XMM2Constant]
+ movdqa xmm7,[rel XMM3Constant]
+{$endif}
 
  and rdi,-32
  and ecx,31
@@ -4662,32 +5043,42 @@ asm
  jc @Fail
  add rax,rdx
 @Done:
+{$ifdef Windows}
+ pop rdi
+ pop rsi
+{$endif}
 end;
 
-function PtrPosCharSetOf2Of2(const SearchChar0,SearchChar1:TFLRERawByteChar;const Text:PFLRERawByteChar;TextLength:longint;Offset:longint=0):ptrint;
-var Index:longint;
-    CurrentChar:TFLRERawByteChar;
+function PtrPosCharSetOf2Of2(const SearchChar0,SearchChar1:TFLRERawByteChar;const Text:PFLRERawByteChar;TextLength:TFLRESizeInt;Offset:TFLRESizeInt=0):TFLRESizeInt;
 begin
- result:=PtrPosCharSetOf2Of2Search(@Text[Offset],
-                                   (TFLREQWord(byte(TFLRERawByteChar(SearchChar1))) shl 8) or
-                                   TFLREQWord(byte(TFLRERawByteChar(SearchChar0))),
-                                   @Text[TextLength]);
- if result=0 then begin
-  result:=-1;
+ if Offset<TextLength then begin
+  result:=PtrPosCharSetOf2Of2Search(@Text[Offset],
+                                    (TFLREQWord(TFLREUInt8(TFLRERawByteChar(SearchChar1))) shl 8) or
+                                    TFLREQWord(TFLREUInt8(TFLRERawByteChar(SearchChar0))),
+                                    @Text[TextLength]);
+  if result=0 then begin
+   result:=-1;
+  end else begin
+   dec(result,TFLREPtrInt(pointer(@Text[Offset])));
+  end;
  end else begin
-  dec(result,ptrint(pointer(@Text[Offset])));
+  result:=-1;
  end;
 end;
 
-function PtrPosCharSetOf2Of3Search(const p:pointer;const v:TFLREQWord;const pEnd:pointer):ptrint; assembler; register;
-const XMM1Constant:array[0..1] of TFLREQWord=(TFLREQWord($0101010101010101),TFLREQWord($0101010101010101));
-      XMM2Constant:array[0..1] of TFLREQWord=(TFLREQWord($0202020202020202),TFLREQWord($0202020202020202));
-      XMM3Constant:array[0..1] of TFLREQWord=(TFLREQWord($0303030303030303),TFLREQWord($0303030303030303));
-      XMM4Constant:array[0..1] of TFLREQWord=(TFLREQWord($0404040404040404),TFLREQWord($0404040404040404));
-      XMM5Constant:array[0..1] of TFLREQWord=(TFLREQWord($0505050505050505),TFLREQWord($0505050505050505));
+function PtrPosCharSetOf2Of3Search(const p:pointer;const v:TFLREQWord;const pEnd:pointer):TFLREPtrInt; assembler; register;
+{$if defined(fpc) and (fpc_version>=3)}{$push}{$codealign localmin=16}{$codealign varmin=16}{$codealign constmin=16}{$ifend}
+const XMM1Constant:TXMMValue=(Lo:TFLREQWord($0101010101010101);Hi:TFLREQWord($0101010101010101));
+      XMM2Constant:TXMMValue=(Lo:TFLREQWord($0202020202020202);Hi:TFLREQWord($0202020202020202));
+      XMM3Constant:TXMMValue=(Lo:TFLREQWord($0303030303030303);Hi:TFLREQWord($0303030303030303));
+      XMM4Constant:TXMMValue=(Lo:TFLREQWord($0404040404040404);Hi:TFLREQWord($0404040404040404));
+      XMM5Constant:TXMMValue=(Lo:TFLREQWord($0505050505050505);Hi:TFLREQWord($0505050505050505));
+{$if defined(fpc) and (fpc_version>=3)}{$pop}{$ifend}
 asm
 {$ifdef Windows}
  // Win64 ABI to System-V ABI wrapper
+ push rsi
+ push rdi
  mov rdi,rcx
  mov rsi,rdx
  mov rdx,r8
@@ -4703,11 +5094,19 @@ asm
 
  mov ecx,edi
  pxor xmm6,xmm6
- movdqa xmm7,[{$ifdef fpc}rip+{$else}rel {$endif}XMM1Constant]
- movdqa xmm8,[{$ifdef fpc}rip+{$else}rel {$endif}XMM2Constant]
- movdqa xmm9,[{$ifdef fpc}rip+{$else}rel {$endif}XMM3Constant]
- movdqa xmm10,[{$ifdef fpc}rip+{$else}rel {$endif}XMM4Constant]
- movdqa xmm11,[{$ifdef fpc}rip+{$else}rel {$endif}XMM5Constant]
+{$ifdef fpc}
+ movdqa xmm7,[rip+XMM1Constant]
+ movdqa xmm8,[rip+XMM2Constant]
+ movdqa xmm9,[rip+XMM3Constant]
+ movdqa xmm10,[rip+XMM4Constant]
+ movdqa xmm11,[rip+XMM5Constant]
+{$else}
+ movdqa xmm7,[rel XMM1Constant]
+ movdqa xmm8,[rel XMM2Constant]
+ movdqa xmm9,[rel XMM3Constant]
+ movdqa xmm10,[rel XMM4Constant]
+ movdqa xmm11,[rel XMM5Constant]
+{$endif}
 
  and rdi,-16
  and ecx,15
@@ -4803,34 +5202,44 @@ asm
  jc @Fail
  add rax,rdx
 @Done:
+{$ifdef Windows}
+ pop rdi
+ pop rsi
+{$endif}
 end;
 
-function PtrPosCharSetOf2Of3(const SearchChar0,SearchChar1:TFLRERawByteChar;const Text:PFLRERawByteChar;TextLength:longint;Offset:longint=0):ptrint;
-var Index:longint;
-    CurrentChar:TFLRERawByteChar;
+function PtrPosCharSetOf2Of3(const SearchChar0,SearchChar1:TFLRERawByteChar;const Text:PFLRERawByteChar;TextLength:TFLRESizeInt;Offset:TFLRESizeInt=0):TFLRESizeInt;
 begin
- result:=PtrPosCharSetOf2Of3Search(@Text[Offset],
-                                   (TFLREQWord(byte(TFLRERawByteChar(SearchChar1))) shl 8) or
-                                   TFLREQWord(byte(TFLRERawByteChar(SearchChar0))),
-                                   @Text[TextLength]);
- if result=0 then begin
-  result:=-1;
+ if Offset<TextLength then begin
+  result:=PtrPosCharSetOf2Of3Search(@Text[Offset],
+                                    (TFLREQWord(TFLREUInt8(TFLRERawByteChar(SearchChar1))) shl 8) or
+                                    TFLREQWord(TFLREUInt8(TFLRERawByteChar(SearchChar0))),
+                                    @Text[TextLength]);
+  if result=0 then begin
+   result:=-1;
+  end else begin
+   dec(result,TFLREPtrInt(pointer(@Text[Offset])));
+  end;
  end else begin
-  dec(result,ptrint(pointer(@Text[Offset])));
+  result:=-1;
  end;
 end;
 
-function PtrPosCharSetOf2Of4Search(const p:pointer;const v:TFLREQWord;const pEnd:pointer):ptrint; assembler; register;
-const XMM1Constant:array[0..1] of TFLREQWord=(TFLREQWord($0101010101010101),TFLREQWord($0101010101010101));
-      XMM2Constant:array[0..1] of TFLREQWord=(TFLREQWord($0202020202020202),TFLREQWord($0202020202020202));
-      XMM3Constant:array[0..1] of TFLREQWord=(TFLREQWord($0303030303030303),TFLREQWord($0303030303030303));
-      XMM4Constant:array[0..1] of TFLREQWord=(TFLREQWord($0404040404040404),TFLREQWord($0404040404040404));
-      XMM5Constant:array[0..1] of TFLREQWord=(TFLREQWord($0505050505050505),TFLREQWord($0505050505050505));
-      XMM6Constant:array[0..1] of TFLREQWord=(TFLREQWord($0606060606060606),TFLREQWord($0606060606060606));
-      XMM7Constant:array[0..1] of TFLREQWord=(TFLREQWord($0707070707070707),TFLREQWord($0707070707070707));
+function PtrPosCharSetOf2Of4Search(const p:pointer;const v:TFLREQWord;const pEnd:pointer):TFLREPtrInt; assembler; register;
+{$if defined(fpc) and (fpc_version>=3)}{$push}{$codealign localmin=16}{$codealign varmin=16}{$codealign constmin=16}{$ifend}
+const XMM1Constant:TXMMValue=(Lo:TFLREQWord($0101010101010101);Hi:TFLREQWord($0101010101010101));
+      XMM2Constant:TXMMValue=(Lo:TFLREQWord($0202020202020202);Hi:TFLREQWord($0202020202020202));
+      XMM3Constant:TXMMValue=(Lo:TFLREQWord($0303030303030303);Hi:TFLREQWord($0303030303030303));
+      XMM4Constant:TXMMValue=(Lo:TFLREQWord($0404040404040404);Hi:TFLREQWord($0404040404040404));
+      XMM5Constant:TXMMValue=(Lo:TFLREQWord($0505050505050505);Hi:TFLREQWord($0505050505050505));
+      XMM6Constant:TXMMValue=(Lo:TFLREQWord($0606060606060606);Hi:TFLREQWord($0606060606060606));
+      XMM7Constant:TXMMValue=(Lo:TFLREQWord($0707070707070707);Hi:TFLREQWord($0707070707070707));
+{$if defined(fpc) and (fpc_version>=3)}{$pop}{$ifend}
 asm
 {$ifdef Windows}
  // Win64 ABI to System-V ABI wrapper
+ push rsi
+ push rdi
  mov rdi,rcx
  mov rsi,rdx
  mov rdx,r8
@@ -4848,13 +5257,23 @@ asm
 
  mov ecx,edi
  pxor xmm8,xmm8
- movdqa xmm9,[{$ifdef fpc}rip+{$else}rel {$endif}XMM1Constant]
- movdqa xmm10,[{$ifdef fpc}rip+{$else}rel {$endif}XMM2Constant]
- movdqa xmm11,[{$ifdef fpc}rip+{$else}rel {$endif}XMM3Constant]
- movdqa xmm12,[{$ifdef fpc}rip+{$else}rel {$endif}XMM4Constant]
- movdqa xmm13,[{$ifdef fpc}rip+{$else}rel {$endif}XMM5Constant]
- movdqa xmm14,[{$ifdef fpc}rip+{$else}rel {$endif}XMM6Constant]
- movdqa xmm15,[{$ifdef fpc}rip+{$else}rel {$endif}XMM7Constant]
+{$ifdef fpc}
+ movdqa xmm9,[rip+XMM1Constant]
+ movdqa xmm10,[rip+XMM2Constant]
+ movdqa xmm11,[rip+XMM3Constant]
+ movdqa xmm12,[rip+XMM4Constant]
+ movdqa xmm13,[rip+XMM5Constant]
+ movdqa xmm14,[rip+XMM6Constant]
+ movdqa xmm15,[rip+XMM7Constant]
+{$else}
+ movdqa xmm9,[rel XMM1Constant]
+ movdqa xmm10,[rel XMM2Constant]
+ movdqa xmm11,[rel XMM3Constant]
+ movdqa xmm12,[rel XMM4Constant]
+ movdqa xmm13,[rel XMM5Constant]
+ movdqa xmm14,[rel XMM6Constant]
+ movdqa xmm15,[rel XMM7Constant]
+{$endif}
 
  and rdi,-16
  and ecx,15
@@ -4964,30 +5383,40 @@ asm
  jc @Fail
  add rax,rdx
 @Done:
+{$ifdef Windows}
+ pop rdi
+ pop rsi
+{$endif}
 end;
 
-function PtrPosCharSetOf2Of4(const SearchChar0,SearchChar1:TFLRERawByteChar;const Text:PFLRERawByteChar;TextLength:longint;Offset:longint=0):ptrint;
-var Index:longint;
-    CurrentChar:TFLRERawByteChar;
+function PtrPosCharSetOf2Of4(const SearchChar0,SearchChar1:TFLRERawByteChar;const Text:PFLRERawByteChar;TextLength:TFLRESizeInt;Offset:TFLRESizeInt=0):TFLRESizeInt;
 begin
- result:=PtrPosCharSetOf2Of4Search(@Text[Offset],
-                                   (TFLREQWord(byte(TFLRERawByteChar(SearchChar1))) shl 8) or
-                                   TFLREQWord(byte(TFLRERawByteChar(SearchChar0))),
-                                   @Text[TextLength]);
- if result=0 then begin
-  result:=-1;
+ if Offset<TextLength then begin
+  result:=PtrPosCharSetOf2Of4Search(@Text[Offset],
+                                    (TFLREQWord(TFLREUInt8(TFLRERawByteChar(SearchChar1))) shl 8) or
+                                    TFLREQWord(TFLREUInt8(TFLRERawByteChar(SearchChar0))),
+                                    @Text[TextLength]);
+  if result=0 then begin
+   result:=-1;
+  end else begin
+   dec(result,TFLREPtrInt(pointer(@Text[Offset])));
+  end;
  end else begin
-  dec(result,ptrint(pointer(@Text[Offset])));
+  result:=-1;
  end;
 end;
 
-function PtrPosCharRangeSearch(const p:pointer;const v:TFLREQWord;const pEnd:pointer):ptrint; assembler; register;
-const XMM1Constant:array[0..1] of TFLREQWord=(TFLREQWord($0101010101010101),TFLREQWord($0101010101010101));
-      XMM126Constant:array[0..1] of TFLREQWord=(TFLREQWord($7e7e7e7e7e7e7e7e),TFLREQWord($7e7e7e7e7e7e7e7e));
-      XMM127Constant:array[0..1] of TFLREQWord=(TFLREQWord($7f7f7f7f7f7f7f7f),TFLREQWord($7f7f7f7f7f7f7f7f));
+function PtrPosCharRangeSearch(const p:pointer;const v:TFLREQWord;const pEnd:pointer):TFLREPtrInt; assembler; register;
+{$if defined(fpc) and (fpc_version>=3)}{$push}{$codealign localmin=16}{$codealign varmin=16}{$codealign constmin=16}{$ifend}
+const XMM1Constant:TXMMValue=(Lo:TFLREQWord($0101010101010101);Hi:TFLREQWord($0101010101010101));
+      XMM126Constant:TXMMValue=(Lo:TFLREQWord($7e7e7e7e7e7e7e7e);Hi:TFLREQWord($7e7e7e7e7e7e7e7e));
+      XMM127Constant:TXMMValue=(Lo:TFLREQWord($7f7f7f7f7f7f7f7f);Hi:TFLREQWord($7f7f7f7f7f7f7f7f));
+{$if defined(fpc) and (fpc_version>=3)}{$pop}{$ifend}
 asm
 {$ifdef Windows}
  // Win64 ABI to System-V ABI wrapper
+ push rsi
+ push rdi
  mov rdi,rcx
  mov rsi,rdx
  mov rdx,r8
@@ -4999,9 +5428,15 @@ asm
 
  mov ecx,edi
  pxor xmm4,xmm4
- movdqa xmm5,[{$ifdef fpc}rip+{$else}rel {$endif}XMM1Constant]
- movdqa xmm6,[{$ifdef fpc}rip+{$else}rel {$endif}XMM126Constant]
- movdqa xmm7,[{$ifdef fpc}rip+{$else}rel {$endif}XMM127Constant]
+{$ifdef fpc}
+ movdqa xmm5,[rip+XMM1Constant]
+ movdqa xmm6,[rip+XMM126Constant]
+ movdqa xmm7,[rip+XMM127Constant]
+{$else}
+ movdqa xmm5,[rel XMM1Constant]
+ movdqa xmm6,[rel XMM126Constant]
+ movdqa xmm7,[rel XMM127Constant]
+{$endif}
 
  and rdi,-32
  and ecx,31
@@ -5063,32 +5498,42 @@ asm
  jc @Fail
  add rax,rdx
 @Done:
+{$ifdef Windows}
+ pop rdi
+ pop rsi
+{$endif}
 end;
 
-function PtrPosCharRange(const SearchFromChar,SearchToChar:TFLRERawByteChar;const Text:PFLRERawByteChar;TextLength:longint;Offset:longint=0):ptrint;
-var Index:longint;
-    CurrentChar:TFLRERawByteChar;
+function PtrPosCharRange(const SearchFromChar,SearchToChar:TFLRERawByteChar;const Text:PFLRERawByteChar;TextLength:TFLRESizeInt;Offset:TFLRESizeInt=0):TFLRESizeInt;
 begin
- result:=PtrPosCharRangeSearch(@Text[Offset],
-                               (TFLREQWord(byte(TFLRERawByteChar(SearchToChar))) shl 8) or
-                               TFLREQWord(byte(TFLRERawByteChar(SearchFromChar))),
-                               @Text[TextLength]);
- if result=0 then begin
-  result:=-1;
+ if Offset<TextLength then begin
+  result:=PtrPosCharRangeSearch(@Text[Offset],
+                                (TFLREQWord(TFLREUInt8(TFLRERawByteChar(SearchToChar))) shl 8) or
+                                TFLREQWord(TFLREUInt8(TFLRERawByteChar(SearchFromChar))),
+                                @Text[TextLength]);
+  if result=0 then begin
+   result:=-1;
+  end else begin
+   dec(result,TFLREPtrInt(pointer(@Text[Offset])));
+  end;
  end else begin
-  dec(result,ptrint(pointer(@Text[Offset])));
+  result:=-1;
  end;
 end;
 
-function PtrPosCharRangeOf2Search(const p:pointer;const v:TFLREQWord;const pEnd:pointer):ptrint; assembler; register;
-const XMM1Constant:array[0..1] of TFLREQWord=(TFLREQWord($0101010101010101),TFLREQWord($0101010101010101));
-      XMM2Constant:array[0..1] of TFLREQWord=(TFLREQWord($0202020202020202),TFLREQWord($0202020202020202));
-      XMM3Constant:array[0..1] of TFLREQWord=(TFLREQWord($0303030303030303),TFLREQWord($0303030303030303));
-      XMM126Constant:array[0..1] of TFLREQWord=(TFLREQWord($7e7e7e7e7e7e7e7e),TFLREQWord($7e7e7e7e7e7e7e7e));
-      XMM127Constant:array[0..1] of TFLREQWord=(TFLREQWord($7f7f7f7f7f7f7f7f),TFLREQWord($7f7f7f7f7f7f7f7f));
+function PtrPosCharRangeOf2Search(const p:pointer;const v:TFLREQWord;const pEnd:pointer):TFLREPtrInt; assembler; register;
+{$if defined(fpc) and (fpc_version>=3)}{$push}{$codealign localmin=16}{$codealign varmin=16}{$codealign constmin=16}{$ifend}
+const XMM1Constant:TXMMValue=(Lo:TFLREQWord($0101010101010101);Hi:TFLREQWord($0101010101010101));
+      XMM2Constant:TXMMValue=(Lo:TFLREQWord($0202020202020202);Hi:TFLREQWord($0202020202020202));
+      XMM3Constant:TXMMValue=(Lo:TFLREQWord($0303030303030303);Hi:TFLREQWord($0303030303030303));
+      XMM126Constant:TXMMValue=(Lo:TFLREQWord($7e7e7e7e7e7e7e7e);Hi:TFLREQWord($7e7e7e7e7e7e7e7e));
+      XMM127Constant:TXMMValue=(Lo:TFLREQWord($7f7f7f7f7f7f7f7f);Hi:TFLREQWord($7f7f7f7f7f7f7f7f));
+{$if defined(fpc) and (fpc_version>=3)}{$pop}{$ifend}
 asm
 {$ifdef Windows}
  // Win64 ABI to System-V ABI wrapper
+ push rsi
+ push rdi
  mov rdi,rcx
  mov rsi,rdx
  mov rdx,r8
@@ -5102,13 +5547,23 @@ asm
 
  mov ecx,edi
  pxor xmm8,xmm8
- movdqa xmm9,[{$ifdef fpc}rip+{$else}rel {$endif}XMM1Constant]
- movdqa xmm10,[{$ifdef fpc}rip+{$else}rel {$endif}XMM2Constant]
- movdqa xmm11,[{$ifdef fpc}rip+{$else}rel {$endif}XMM3Constant]
- movdqa xmm12,[{$ifdef fpc}rip+{$else}rel {$endif}XMM126Constant]
- movdqa xmm13,[{$ifdef fpc}rip+{$else}rel {$endif}XMM127Constant]
- movdqa xmm14,[{$ifdef fpc}rip+{$else}rel {$endif}XMM126Constant]
- movdqa xmm15,[{$ifdef fpc}rip+{$else}rel {$endif}XMM127Constant]
+{$ifdef fpc}
+ movdqa xmm9,[rip+XMM1Constant]
+ movdqa xmm10,[rip+XMM2Constant]
+ movdqa xmm11,[rip+XMM3Constant]
+ movdqa xmm12,[rip+XMM126Constant]
+ movdqa xmm13,[rip+XMM127Constant]
+ movdqa xmm14,[rip+XMM126Constant]
+ movdqa xmm15,[rip+XMM127Constant]
+{$else}
+ movdqa xmm9,[rel XMM1Constant]
+ movdqa xmm10,[rel XMM2Constant]
+ movdqa xmm11,[rel XMM3Constant]
+ movdqa xmm12,[rel XMM126Constant]
+ movdqa xmm13,[rel XMM127Constant]
+ movdqa xmm14,[rel XMM126Constant]
+ movdqa xmm15,[rel XMM127Constant]
+{$endif}
 
  and rdi,-32
  and ecx,31
@@ -5209,40 +5664,46 @@ asm
  jc @Fail
  add rax,rdx
 @Done:
+{$ifdef Windows}
+ pop rdi
+ pop rsi
+{$endif}
 end;
 
-function PtrPosCharRangeOf2(const SearchFromChar0,SearchToChar0,SearchFromChar1,SearchToChar1:TFLRERawByteChar;const Text:PFLRERawByteChar;TextLength:longint;Offset:longint=0):ptrint;
-var Index:longint;
-    CurrentChar:TFLRERawByteChar;
+function PtrPosCharRangeOf2(const SearchFromChar0,SearchToChar0,SearchFromChar1,SearchToChar1:TFLRERawByteChar;const Text:PFLRERawByteChar;TextLength:TFLRESizeInt;Offset:TFLRESizeInt=0):TFLRESizeInt;
 begin
- result:=PtrPosCharRangeOf2Search(@Text[Offset],
-                                  (TFLREQWord(byte(TFLRERawByteChar(SearchToChar1))) shl 24) or
-                                  (TFLREQWord(byte(TFLRERawByteChar(SearchFromChar1))) shl 16) or
-                                  (TFLREQWord(byte(TFLRERawByteChar(SearchToChar0))) shl 8) or
-                                  TFLREQWord(byte(TFLRERawByteChar(SearchFromChar0))),
-                                  @Text[TextLength]);
- if result=0 then begin
-  result:=-1;
+ if Offset<TextLength then begin
+  result:=PtrPosCharRangeOf2Search(@Text[Offset],
+                                   (TFLREQWord(TFLREUInt8(TFLRERawByteChar(SearchToChar1))) shl 24) or
+                                   (TFLREQWord(TFLREUInt8(TFLRERawByteChar(SearchFromChar1))) shl 16) or
+                                   (TFLREQWord(TFLREUInt8(TFLRERawByteChar(SearchToChar0))) shl 8) or
+                                   TFLREQWord(TFLREUInt8(TFLRERawByteChar(SearchFromChar0))),
+                                   @Text[TextLength]);
+  if result=0 then begin
+   result:=-1;
+  end else begin
+   dec(result,TFLREPtrInt(pointer(@Text[Offset])));
+  end;
  end else begin
-  dec(result,ptrint(pointer(@Text[Offset])));
+  result:=-1;
  end;
 end;
 
 {$else}
-function PtrPosChar(const SearchChar:TFLRERawByteChar;const Text:PFLRERawByteChar;TextLength:longint;Offset:longint=0):longint;
-type pptruint=^ptruint;
-const MaskA=ptruint({$ifdef cpu64}$fefefefefefefeff{$else}$fefefeff{$endif}); // it is: 0-$01010101 / 0-$0101010101010101
-      MaskB=ptruint({$ifdef cpu64}$8080808080808080{$else}$80808080{$endif});
+function PtrPosChar(const SearchChar:TFLRERawByteChar;const Text:PFLRERawByteChar;TextLength:TFLRESizeInt;Offset:TFLRESizeInt=0):TFLRESizeInt;
+type pptruint=^TFLREPtrUInt;
+const MaskA=TFLREPtrUInt({$ifdef cpu64}$fefefefefefefeff{$else}$fefefeff{$endif}); // it is: 0-$01010101 / 0-$0101010101010101
+      MaskB=TFLREPtrUInt({$ifdef cpu64}$8080808080808080{$else}$80808080{$endif});
 var CurrentChar:PFLRERawByteChar;
     CurrentChunk:pptruint;
-    XorMask,XoredChunk,Size:ptruint;
+    XorMask,XoredChunk,Size:TFLREPtrUInt;
 begin
  result:=-1;
 
- Size:=(TextLength-Offset)+1;
- if (Offset<TextLength) and (ptrint(Size)>0) then begin
+ Size:=TextLength-Offset;
+ if (Offset<TextLength) and (TFLREPtrInt(Size)>0) then begin
 
-  XorMask:=byte(SearchChar);
+  XorMask:=TFLREUInt8(SearchChar);
   XorMask:=XorMask or (XorMask shl 8);
   XorMask:=XorMask or (XorMask shl 16);
 {$ifdef cpu64}
@@ -5251,13 +5712,13 @@ begin
 
   CurrentChar:=@Text[Offset];
 
-  if Size>(SizeOf(ptruint)*2) then begin
+  if Size>(SizeOf(TFLREPtrUInt)*2) then begin
 
    // Alignment initialization
-   CurrentChunk:=pointer(ptruint(ptruint(CurrentChar) and not (SizeOf(ptruint)-1)));
+   CurrentChunk:=pointer(TFLREPtrUInt(TFLREPtrUInt(CurrentChar) and not (SizeOf(TFLREPtrUInt)-1)));
 
    // Try to get first chunk
-   if ptruint(CurrentChunk)>=ptruint(Text) then begin
+   if TFLREPtrUInt(CurrentChunk)>=TFLREPtrUInt(Text) then begin
     // Yes, we can the get first chunk
     XoredChunk:=CurrentChunk^ xor XorMask;
    end else begin
@@ -5269,13 +5730,13 @@ begin
    inc(CurrentChunk);
 
    // Subtract the first chunk from size
-   dec(ptruint(Size),ptruint(CurrentChunk)-ptruint(CurrentChar));
+   dec(TFLREPtrUInt(Size),TFLREPtrUInt(CurrentChunk)-TFLREPtrUInt(CurrentChar));
 
    // Scan first chunk
    if (((XoredChunk+MaskA) and not XoredChunk) and MaskB)<>0 then begin
-    while ptruint(CurrentChar)<ptruint(CurrentChunk) do begin
+    while TFLREPtrUInt(CurrentChar)<TFLREPtrUInt(CurrentChunk) do begin
      if CurrentChar^=SearchChar then begin
-      result:=ptruint(CurrentChar)-ptruint(Text);
+      result:=TFLREPtrUInt(CurrentChar)-TFLREPtrUInt(Text);
       exit;
      end;
      inc(CurrentChar);
@@ -5283,60 +5744,69 @@ begin
    end;
 
    // Scan until the last whole chunk
-   while Size>=SizeOf(ptruint) do begin
+   while Size>=SizeOf(TFLREPtrUInt) do begin
     XoredChunk:=CurrentChunk^ xor XorMask;
     if (((XoredChunk+MaskA) and not XoredChunk) and MaskB)<>0 then begin
 {$ifdef POSCHARSAFECHECK}
      CurrentChar:=pointer(CurrentChunk);
      if CurrentChar[0]=SearchChar then begin
-      result:=ptruint(pointer(@CurrentChar[0]))-ptruint(Text);
+      result:=TFLREPtrUInt(pointer(@CurrentChar[0]))-TFLREPtrUInt(Text);
       exit;
      end;
      if CurrentChar[1]=SearchChar then begin
-      result:=ptruint(pointer(@CurrentChar[1]))-ptruint(Text);
+      result:=TFLREPtrUInt(pointer(@CurrentChar[1]))-TFLREPtrUInt(Text);
       exit;
      end;
      if CurrentChar[2]=SearchChar then begin
-      result:=ptruint(pointer(@CurrentChar[2]))-ptruint(Text);
+      result:=TFLREPtrUInt(pointer(@CurrentChar[2]))-TFLREPtrUInt(Text);
       exit;
      end;
      if CurrentChar[3]=SearchChar then begin
-      result:=ptruint(pointer(@CurrentChar[3]))-ptruint(Text);
+      result:=TFLREPtrUInt(pointer(@CurrentChar[3]))-TFLREPtrUInt(Text);
       exit;
      end;
 {$ifdef cpu64}
      if CurrentChar[4]=SearchChar then begin
-      result:=ptruint(pointer(@CurrentChar[4]))-ptruint(Text);
+      result:=TFLREPtrUInt(pointer(@CurrentChar[4]))-TFLREPtrUInt(Text);
       exit;
      end;
      if CurrentChar[5]=Pattern then begin
-      result:=ptruint(pointer(@CurrentChar[5]))-ptruint(Text);
+      result:=TFLREPtrUInt(pointer(@CurrentChar[5]))-TFLREPtrUInt(Text);
       exit;
      end;
      if CurrentChar[6]=SearchChar then begin
-      result:=ptruint(pointer(@CurrentChar[6]))-ptruint(Text);
+      result:=TFLREPtrUInt(pointer(@CurrentChar[6]))-TFLREPtrUInt(Text);
       exit;
      end;
      if CurrentChar[7]=SearchChar then begin
-      result:=ptruint(pointer(@CurrentChar[7]))-ptruint(Text);
+      result:=TFLREPtrUInt(pointer(@CurrentChar[7]))-TFLREPtrUInt(Text);
       exit;
      end;
 {$endif}
 {$else}
-     CurrentChar:=pointer({$ifdef BIG_ENDIAN}ptruint(ptruint(CurrentChunk)+ptruint(SizeOf(ptruint)-1)){$else}CurrentChunk{$endif});
+     CurrentChar:=pointer({$ifdef BIG_ENDIAN}TFLREPtrUInt(TFLREPtrUInt(CurrentChunk)+TFLREPtrUInt(SizeOf(TFLREPtrUInt)-1)){$else}CurrentChunk{$endif});
      XoredChunk:=XoredChunk xor XorMask;
-     while (XoredChunk<>0) and ((XoredChunk and $ff)<>byte(SearchChar)) do begin
-      XoredChunk:=XoredChunk shr 8;
-      {$ifdef BIG_ENDIAN}dec{$else}inc{$endif}(CurrentChar);
+     if TFLREUInt8(SearchChar)=0 then begin
+      // Special case
+      XoredChunk:=not XoredChunk;
+      while (XoredChunk<>0) and ((XoredChunk and $ff)<>$ff) do begin
+       XoredChunk:=XoredChunk shr 8;
+       {$ifdef BIG_ENDIAN}dec{$else}inc{$endif}(CurrentChar);
+      end;
+     end else begin
+      while (XoredChunk<>0) and ((XoredChunk and $ff)<>TFLREUInt8(SearchChar)) do begin
+       XoredChunk:=XoredChunk shr 8;
+       {$ifdef BIG_ENDIAN}dec{$else}inc{$endif}(CurrentChar);
+      end;
      end;
      if XoredChunk<>0 then begin
-      result:=ptruint(pointer(CurrentChar))-ptruint(Text);
+      result:=TFLREPtrUInt(pointer(CurrentChar))-TFLREPtrUInt(Text);
       exit;
      end;
 {$endif}
     end;
     inc(CurrentChunk);
-    dec(Size,SizeOf(ptruint));
+    dec(Size,SizeOf(TFLREPtrUInt));
    end;
 
    // Set chunkwise to charwise pointer
@@ -5346,7 +5816,7 @@ begin
   // Scan rest of the remained characters, if there are any
   while Size>0 do begin
    if CurrentChar^=SearchChar then begin
-    result:=ptruint(pointer(CurrentChar))-ptruint(Text);
+    result:=TFLREPtrUInt(pointer(CurrentChar))-TFLREPtrUInt(Text);
     exit;
    end;
    inc(CurrentChar);
@@ -5356,28 +5826,28 @@ begin
  end;
 end;
 
-function PtrPosCharSetOf2(const SearchChar0,SearchChar1:TFLRERawByteChar;const Text:PFLRERawByteChar;TextLength:longint;Offset:longint=0):longint;
-type pptruint=^ptruint;
-const MaskA=ptruint({$ifdef cpu64}$fefefefefefefeff{$else}$fefefeff{$endif}); // it is: 0-$01010101 / 0-$0101010101010101
-      MaskB=ptruint({$ifdef cpu64}$8080808080808080{$else}$80808080{$endif});
+function PtrPosCharSetOf2(const SearchChar0,SearchChar1:TFLRERawByteChar;const Text:PFLRERawByteChar;TextLength:TFLRESizeInt;Offset:TFLRESizeInt=0):TFLRESizeInt;
+type pptruint=^TFLREPtrUInt;
+const MaskA=TFLREPtrUInt({$ifdef cpu64}$fefefefefefefeff{$else}$fefefeff{$endif}); // it is: 0-$01010101 / 0-$0101010101010101
+      MaskB=TFLREPtrUInt({$ifdef cpu64}$8080808080808080{$else}$80808080{$endif});
 var CurrentChar:PFLRERawByteChar;
     CurrentChunk:pptruint;
-    XorMask0,XorMask1,XoredChunk0,XoredChunk1,CurrentChunkValue,Size:ptruint;
+    XorMask0,XorMask1,XoredChunk0,XoredChunk1,CurrentChunkValue,Size:TFLREPtrUInt;
     CharSet:TFLRERawByteCharSet;
 begin
  result:=-1;
 
- Size:=(TextLength-Offset)+1;
- if (Offset<TextLength) and (ptrint(Size)>0) then begin
+ Size:=TextLength-Offset;
+ if (Offset<TextLength) and (TFLREPtrInt(Size)>0) then begin
 
-  XorMask0:=byte(SearchChar0);
+  XorMask0:=TFLREUInt8(SearchChar0);
   XorMask0:=XorMask0 or (XorMask0 shl 8);
   XorMask0:=XorMask0 or (XorMask0 shl 16);
 {$ifdef cpu64}
   XorMask0:=XorMask0 or (XorMask0 shl 32);
 {$endif}
 
-  XorMask1:=byte(SearchChar1);
+  XorMask1:=TFLREUInt8(SearchChar1);
   XorMask1:=XorMask1 or (XorMask1 shl 8);
   XorMask1:=XorMask1 or (XorMask1 shl 16);
 {$ifdef cpu64}
@@ -5388,13 +5858,13 @@ begin
 
   CurrentChar:=@Text[Offset];
 
-  if Size>(SizeOf(ptruint)*2) then begin
+  if Size>(SizeOf(TFLREPtrUInt)*2) then begin
 
    // Alignment initialization
-   CurrentChunk:=pointer(ptruint(ptruint(CurrentChar) and not (SizeOf(ptruint)-1)));
+   CurrentChunk:=pointer(TFLREPtrUInt(TFLREPtrUInt(CurrentChar) and not (SizeOf(TFLREPtrUInt)-1)));
 
    // Try to get first chunk
-   if ptruint(CurrentChunk)>=ptruint(Text) then begin
+   if TFLREPtrUInt(CurrentChunk)>=TFLREPtrUInt(Text) then begin
     // Yes, we can the get first chunk
     CurrentChunkValue:=CurrentChunk^;
     XoredChunk0:=CurrentChunkValue xor XorMask0;
@@ -5409,14 +5879,14 @@ begin
    inc(CurrentChunk);
 
    // Subtract the first chunk from size
-   dec(ptruint(Size),ptruint(CurrentChunk)-ptruint(CurrentChar));
+   dec(TFLREPtrUInt(Size),TFLREPtrUInt(CurrentChunk)-TFLREPtrUInt(CurrentChar));
 
    // Scan first chunk
    if ((((XoredChunk0+MaskA) and not XoredChunk0) or
         ((XoredChunk1+MaskA) and not XoredChunk1)) and MaskB)<>0 then begin
-    while ptruint(CurrentChar)<ptruint(CurrentChunk) do begin
+    while TFLREPtrUInt(CurrentChar)<TFLREPtrUInt(CurrentChunk) do begin
      if CurrentChar^ in CharSet then begin
-      result:=ptruint(CurrentChar)-ptruint(Text);
+      result:=TFLREPtrUInt(CurrentChar)-TFLREPtrUInt(Text);
       exit;
      end;
      inc(CurrentChar);
@@ -5424,7 +5894,7 @@ begin
    end;
 
    // Scan until the last whole chunk
-   while Size>=SizeOf(ptruint) do begin
+   while Size>=SizeOf(TFLREPtrUInt) do begin
     CurrentChunkValue:=CurrentChunk^;
     XoredChunk0:=CurrentChunkValue xor XorMask0;
     XoredChunk1:=CurrentChunkValue xor XorMask1;
@@ -5433,58 +5903,71 @@ begin
 {$ifdef POSCHARSAFECHECK}
      CurrentChar:=pointer(CurrentChunk);
      if CurrentChar[0] in CharSet then begin
-      result:=ptruint(pointer(@CurrentChar[0]))-ptruint(Text);
+      result:=TFLREPtrUInt(pointer(@CurrentChar[0]))-TFLREPtrUInt(Text);
       exit;
      end;
      if CurrentChar[1] in CharSet then begin
-      result:=ptruint(pointer(@CurrentChar[1]))-ptruint(Text);
+      result:=TFLREPtrUInt(pointer(@CurrentChar[1]))-TFLREPtrUInt(Text);
       exit;
      end;
      if CurrentChar[2] in CharSet then begin
-      result:=ptruint(pointer(@CurrentChar[2]))-ptruint(Text);
+      result:=TFLREPtrUInt(pointer(@CurrentChar[2]))-TFLREPtrUInt(Text);
       exit;
      end;
      if CurrentChar[3] in CharSet then begin
-      result:=ptruint(pointer(@CurrentChar[3]))-ptruint(Text);
+      result:=TFLREPtrUInt(pointer(@CurrentChar[3]))-TFLREPtrUInt(Text);
       exit;
      end;
 {$ifdef cpu64}
      if CurrentChar[4] in CharSet then begin
-      result:=ptruint(pointer(@CurrentChar[4]))-ptruint(Text);
+      result:=TFLREPtrUInt(pointer(@CurrentChar[4]))-TFLREPtrUInt(Text);
       exit;
      end;
      if CurrentChar[5] in CharSet then begin
-      result:=ptruint(pointer(@CurrentChar[5]))-ptruint(Text);
+      result:=TFLREPtrUInt(pointer(@CurrentChar[5]))-TFLREPtrUInt(Text);
       exit;
      end;
      if CurrentChar[6] in CharSet then begin
-      result:=ptruint(pointer(@CurrentChar[6]))-ptruint(Text);
+      result:=TFLREPtrUInt(pointer(@CurrentChar[6]))-TFLREPtrUInt(Text);
       exit;
      end;
      if CurrentChar[7] in CharSet then begin
-      result:=ptruint(pointer(@CurrentChar[7]))-ptruint(Text);
+      result:=TFLREPtrUInt(pointer(@CurrentChar[7]))-TFLREPtrUInt(Text);
       exit;
      end;
 {$endif}
 {$else}
-     CurrentChar:=pointer({$ifdef BIG_ENDIAN}ptruint(ptruint(CurrentChunk)+ptruint(SizeOf(ptruint)-1)){$else}CurrentChunk{$endif});
+     CurrentChar:=pointer({$ifdef BIG_ENDIAN}TFLREPtrUInt(TFLREPtrUInt(CurrentChunk)+TFLREPtrUInt(SizeOf(TFLREPtrUInt)-1)){$else}CurrentChunk{$endif});
      XoredChunk0:=XoredChunk0 xor XorMask0;
      XoredChunk1:=XoredChunk1 xor XorMask1;
-     while ((XoredChunk0 or XoredChunk1)<>0) and
-           ((XoredChunk0 and $ff)<>byte(SearchChar0)) and
-           ((XoredChunk1 and $ff)<>byte(SearchChar1)) do begin
-      XoredChunk0:=XoredChunk0 shr 8;
-      XoredChunk1:=XoredChunk1 shr 8;
-      {$ifdef BIG_ENDIAN}dec{$else}inc{$endif}(CurrentChar);
+     if (TFLREUInt8(SearchChar0)=0) and (TFLREUInt8(SearchChar1)=0) then begin
+      // Special case
+      XoredChunk0:=not XoredChunk0;
+      XoredChunk1:=not XoredChunk1;
+      while ((XoredChunk0 or XoredChunk1)<>0) and
+            ((XoredChunk0 and $ff)<>$ff) and
+            ((XoredChunk1 and $ff)<>$ff) do begin
+       XoredChunk0:=XoredChunk0 shr 8;
+       XoredChunk1:=XoredChunk1 shr 8;
+       {$ifdef BIG_ENDIAN}dec{$else}inc{$endif}(CurrentChar);
+      end;
+     end else begin
+      while ((XoredChunk0 or XoredChunk1)<>0) and
+            ((XoredChunk0 and $ff)<>TFLREUInt8(SearchChar0)) and
+            ((XoredChunk1 and $ff)<>TFLREUInt8(SearchChar1)) do begin
+       XoredChunk0:=XoredChunk0 shr 8;
+       XoredChunk1:=XoredChunk1 shr 8;
+       {$ifdef BIG_ENDIAN}dec{$else}inc{$endif}(CurrentChar);
+      end;
      end;
      if (XoredChunk0 or XoredChunk1)<>0 then begin
-      result:=ptruint(pointer(CurrentChar))-ptruint(Text);
+      result:=TFLREPtrUInt(pointer(CurrentChar))-TFLREPtrUInt(Text);
       exit;
      end;
 {$endif}
     end;
     inc(CurrentChunk);
-    dec(Size,SizeOf(ptruint));
+    dec(Size,SizeOf(TFLREPtrUInt));
    end;
 
    // Set chunkwise to charwise pointer
@@ -5494,7 +5977,7 @@ begin
   // Scan rest of the remained characters, if there are any
   while Size>0 do begin
    if CurrentChar^ in CharSet then begin
-    result:=ptruint(pointer(CurrentChar))-ptruint(Text);
+    result:=TFLREPtrUInt(pointer(CurrentChar))-TFLREPtrUInt(Text);
     exit;
    end;
    inc(CurrentChar);
@@ -5504,35 +5987,35 @@ begin
  end;
 end;
 
-function PtrPosCharSetOf3(const SearchChar0,SearchChar1,SearchChar2:TFLRERawByteChar;const Text:PFLRERawByteChar;TextLength:longint;Offset:longint=0):longint;
-type pptruint=^ptruint;
-const MaskA=ptruint({$ifdef cpu64}$fefefefefefefeff{$else}$fefefeff{$endif}); // it is: 0-$01010101 / 0-$0101010101010101
-      MaskB=ptruint({$ifdef cpu64}$8080808080808080{$else}$80808080{$endif});
+function PtrPosCharSetOf3(const SearchChar0,SearchChar1,SearchChar2:TFLRERawByteChar;const Text:PFLRERawByteChar;TextLength:TFLRESizeInt;Offset:TFLRESizeInt=0):TFLRESizeInt;
+type pptruint=^TFLREPtrUInt;
+const MaskA=TFLREPtrUInt({$ifdef cpu64}$fefefefefefefeff{$else}$fefefeff{$endif}); // it is: 0-$01010101 / 0-$0101010101010101
+      MaskB=TFLREPtrUInt({$ifdef cpu64}$8080808080808080{$else}$80808080{$endif});
 var CurrentChar:PFLRERawByteChar;
     CurrentChunk:pptruint;
-    XorMask0,XorMask1,XorMask2,XoredChunk0,XoredChunk1,XoredChunk2,CurrentChunkValue,Size:ptruint;
+    XorMask0,XorMask1,XorMask2,XoredChunk0,XoredChunk1,XoredChunk2,CurrentChunkValue,Size:TFLREPtrUInt;
     CharSet:TFLRERawByteCharSet;
 begin
  result:=-1;
 
- Size:=(TextLength-Offset)+1;
- if (Offset<TextLength) and (ptrint(Size)>0) then begin
+ Size:=TextLength-Offset;
+ if (Offset<TextLength) and (TFLREPtrInt(Size)>0) then begin
 
-  XorMask0:=byte(SearchChar0);
+  XorMask0:=TFLREUInt8(SearchChar0);
   XorMask0:=XorMask0 or (XorMask0 shl 8);
   XorMask0:=XorMask0 or (XorMask0 shl 16);
 {$ifdef cpu64}
   XorMask0:=XorMask0 or (XorMask0 shl 32);
 {$endif}
 
-  XorMask1:=byte(SearchChar1);
+  XorMask1:=TFLREUInt8(SearchChar1);
   XorMask1:=XorMask1 or (XorMask1 shl 8);
   XorMask1:=XorMask1 or (XorMask1 shl 16);
 {$ifdef cpu64}
   XorMask1:=XorMask1 or (XorMask1 shl 32);
 {$endif}
 
-  XorMask2:=byte(SearchChar2);
+  XorMask2:=TFLREUInt8(SearchChar2);
   XorMask2:=XorMask2 or (XorMask2 shl 8);
   XorMask2:=XorMask2 or (XorMask2 shl 16);
 {$ifdef cpu64}
@@ -5543,13 +6026,13 @@ begin
 
   CurrentChar:=@Text[Offset];
 
-  if Size>(SizeOf(ptruint)*2) then begin
+  if Size>(SizeOf(TFLREPtrUInt)*2) then begin
 
    // Alignment initialization
-   CurrentChunk:=pointer(ptruint(ptruint(CurrentChar) and not (SizeOf(ptruint)-1)));
+   CurrentChunk:=pointer(TFLREPtrUInt(TFLREPtrUInt(CurrentChar) and not (SizeOf(TFLREPtrUInt)-1)));
 
    // Try to get first chunk
-   if ptruint(CurrentChunk)>=ptruint(Text) then begin
+   if TFLREPtrUInt(CurrentChunk)>=TFLREPtrUInt(Text) then begin
     // Yes, we can the get first chunk
     CurrentChunkValue:=CurrentChunk^;
     XoredChunk0:=CurrentChunkValue xor XorMask0;
@@ -5566,15 +6049,15 @@ begin
    inc(CurrentChunk);
 
    // Subtract the first chunk from size
-   dec(ptruint(Size),ptruint(CurrentChunk)-ptruint(CurrentChar));
+   dec(TFLREPtrUInt(Size),TFLREPtrUInt(CurrentChunk)-TFLREPtrUInt(CurrentChar));
 
    // Scan first chunk
    if ((((XoredChunk0+MaskA) and not XoredChunk0) or
         ((XoredChunk1+MaskA) and not XoredChunk1) or
         ((XoredChunk2+MaskA) and not XoredChunk2)) and MaskB)<>0 then begin
-    while ptruint(CurrentChar)<ptruint(CurrentChunk) do begin
+    while TFLREPtrUInt(CurrentChar)<TFLREPtrUInt(CurrentChunk) do begin
      if CurrentChar^ in CharSet then begin
-      result:=ptruint(CurrentChar)-ptruint(Text);
+      result:=TFLREPtrUInt(CurrentChar)-TFLREPtrUInt(Text);
       exit;
      end;
      inc(CurrentChar);
@@ -5582,7 +6065,7 @@ begin
    end;
 
    // Scan until the last whole chunk
-   while Size>=SizeOf(ptruint) do begin
+   while Size>=SizeOf(TFLREPtrUInt) do begin
     CurrentChunkValue:=CurrentChunk^;
     XoredChunk0:=CurrentChunkValue xor XorMask0;
     XoredChunk1:=CurrentChunkValue xor XorMask1;
@@ -5593,61 +6076,77 @@ begin
 {$ifdef POSCHARSAFECHECK}
      CurrentChar:=pointer(CurrentChunk);
      if CurrentChar[0] in CharSet then begin
-      result:=ptruint(pointer(@CurrentChar[0]))-ptruint(Text);
+      result:=TFLREPtrUInt(pointer(@CurrentChar[0]))-TFLREPtrUInt(Text);
       exit;
      end;
      if CurrentChar[1] in CharSet then begin
-      result:=ptruint(pointer(@CurrentChar[1]))-ptruint(Text);
+      result:=TFLREPtrUInt(pointer(@CurrentChar[1]))-TFLREPtrUInt(Text);
       exit;
      end;
      if CurrentChar[2] in CharSet then begin
-      result:=ptruint(pointer(@CurrentChar[2]))-ptruint(Text);
+      result:=TFLREPtrUInt(pointer(@CurrentChar[2]))-TFLREPtrUInt(Text);
       exit;
      end;
      if CurrentChar[3] in CharSet then begin
-      result:=ptruint(pointer(@CurrentChar[3]))-ptruint(Text);
+      result:=TFLREPtrUInt(pointer(@CurrentChar[3]))-TFLREPtrUInt(Text);
       exit;
      end;
 {$ifdef cpu64}
      if CurrentChar[4] in CharSet then begin
-      result:=ptruint(pointer(@CurrentChar[4]))-ptruint(Text);
+      result:=TFLREPtrUInt(pointer(@CurrentChar[4]))-TFLREPtrUInt(Text);
       exit;
      end;
      if CurrentChar[5] in CharSet then begin
-      result:=ptruint(pointer(@CurrentChar[5]))-ptruint(Text);
+      result:=TFLREPtrUInt(pointer(@CurrentChar[5]))-TFLREPtrUInt(Text);
       exit;
      end;
      if CurrentChar[6] in CharSet then begin
-      result:=ptruint(pointer(@CurrentChar[6]))-ptruint(Text);
+      result:=TFLREPtrUInt(pointer(@CurrentChar[6]))-TFLREPtrUInt(Text);
       exit;
      end;
      if CurrentChar[7] in CharSet then begin
-      result:=ptruint(pointer(@CurrentChar[7]))-ptruint(Text);
+      result:=TFLREPtrUInt(pointer(@CurrentChar[7]))-TFLREPtrUInt(Text);
       exit;
      end;
 {$endif}
 {$else}
-     CurrentChar:=pointer({$ifdef BIG_ENDIAN}ptruint(ptruint(CurrentChunk)+ptruint(SizeOf(ptruint)-1)){$else}CurrentChunk{$endif});
+     CurrentChar:=pointer({$ifdef BIG_ENDIAN}TFLREPtrUInt(TFLREPtrUInt(CurrentChunk)+TFLREPtrUInt(SizeOf(TFLREPtrUInt)-1)){$else}CurrentChunk{$endif});
      XoredChunk0:=XoredChunk0 xor XorMask0;
      XoredChunk1:=XoredChunk1 xor XorMask1;
      XoredChunk2:=XoredChunk2 xor XorMask2;
-     while ((XoredChunk0 or XoredChunk1 or XoredChunk2)<>0) and
-           ((XoredChunk0 and $ff)<>byte(SearchChar0)) and
-           ((XoredChunk1 and $ff)<>byte(SearchChar1)) and
-           ((XoredChunk2 and $ff)<>byte(SearchChar2)) do begin
-      XoredChunk0:=XoredChunk0 shr 8;
-      XoredChunk1:=XoredChunk1 shr 8;
-      XoredChunk2:=XoredChunk2 shr 8;
-      {$ifdef BIG_ENDIAN}dec{$else}inc{$endif}(CurrentChar);
+     if (TFLREUInt8(SearchChar0)=0) and (TFLREUInt8(SearchChar1)=0) and (TFLREUInt8(SearchChar2)=0) then begin
+      // Special case
+      XoredChunk0:=not XoredChunk0;
+      XoredChunk1:=not XoredChunk1;
+      XoredChunk2:=not XoredChunk2;
+      while ((XoredChunk0 or XoredChunk1 or XoredChunk2)<>0) and
+            ((XoredChunk0 and $ff)<>$ff) and
+            ((XoredChunk1 and $ff)<>$ff) and
+            ((XoredChunk2 and $ff)<>$ff) do begin
+       XoredChunk0:=XoredChunk0 shr 8;
+       XoredChunk1:=XoredChunk1 shr 8;
+       XoredChunk2:=XoredChunk2 shr 8;
+       {$ifdef BIG_ENDIAN}dec{$else}inc{$endif}(CurrentChar);
+      end;
+     end else begin
+      while ((XoredChunk0 or XoredChunk1 or XoredChunk2)<>0) and
+            ((XoredChunk0 and $ff)<>TFLREUInt8(SearchChar0)) and
+            ((XoredChunk1 and $ff)<>TFLREUInt8(SearchChar1)) and
+            ((XoredChunk2 and $ff)<>TFLREUInt8(SearchChar2)) do begin
+       XoredChunk0:=XoredChunk0 shr 8;
+       XoredChunk1:=XoredChunk1 shr 8;
+       XoredChunk2:=XoredChunk2 shr 8;
+       {$ifdef BIG_ENDIAN}dec{$else}inc{$endif}(CurrentChar);
+      end;
      end;
      if (XoredChunk0 or XoredChunk1 or XoredChunk2)<>0 then begin
-      result:=ptruint(pointer(CurrentChar))-ptruint(Text);
+      result:=TFLREPtrUInt(pointer(CurrentChar))-TFLREPtrUInt(Text);
       exit;
      end;
 {$endif}
     end;
     inc(CurrentChunk);
-    dec(Size,SizeOf(ptruint));
+    dec(Size,SizeOf(TFLREPtrUInt));
    end;
 
    // Set chunkwise to charwise pointer
@@ -5657,7 +6156,7 @@ begin
   // Scan rest of the remained characters, if there are any
   while Size>0 do begin
    if CurrentChar^ in CharSet then begin
-    result:=ptruint(pointer(CurrentChar))-ptruint(Text);
+    result:=TFLREPtrUInt(pointer(CurrentChar))-TFLREPtrUInt(Text);
     exit;
    end;
    inc(CurrentChar);
@@ -5667,42 +6166,42 @@ begin
  end;
 end;
 
-function PtrPosCharSetOf4(const SearchChar0,SearchChar1,SearchChar2,SearchChar3:TFLRERawByteChar;const Text:PFLRERawByteChar;TextLength:longint;Offset:longint=0):longint;
-type pptruint=^ptruint;
-const MaskA=ptruint({$ifdef cpu64}$fefefefefefefeff{$else}$fefefeff{$endif}); // it is: 0-$01010101 / 0-$0101010101010101
-      MaskB=ptruint({$ifdef cpu64}$8080808080808080{$else}$80808080{$endif});
+function PtrPosCharSetOf4(const SearchChar0,SearchChar1,SearchChar2,SearchChar3:TFLRERawByteChar;const Text:PFLRERawByteChar;TextLength:TFLRESizeInt;Offset:TFLRESizeInt=0):TFLRESizeInt;
+type pptruint=^TFLREPtrUInt;
+const MaskA=TFLREPtrUInt({$ifdef cpu64}$fefefefefefefeff{$else}$fefefeff{$endif}); // it is: 0-$01010101 / 0-$0101010101010101
+      MaskB=TFLREPtrUInt({$ifdef cpu64}$8080808080808080{$else}$80808080{$endif});
 var CurrentChar:PFLRERawByteChar;
     CurrentChunk:pptruint;
-    XorMask0,XorMask1,XorMask2,XorMask3,XoredChunk0,XoredChunk1,XoredChunk2,XoredChunk3,CurrentChunkValue,Size:ptruint;
+    XorMask0,XorMask1,XorMask2,XorMask3,XoredChunk0,XoredChunk1,XoredChunk2,XoredChunk3,CurrentChunkValue,Size:TFLREPtrUInt;
     CharSet:TFLRERawByteCharSet;
 begin
  result:=-1;
 
- Size:=(TextLength-Offset)+1;
- if (Offset<TextLength) and (ptrint(Size)>0) then begin
+ Size:=TextLength-Offset;
+ if (Offset<TextLength) and (TFLREPtrInt(Size)>0) then begin
 
-  XorMask0:=byte(SearchChar0);
+  XorMask0:=TFLREUInt8(SearchChar0);
   XorMask0:=XorMask0 or (XorMask0 shl 8);
   XorMask0:=XorMask0 or (XorMask0 shl 16);
 {$ifdef cpu64}
   XorMask0:=XorMask0 or (XorMask0 shl 32);
 {$endif}
 
-  XorMask1:=byte(SearchChar1);
+  XorMask1:=TFLREUInt8(SearchChar1);
   XorMask1:=XorMask1 or (XorMask1 shl 8);
   XorMask1:=XorMask1 or (XorMask1 shl 16);
 {$ifdef cpu64}
   XorMask1:=XorMask1 or (XorMask1 shl 32);
 {$endif}
 
-  XorMask2:=byte(SearchChar2);
+  XorMask2:=TFLREUInt8(SearchChar2);
   XorMask2:=XorMask2 or (XorMask2 shl 8);
   XorMask2:=XorMask2 or (XorMask2 shl 16);
 {$ifdef cpu64}
   XorMask2:=XorMask2 or (XorMask2 shl 32);
 {$endif}
 
-  XorMask3:=byte(SearchChar3);
+  XorMask3:=TFLREUInt8(SearchChar3);
   XorMask3:=XorMask3 or (XorMask3 shl 8);
   XorMask3:=XorMask3 or (XorMask3 shl 16);
 {$ifdef cpu64}
@@ -5713,13 +6212,13 @@ begin
 
   CurrentChar:=@Text[Offset];
 
-  if Size>(SizeOf(ptruint)*2) then begin
+  if Size>(SizeOf(TFLREPtrUInt)*2) then begin
 
    // Alignment initialization
-   CurrentChunk:=pointer(ptruint(ptruint(CurrentChar) and not (SizeOf(ptruint)-1)));
+   CurrentChunk:=pointer(TFLREPtrUInt(TFLREPtrUInt(CurrentChar) and not (SizeOf(TFLREPtrUInt)-1)));
 
    // Try to get first chunk
-   if ptruint(CurrentChunk)>=ptruint(Text) then begin
+   if TFLREPtrUInt(CurrentChunk)>=TFLREPtrUInt(Text) then begin
     // Yes, we can the get first chunk
     CurrentChunkValue:=CurrentChunk^;
     XoredChunk0:=CurrentChunkValue xor XorMask0;
@@ -5738,16 +6237,16 @@ begin
    inc(CurrentChunk);
 
    // Subtract the first chunk from size
-   dec(ptruint(Size),ptruint(CurrentChunk)-ptruint(CurrentChar));
+   dec(TFLREPtrUInt(Size),TFLREPtrUInt(CurrentChunk)-TFLREPtrUInt(CurrentChar));
 
    // Scan first chunk
    if ((((XoredChunk0+MaskA) and not XoredChunk0) or
         ((XoredChunk1+MaskA) and not XoredChunk1) or
         ((XoredChunk2+MaskA) and not XoredChunk2) or
         ((XoredChunk3+MaskA) and not XoredChunk3)) and MaskB)<>0 then begin
-    while ptruint(CurrentChar)<ptruint(CurrentChunk) do begin
+    while TFLREPtrUInt(CurrentChar)<TFLREPtrUInt(CurrentChunk) do begin
      if CurrentChar^ in CharSet then begin
-      result:=ptruint(CurrentChar)-ptruint(Text);
+      result:=TFLREPtrUInt(CurrentChar)-TFLREPtrUInt(Text);
       exit;
      end;
      inc(CurrentChar);
@@ -5755,7 +6254,7 @@ begin
    end;
 
    // Scan until the last whole chunk
-   while Size>=SizeOf(ptruint) do begin
+   while Size>=SizeOf(TFLREPtrUInt) do begin
     CurrentChunkValue:=CurrentChunk^;
     XoredChunk0:=CurrentChunkValue xor XorMask0;
     XoredChunk1:=CurrentChunkValue xor XorMask1;
@@ -5768,64 +6267,84 @@ begin
 {$ifdef POSCHARSAFECHECK}
      CurrentChar:=pointer(CurrentChunk);
      if CurrentChar[0] in CharSet then begin
-      result:=ptruint(pointer(@CurrentChar[0]))-ptruint(Text);
+      result:=TFLREPtrUInt(pointer(@CurrentChar[0]))-TFLREPtrUInt(Text);
       exit;
      end;
      if CurrentChar[1] in CharSet then begin
-      result:=ptruint(pointer(@CurrentChar[1]))-ptruint(Text);
+      result:=TFLREPtrUInt(pointer(@CurrentChar[1]))-TFLREPtrUInt(Text);
       exit;
      end;
      if CurrentChar[2] in CharSet then begin
-      result:=ptruint(pointer(@CurrentChar[2]))-ptruint(Text);
+      result:=TFLREPtrUInt(pointer(@CurrentChar[2]))-TFLREPtrUInt(Text);
       exit;
      end;
      if CurrentChar[3] in CharSet then begin
-      result:=ptruint(pointer(@CurrentChar[3]))-ptruint(Text);
+      result:=TFLREPtrUInt(pointer(@CurrentChar[3]))-TFLREPtrUInt(Text);
       exit;
      end;
 {$ifdef cpu64}
      if CurrentChar[4] in CharSet then begin
-      result:=ptruint(pointer(@CurrentChar[4]))-ptruint(Text);
+      result:=TFLREPtrUInt(pointer(@CurrentChar[4]))-TFLREPtrUInt(Text);
       exit;
      end;
      if CurrentChar[5] in CharSet then begin
-      result:=ptruint(pointer(@CurrentChar[5]))-ptruint(Text);
+      result:=TFLREPtrUInt(pointer(@CurrentChar[5]))-TFLREPtrUInt(Text);
       exit;
      end;
      if CurrentChar[6] in CharSet then begin
-      result:=ptruint(pointer(@CurrentChar[6]))-ptruint(Text);
+      result:=TFLREPtrUInt(pointer(@CurrentChar[6]))-TFLREPtrUInt(Text);
       exit;
      end;
      if CurrentChar[7] in CharSet then begin
-      result:=ptruint(pointer(@CurrentChar[7]))-ptruint(Text);
+      result:=TFLREPtrUInt(pointer(@CurrentChar[7]))-TFLREPtrUInt(Text);
       exit;
      end;
 {$endif}
 {$else}
-     CurrentChar:=pointer({$ifdef BIG_ENDIAN}ptruint(ptruint(CurrentChunk)+ptruint(SizeOf(ptruint)-1)){$else}CurrentChunk{$endif});
+     CurrentChar:=pointer({$ifdef BIG_ENDIAN}TFLREPtrUInt(TFLREPtrUInt(CurrentChunk)+TFLREPtrUInt(SizeOf(TFLREPtrUInt)-1)){$else}CurrentChunk{$endif});
      XoredChunk0:=XoredChunk0 xor XorMask0;
      XoredChunk1:=XoredChunk1 xor XorMask1;
      XoredChunk2:=XoredChunk2 xor XorMask2;
      XoredChunk3:=XoredChunk3 xor XorMask3;
-     while ((XoredChunk0 or XoredChunk1 or XoredChunk2 or XoredChunk3)<>0) and
-           ((XoredChunk0 and $ff)<>byte(SearchChar0)) and
-           ((XoredChunk1 and $ff)<>byte(SearchChar1)) and
-           ((XoredChunk2 and $ff)<>byte(SearchChar2)) and
-           ((XoredChunk3 and $ff)<>byte(SearchChar3)) do begin
-      XoredChunk0:=XoredChunk0 shr 8;
-      XoredChunk1:=XoredChunk1 shr 8;
-      XoredChunk2:=XoredChunk2 shr 8;
-      XoredChunk3:=XoredChunk3 shr 8;
-      {$ifdef BIG_ENDIAN}dec{$else}inc{$endif}(CurrentChar);
+     if (TFLREUInt8(SearchChar0)=0) and (TFLREUInt8(SearchChar1)=0) and
+        (TFLREUInt8(SearchChar2)=0) and (TFLREUInt8(SearchChar3)=0) then begin
+      // Special case
+      XoredChunk0:=not XoredChunk0;
+      XoredChunk1:=not XoredChunk1;
+      XoredChunk2:=not XoredChunk2;
+      XoredChunk3:=not XoredChunk3;
+      while ((XoredChunk0 or XoredChunk1 or XoredChunk2 or XoredChunk3)<>0) and
+            ((XoredChunk0 and $ff)<>$ff) and
+            ((XoredChunk1 and $ff)<>$ff) and
+            ((XoredChunk2 and $ff)<>$ff) and
+            ((XoredChunk3 and $ff)<>$ff) do begin
+       XoredChunk0:=XoredChunk0 shr 8;
+       XoredChunk1:=XoredChunk1 shr 8;
+       XoredChunk2:=XoredChunk2 shr 8;
+       XoredChunk3:=XoredChunk3 shr 8;
+       {$ifdef BIG_ENDIAN}dec{$else}inc{$endif}(CurrentChar);
+      end;
+     end else begin
+      while ((XoredChunk0 or XoredChunk1 or XoredChunk2 or XoredChunk3)<>0) and
+            ((XoredChunk0 and $ff)<>TFLREUInt8(SearchChar0)) and
+            ((XoredChunk1 and $ff)<>TFLREUInt8(SearchChar1)) and
+            ((XoredChunk2 and $ff)<>TFLREUInt8(SearchChar2)) and
+            ((XoredChunk3 and $ff)<>TFLREUInt8(SearchChar3)) do begin
+       XoredChunk0:=XoredChunk0 shr 8;
+       XoredChunk1:=XoredChunk1 shr 8;
+       XoredChunk2:=XoredChunk2 shr 8;
+       XoredChunk3:=XoredChunk3 shr 8;
+       {$ifdef BIG_ENDIAN}dec{$else}inc{$endif}(CurrentChar);
+      end;
      end;
      if (XoredChunk0 or XoredChunk1 or XoredChunk2 or XoredChunk3)<>0 then begin
-      result:=ptruint(pointer(CurrentChar))-ptruint(Text);
+      result:=TFLREPtrUInt(pointer(CurrentChar))-TFLREPtrUInt(Text);
       exit;
      end;
 {$endif}
     end;
     inc(CurrentChunk);
-    dec(Size,SizeOf(ptruint));
+    dec(Size,SizeOf(TFLREPtrUInt));
    end;
 
    // Set chunkwise to charwise pointer
@@ -5835,7 +6354,7 @@ begin
   // Scan rest of the remained characters, if there are any
   while Size>0 do begin
    if CurrentChar^ in CharSet then begin
-    result:=ptruint(pointer(CurrentChar))-ptruint(Text);
+    result:=TFLREPtrUInt(pointer(CurrentChar))-TFLREPtrUInt(Text);
     exit;
    end;
    inc(CurrentChar);
@@ -5845,49 +6364,49 @@ begin
  end;
 end;
 
-function PtrPosCharSetOf5(const SearchChar0,SearchChar1,SearchChar2,SearchChar3,SearchChar4:TFLRERawByteChar;const Text:PFLRERawByteChar;TextLength:longint;Offset:longint=0):longint;
-type pptruint=^ptruint;
-const MaskA=ptruint({$ifdef cpu64}$fefefefefefefeff{$else}$fefefeff{$endif}); // it is: 0-$01010101 / 0-$0101010101010101
-      MaskB=ptruint({$ifdef cpu64}$8080808080808080{$else}$80808080{$endif});
+function PtrPosCharSetOf5(const SearchChar0,SearchChar1,SearchChar2,SearchChar3,SearchChar4:TFLRERawByteChar;const Text:PFLRERawByteChar;TextLength:TFLRESizeInt;Offset:TFLRESizeInt=0):TFLRESizeInt;
+type pptruint=^TFLREPtrUInt;
+const MaskA=TFLREPtrUInt({$ifdef cpu64}$fefefefefefefeff{$else}$fefefeff{$endif}); // it is: 0-$01010101 / 0-$0101010101010101
+      MaskB=TFLREPtrUInt({$ifdef cpu64}$8080808080808080{$else}$80808080{$endif});
 var CurrentChar:PFLRERawByteChar;
     CurrentChunk:pptruint;
-    XorMask0,XorMask1,XorMask2,XorMask3,XorMask4,XoredChunk0,XoredChunk1,XoredChunk2,XoredChunk3,XoredChunk4,CurrentChunkValue,Size:ptruint;
+    XorMask0,XorMask1,XorMask2,XorMask3,XorMask4,XoredChunk0,XoredChunk1,XoredChunk2,XoredChunk3,XoredChunk4,CurrentChunkValue,Size:TFLREPtrUInt;
     CharSet:TFLRERawByteCharSet;
 begin
  result:=-1;
 
- Size:=(TextLength-Offset)+1;
- if (Offset<TextLength) and (ptrint(Size)>0) then begin
+ Size:=TextLength-Offset;
+ if (Offset<TextLength) and (TFLREPtrInt(Size)>0) then begin
 
-  XorMask0:=byte(SearchChar0);
+  XorMask0:=TFLREUInt8(SearchChar0);
   XorMask0:=XorMask0 or (XorMask0 shl 8);
   XorMask0:=XorMask0 or (XorMask0 shl 16);
 {$ifdef cpu64}
   XorMask0:=XorMask0 or (XorMask0 shl 32);
 {$endif}
 
-  XorMask1:=byte(SearchChar1);
+  XorMask1:=TFLREUInt8(SearchChar1);
   XorMask1:=XorMask1 or (XorMask1 shl 8);
   XorMask1:=XorMask1 or (XorMask1 shl 16);
 {$ifdef cpu64}
   XorMask1:=XorMask1 or (XorMask1 shl 32);
 {$endif}
 
-  XorMask2:=byte(SearchChar2);
+  XorMask2:=TFLREUInt8(SearchChar2);
   XorMask2:=XorMask2 or (XorMask2 shl 8);
   XorMask2:=XorMask2 or (XorMask2 shl 16);
 {$ifdef cpu64}
   XorMask2:=XorMask2 or (XorMask2 shl 32);
 {$endif}
 
-  XorMask3:=byte(SearchChar3);
+  XorMask3:=TFLREUInt8(SearchChar3);
   XorMask3:=XorMask3 or (XorMask3 shl 8);
   XorMask3:=XorMask3 or (XorMask3 shl 16);
 {$ifdef cpu64}
   XorMask3:=XorMask3 or (XorMask3 shl 32);
 {$endif}
 
-  XorMask4:=byte(SearchChar4);
+  XorMask4:=TFLREUInt8(SearchChar4);
   XorMask4:=XorMask4 or (XorMask4 shl 8);
   XorMask4:=XorMask4 or (XorMask4 shl 16);
 {$ifdef cpu64}
@@ -5898,13 +6417,13 @@ begin
 
   CurrentChar:=@Text[Offset];
 
-  if Size>(SizeOf(ptruint)*2) then begin
+  if Size>(SizeOf(TFLREPtrUInt)*2) then begin
 
    // Alignment initialization
-   CurrentChunk:=pointer(ptruint(ptruint(CurrentChar) and not (SizeOf(ptruint)-1)));
+   CurrentChunk:=pointer(TFLREPtrUInt(TFLREPtrUInt(CurrentChar) and not (SizeOf(TFLREPtrUInt)-1)));
 
    // Try to get first chunk
-   if ptruint(CurrentChunk)>=ptruint(Text) then begin
+   if TFLREPtrUInt(CurrentChunk)>=TFLREPtrUInt(Text) then begin
     // Yes, we can the get first chunk
     CurrentChunkValue:=CurrentChunk^;
     XoredChunk0:=CurrentChunkValue xor XorMask0;
@@ -5925,7 +6444,7 @@ begin
    inc(CurrentChunk);
 
    // Subtract the first chunk from size
-   dec(ptruint(Size),ptruint(CurrentChunk)-ptruint(CurrentChar));
+   dec(TFLREPtrUInt(Size),TFLREPtrUInt(CurrentChunk)-TFLREPtrUInt(CurrentChar));
 
    // Scan first chunk
    if ((((XoredChunk0+MaskA) and not XoredChunk0) or
@@ -5933,9 +6452,9 @@ begin
         ((XoredChunk2+MaskA) and not XoredChunk2) or
         ((XoredChunk3+MaskA) and not XoredChunk3) or
         ((XoredChunk4+MaskA) and not XoredChunk4)) and MaskB)<>0 then begin
-    while ptruint(CurrentChar)<ptruint(CurrentChunk) do begin
+    while TFLREPtrUInt(CurrentChar)<TFLREPtrUInt(CurrentChunk) do begin
      if CurrentChar^ in CharSet then begin
-      result:=ptruint(CurrentChar)-ptruint(Text);
+      result:=TFLREPtrUInt(CurrentChar)-TFLREPtrUInt(Text);
       exit;
      end;
      inc(CurrentChar);
@@ -5943,7 +6462,7 @@ begin
    end;
 
    // Scan until the last whole chunk
-   while Size>=SizeOf(ptruint) do begin
+   while Size>=SizeOf(TFLREPtrUInt) do begin
     CurrentChunkValue:=CurrentChunk^;
     XoredChunk0:=CurrentChunkValue xor XorMask0;
     XoredChunk1:=CurrentChunkValue xor XorMask1;
@@ -5958,67 +6477,91 @@ begin
 {$ifdef POSCHARSAFECHECK}
      CurrentChar:=pointer(CurrentChunk);
      if CurrentChar[0] in CharSet then begin
-      result:=ptruint(pointer(@CurrentChar[0]))-ptruint(Text);
+      result:=TFLREPtrUInt(pointer(@CurrentChar[0]))-TFLREPtrUInt(Text);
       exit;
      end;
      if CurrentChar[1] in CharSet then begin
-      result:=ptruint(pointer(@CurrentChar[1]))-ptruint(Text);
+      result:=TFLREPtrUInt(pointer(@CurrentChar[1]))-TFLREPtrUInt(Text);
       exit;
      end;
      if CurrentChar[2] in CharSet then begin
-      result:=ptruint(pointer(@CurrentChar[2]))-ptruint(Text);
+      result:=TFLREPtrUInt(pointer(@CurrentChar[2]))-TFLREPtrUInt(Text);
       exit;
      end;
      if CurrentChar[3] in CharSet then begin
-      result:=ptruint(pointer(@CurrentChar[3]))-ptruint(Text);
+      result:=TFLREPtrUInt(pointer(@CurrentChar[3]))-TFLREPtrUInt(Text);
       exit;
      end;
 {$ifdef cpu64}
      if CurrentChar[4] in CharSet then begin
-      result:=ptruint(pointer(@CurrentChar[4]))-ptruint(Text);
+      result:=TFLREPtrUInt(pointer(@CurrentChar[4]))-TFLREPtrUInt(Text);
       exit;
      end;
      if CurrentChar[5] in CharSet then begin
-      result:=ptruint(pointer(@CurrentChar[5]))-ptruint(Text);
+      result:=TFLREPtrUInt(pointer(@CurrentChar[5]))-TFLREPtrUInt(Text);
       exit;
      end;
      if CurrentChar[6] in CharSet then begin
-      result:=ptruint(pointer(@CurrentChar[6]))-ptruint(Text);
+      result:=TFLREPtrUInt(pointer(@CurrentChar[6]))-TFLREPtrUInt(Text);
       exit;
      end;
      if CurrentChar[7] in CharSet then begin
-      result:=ptruint(pointer(@CurrentChar[7]))-ptruint(Text);
+      result:=TFLREPtrUInt(pointer(@CurrentChar[7]))-TFLREPtrUInt(Text);
       exit;
      end;
 {$endif}
 {$else}
-     CurrentChar:=pointer({$ifdef BIG_ENDIAN}ptruint(ptruint(CurrentChunk)+ptruint(SizeOf(ptruint)-1)){$else}CurrentChunk{$endif});
+     CurrentChar:=pointer({$ifdef BIG_ENDIAN}TFLREPtrUInt(TFLREPtrUInt(CurrentChunk)+TFLREPtrUInt(SizeOf(TFLREPtrUInt)-1)){$else}CurrentChunk{$endif});
      XoredChunk0:=XoredChunk0 xor XorMask0;
      XoredChunk1:=XoredChunk1 xor XorMask1;
      XoredChunk2:=XoredChunk2 xor XorMask2;
      XoredChunk3:=XoredChunk3 xor XorMask3;
      XoredChunk4:=XoredChunk4 xor XorMask4;
-     while ((XoredChunk0 or XoredChunk1 or XoredChunk2 or XoredChunk3 or XoredChunk4)<>0) and
-           ((XoredChunk0 and $ff)<>byte(SearchChar0)) and
-           ((XoredChunk1 and $ff)<>byte(SearchChar1)) and
-           ((XoredChunk2 and $ff)<>byte(SearchChar2)) and
-           ((XoredChunk3 and $ff)<>byte(SearchChar3)) and
-           ((XoredChunk4 and $ff)<>byte(SearchChar4)) do begin
-      XoredChunk0:=XoredChunk0 shr 8;
-      XoredChunk1:=XoredChunk1 shr 8;
-      XoredChunk2:=XoredChunk2 shr 8;
-      XoredChunk3:=XoredChunk3 shr 8;
-      XoredChunk4:=XoredChunk4 shr 8;
-      {$ifdef BIG_ENDIAN}dec{$else}inc{$endif}(CurrentChar);
+     if (TFLREUInt8(SearchChar0)=0) and (TFLREUInt8(SearchChar1)=0) and
+        (TFLREUInt8(SearchChar2)=0) and (TFLREUInt8(SearchChar3)=0) and
+        (TFLREUInt8(SearchChar4)=0) then begin
+      // Special case
+      XoredChunk0:=not XoredChunk0;
+      XoredChunk1:=not XoredChunk1;
+      XoredChunk2:=not XoredChunk2;
+      XoredChunk3:=not XoredChunk3;
+      XoredChunk4:=not XoredChunk4;
+      while ((XoredChunk0 or XoredChunk1 or XoredChunk2 or XoredChunk3 or XoredChunk4)<>0) and
+            ((XoredChunk0 and $ff)<>$ff) and
+            ((XoredChunk1 and $ff)<>$ff) and
+            ((XoredChunk2 and $ff)<>$ff) and
+            ((XoredChunk3 and $ff)<>$ff) and
+            ((XoredChunk4 and $ff)<>$ff) do begin
+       XoredChunk0:=XoredChunk0 shr 8;
+       XoredChunk1:=XoredChunk1 shr 8;
+       XoredChunk2:=XoredChunk2 shr 8;
+       XoredChunk3:=XoredChunk3 shr 8;
+       XoredChunk4:=XoredChunk4 shr 8;
+       {$ifdef BIG_ENDIAN}dec{$else}inc{$endif}(CurrentChar);
+      end;
+     end else begin
+      while ((XoredChunk0 or XoredChunk1 or XoredChunk2 or XoredChunk3 or XoredChunk4)<>0) and
+            ((XoredChunk0 and $ff)<>TFLREUInt8(SearchChar0)) and
+            ((XoredChunk1 and $ff)<>TFLREUInt8(SearchChar1)) and
+            ((XoredChunk2 and $ff)<>TFLREUInt8(SearchChar2)) and
+            ((XoredChunk3 and $ff)<>TFLREUInt8(SearchChar3)) and
+            ((XoredChunk4 and $ff)<>TFLREUInt8(SearchChar4)) do begin
+       XoredChunk0:=XoredChunk0 shr 8;
+       XoredChunk1:=XoredChunk1 shr 8;
+       XoredChunk2:=XoredChunk2 shr 8;
+       XoredChunk3:=XoredChunk3 shr 8;
+       XoredChunk4:=XoredChunk4 shr 8;
+       {$ifdef BIG_ENDIAN}dec{$else}inc{$endif}(CurrentChar);
+      end;
      end;
      if (XoredChunk0 or XoredChunk1 or XoredChunk2 or XoredChunk3 or XoredChunk4)<>0 then begin
-      result:=ptruint(pointer(CurrentChar))-ptruint(Text);
+      result:=TFLREPtrUInt(pointer(CurrentChar))-TFLREPtrUInt(Text);
       exit;
      end;
 {$endif}
     end;
     inc(CurrentChunk);
-    dec(Size,SizeOf(ptruint));
+    dec(Size,SizeOf(TFLREPtrUInt));
    end;
 
    // Set chunkwise to charwise pointer
@@ -6028,7 +6571,7 @@ begin
   // Scan rest of the remained characters, if there are any
   while Size>0 do begin
    if CurrentChar^ in CharSet then begin
-    result:=ptruint(pointer(CurrentChar))-ptruint(Text);
+    result:=TFLREPtrUInt(pointer(CurrentChar))-TFLREPtrUInt(Text);
     exit;
    end;
    inc(CurrentChar);
@@ -6038,56 +6581,56 @@ begin
  end;
 end;
 
-function PtrPosCharSetOf6(const SearchChar0,SearchChar1,SearchChar2,SearchChar3,SearchChar4,SearchChar5:TFLRERawByteChar;const Text:PFLRERawByteChar;TextLength:longint;Offset:longint=0):longint;
-type pptruint=^ptruint;
-const MaskA=ptruint({$ifdef cpu64}$fefefefefefefeff{$else}$fefefeff{$endif}); // it is: 0-$01010101 / 0-$0101010101010101
-      MaskB=ptruint({$ifdef cpu64}$8080808080808080{$else}$80808080{$endif});
+function PtrPosCharSetOf6(const SearchChar0,SearchChar1,SearchChar2,SearchChar3,SearchChar4,SearchChar5:TFLRERawByteChar;const Text:PFLRERawByteChar;TextLength:TFLRESizeInt;Offset:TFLRESizeInt=0):TFLRESizeInt;
+type pptruint=^TFLREPtrUInt;
+const MaskA=TFLREPtrUInt({$ifdef cpu64}$fefefefefefefeff{$else}$fefefeff{$endif}); // it is: 0-$01010101 / 0-$0101010101010101
+      MaskB=TFLREPtrUInt({$ifdef cpu64}$8080808080808080{$else}$80808080{$endif});
 var CurrentChar:PFLRERawByteChar;
     CurrentChunk:pptruint;
-    XorMask0,XorMask1,XorMask2,XorMask3,XorMask4,XorMask5,XoredChunk0,XoredChunk1,XoredChunk2,XoredChunk3,XoredChunk4,XoredChunk5,CurrentChunkValue,Size:ptruint;
+    XorMask0,XorMask1,XorMask2,XorMask3,XorMask4,XorMask5,XoredChunk0,XoredChunk1,XoredChunk2,XoredChunk3,XoredChunk4,XoredChunk5,CurrentChunkValue,Size:TFLREPtrUInt;
     CharSet:TFLRERawByteCharSet;
 begin
  result:=-1;
 
- Size:=(TextLength-Offset)+1;
- if (Offset<TextLength) and (ptrint(Size)>0) then begin
+ Size:=TextLength-Offset;
+ if (Offset<TextLength) and (TFLREPtrInt(Size)>0) then begin
 
-  XorMask0:=byte(SearchChar0);
+  XorMask0:=TFLREUInt8(SearchChar0);
   XorMask0:=XorMask0 or (XorMask0 shl 8);
   XorMask0:=XorMask0 or (XorMask0 shl 16);
 {$ifdef cpu64}
   XorMask0:=XorMask0 or (XorMask0 shl 32);
 {$endif}
 
-  XorMask1:=byte(SearchChar1);
+  XorMask1:=TFLREUInt8(SearchChar1);
   XorMask1:=XorMask1 or (XorMask1 shl 8);
   XorMask1:=XorMask1 or (XorMask1 shl 16);
 {$ifdef cpu64}
   XorMask1:=XorMask1 or (XorMask1 shl 32);
 {$endif}
 
-  XorMask2:=byte(SearchChar2);
+  XorMask2:=TFLREUInt8(SearchChar2);
   XorMask2:=XorMask2 or (XorMask2 shl 8);
   XorMask2:=XorMask2 or (XorMask2 shl 16);
 {$ifdef cpu64}
   XorMask2:=XorMask2 or (XorMask2 shl 32);
 {$endif}
 
-  XorMask3:=byte(SearchChar3);
+  XorMask3:=TFLREUInt8(SearchChar3);
   XorMask3:=XorMask3 or (XorMask3 shl 8);
   XorMask3:=XorMask3 or (XorMask3 shl 16);
 {$ifdef cpu64}
   XorMask3:=XorMask3 or (XorMask3 shl 32);
 {$endif}
 
-  XorMask4:=byte(SearchChar4);
+  XorMask4:=TFLREUInt8(SearchChar4);
   XorMask4:=XorMask4 or (XorMask4 shl 8);
   XorMask4:=XorMask4 or (XorMask4 shl 16);
 {$ifdef cpu64}
   XorMask4:=XorMask4 or (XorMask4 shl 32);
 {$endif}
 
-  XorMask5:=byte(SearchChar5);
+  XorMask5:=TFLREUInt8(SearchChar5);
   XorMask5:=XorMask5 or (XorMask5 shl 8);
   XorMask5:=XorMask5 or (XorMask5 shl 16);
 {$ifdef cpu64}
@@ -6098,13 +6641,13 @@ begin
 
   CurrentChar:=@Text[Offset];
 
-  if Size>(SizeOf(ptruint)*2) then begin
+  if Size>(SizeOf(TFLREPtrUInt)*2) then begin
 
    // Alignment initialization
-   CurrentChunk:=pointer(ptruint(ptruint(CurrentChar) and not (SizeOf(ptruint)-1)));
+   CurrentChunk:=pointer(TFLREPtrUInt(TFLREPtrUInt(CurrentChar) and not (SizeOf(TFLREPtrUInt)-1)));
 
    // Try to get first chunk
-   if ptruint(CurrentChunk)>=ptruint(Text) then begin
+   if TFLREPtrUInt(CurrentChunk)>=TFLREPtrUInt(Text) then begin
     // Yes, we can the get first chunk
     CurrentChunkValue:=CurrentChunk^;
     XoredChunk0:=CurrentChunkValue xor XorMask0;
@@ -6127,7 +6670,7 @@ begin
    inc(CurrentChunk);
 
    // Subtract the first chunk from size
-   dec(ptruint(Size),ptruint(CurrentChunk)-ptruint(CurrentChar));
+   dec(TFLREPtrUInt(Size),TFLREPtrUInt(CurrentChunk)-TFLREPtrUInt(CurrentChar));
 
    // Scan first chunk
    if ((((XoredChunk0+MaskA) and not XoredChunk0) or
@@ -6136,9 +6679,9 @@ begin
         ((XoredChunk3+MaskA) and not XoredChunk3) or
         ((XoredChunk4+MaskA) and not XoredChunk4) or
         ((XoredChunk5+MaskA) and not XoredChunk5)) and MaskB)<>0 then begin
-    while ptruint(CurrentChar)<ptruint(CurrentChunk) do begin
+    while TFLREPtrUInt(CurrentChar)<TFLREPtrUInt(CurrentChunk) do begin
      if CurrentChar^ in CharSet then begin
-      result:=ptruint(CurrentChar)-ptruint(Text);
+      result:=TFLREPtrUInt(CurrentChar)-TFLREPtrUInt(Text);
       exit;
      end;
      inc(CurrentChar);
@@ -6146,7 +6689,7 @@ begin
    end;
 
    // Scan until the last whole chunk
-   while Size>=SizeOf(ptruint) do begin
+   while Size>=SizeOf(TFLREPtrUInt) do begin
     CurrentChunkValue:=CurrentChunk^;
     XoredChunk0:=CurrentChunkValue xor XorMask0;
     XoredChunk1:=CurrentChunkValue xor XorMask1;
@@ -6163,70 +6706,97 @@ begin
 {$ifdef POSCHARSAFECHECK}
      CurrentChar:=pointer(CurrentChunk);
      if CurrentChar[0] in CharSet then begin
-      result:=ptruint(pointer(@CurrentChar[0]))-ptruint(Text);
+      result:=TFLREPtrUInt(pointer(@CurrentChar[0]))-TFLREPtrUInt(Text);
       exit;
      end;
      if CurrentChar[1] in CharSet then begin
-      result:=ptruint(pointer(@CurrentChar[1]))-ptruint(Text);
+      result:=TFLREPtrUInt(pointer(@CurrentChar[1]))-TFLREPtrUInt(Text);
       exit;
      end;
      if CurrentChar[2] in CharSet then begin
-      result:=ptruint(pointer(@CurrentChar[2]))-ptruint(Text);
+      result:=TFLREPtrUInt(pointer(@CurrentChar[2]))-TFLREPtrUInt(Text);
       exit;
      end;
      if CurrentChar[3] in CharSet then begin
-      result:=ptruint(pointer(@CurrentChar[3]))-ptruint(Text);
+      result:=TFLREPtrUInt(pointer(@CurrentChar[3]))-TFLREPtrUInt(Text);
       exit;
      end;
 {$ifdef cpu64}
      if CurrentChar[4] in CharSet then begin
-      result:=ptruint(pointer(@CurrentChar[4]))-ptruint(Text);
+      result:=TFLREPtrUInt(pointer(@CurrentChar[4]))-TFLREPtrUInt(Text);
       exit;
      end;
      if CurrentChar[5] in CharSet then begin
-      result:=ptruint(pointer(@CurrentChar[5]))-ptruint(Text);
+      result:=TFLREPtrUInt(pointer(@CurrentChar[5]))-TFLREPtrUInt(Text);
       exit;
      end;
      if CurrentChar[6] in CharSet then begin
-      result:=ptruint(pointer(@CurrentChar[6]))-ptruint(Text);
+      result:=TFLREPtrUInt(pointer(@CurrentChar[6]))-TFLREPtrUInt(Text);
       exit;
      end;
      if CurrentChar[7] in CharSet then begin
-      result:=ptruint(pointer(@CurrentChar[7]))-ptruint(Text);
+      result:=TFLREPtrUInt(pointer(@CurrentChar[7]))-TFLREPtrUInt(Text);
       exit;
      end;
 {$endif}
 {$else}
-     CurrentChar:=pointer({$ifdef BIG_ENDIAN}ptruint(ptruint(CurrentChunk)+ptruint(SizeOf(ptruint)-1)){$else}CurrentChunk{$endif});
+     CurrentChar:=pointer({$ifdef BIG_ENDIAN}TFLREPtrUInt(TFLREPtrUInt(CurrentChunk)+TFLREPtrUInt(SizeOf(TFLREPtrUInt)-1)){$else}CurrentChunk{$endif});
      XoredChunk0:=XoredChunk0 xor XorMask0;
      XoredChunk1:=XoredChunk1 xor XorMask1;
      XoredChunk2:=XoredChunk2 xor XorMask2;
      XoredChunk3:=XoredChunk3 xor XorMask3;
      XoredChunk4:=XoredChunk4 xor XorMask4;
      XoredChunk5:=XoredChunk5 xor XorMask5;
-     while ((XoredChunk0 or XoredChunk1 or XoredChunk2 or XoredChunk3 or XoredChunk4 or XoredChunk5)<>0) and
-           ((XoredChunk0 and $ff)<>byte(SearchChar0)) and
-           ((XoredChunk1 and $ff)<>byte(SearchChar1)) and
-           ((XoredChunk2 and $ff)<>byte(SearchChar2)) and
-           ((XoredChunk3 and $ff)<>byte(SearchChar3)) and
-           ((XoredChunk4 and $ff)<>byte(SearchChar4)) and
-           ((XoredChunk5 and $ff)<>byte(SearchChar5)) do begin
-      XoredChunk0:=XoredChunk0 shr 8;
-      XoredChunk1:=XoredChunk1 shr 8;
-      XoredChunk2:=XoredChunk2 shr 8;
-      XoredChunk3:=XoredChunk3 shr 8;
-      XoredChunk4:=XoredChunk4 shr 8;
-      XoredChunk5:=XoredChunk5 shr 8;
-      {$ifdef BIG_ENDIAN}dec{$else}inc{$endif}(CurrentChar);
+     if (TFLREUInt8(SearchChar0)=0) and (TFLREUInt8(SearchChar1)=0) and
+        (TFLREUInt8(SearchChar2)=0) and (TFLREUInt8(SearchChar3)=0) and
+        (TFLREUInt8(SearchChar4)=0) and (TFLREUInt8(SearchChar5)=0) then begin
+      // Special case
+      XoredChunk0:=not XoredChunk0;
+      XoredChunk1:=not XoredChunk1;
+      XoredChunk2:=not XoredChunk2;
+      XoredChunk3:=not XoredChunk3;
+      XoredChunk4:=not XoredChunk4;
+      XoredChunk5:=not XoredChunk5;
+      while ((XoredChunk0 or XoredChunk1 or XoredChunk2 or XoredChunk3 or XoredChunk4 or XoredChunk5)<>0) and
+            ((XoredChunk0 and $ff)<>$ff) and
+            ((XoredChunk1 and $ff)<>$ff) and
+            ((XoredChunk2 and $ff)<>$ff) and
+            ((XoredChunk3 and $ff)<>$ff) and
+            ((XoredChunk4 and $ff)<>$ff) and
+            ((XoredChunk5 and $ff)<>$ff) do begin
+       XoredChunk0:=XoredChunk0 shr 8;
+       XoredChunk1:=XoredChunk1 shr 8;
+       XoredChunk2:=XoredChunk2 shr 8;
+       XoredChunk3:=XoredChunk3 shr 8;
+       XoredChunk4:=XoredChunk4 shr 8;
+       XoredChunk5:=XoredChunk5 shr 8;
+       {$ifdef BIG_ENDIAN}dec{$else}inc{$endif}(CurrentChar);
+      end;
+     end else begin
+      while ((XoredChunk0 or XoredChunk1 or XoredChunk2 or XoredChunk3 or XoredChunk4 or XoredChunk5)<>0) and
+            ((XoredChunk0 and $ff)<>TFLREUInt8(SearchChar0)) and
+            ((XoredChunk1 and $ff)<>TFLREUInt8(SearchChar1)) and
+            ((XoredChunk2 and $ff)<>TFLREUInt8(SearchChar2)) and
+            ((XoredChunk3 and $ff)<>TFLREUInt8(SearchChar3)) and
+            ((XoredChunk4 and $ff)<>TFLREUInt8(SearchChar4)) and
+            ((XoredChunk5 and $ff)<>TFLREUInt8(SearchChar5)) do begin
+       XoredChunk0:=XoredChunk0 shr 8;
+       XoredChunk1:=XoredChunk1 shr 8;
+       XoredChunk2:=XoredChunk2 shr 8;
+       XoredChunk3:=XoredChunk3 shr 8;
+       XoredChunk4:=XoredChunk4 shr 8;
+       XoredChunk5:=XoredChunk5 shr 8;
+       {$ifdef BIG_ENDIAN}dec{$else}inc{$endif}(CurrentChar);
+      end;
      end;
      if (XoredChunk0 or XoredChunk1 or XoredChunk2 or XoredChunk3 or XoredChunk4 or XoredChunk5)<>0 then begin
-      result:=ptruint(pointer(CurrentChar))-ptruint(Text);
+      result:=TFLREPtrUInt(pointer(CurrentChar))-TFLREPtrUInt(Text);
       exit;
      end;
 {$endif}
     end;
     inc(CurrentChunk);
-    dec(Size,SizeOf(ptruint));
+    dec(Size,SizeOf(TFLREPtrUInt));
    end;
 
    // Set chunkwise to charwise pointer
@@ -6236,7 +6806,7 @@ begin
   // Scan rest of the remained characters, if there are any
   while Size>0 do begin
    if CurrentChar^ in CharSet then begin
-    result:=ptruint(pointer(CurrentChar))-ptruint(Text);
+    result:=TFLREPtrUInt(pointer(CurrentChar))-TFLREPtrUInt(Text);
     exit;
    end;
    inc(CurrentChar);
@@ -6246,63 +6816,63 @@ begin
  end;
 end;
 
-function PtrPosCharSetOf7(const SearchChar0,SearchChar1,SearchChar2,SearchChar3,SearchChar4,SearchChar5,SearchChar6:TFLRERawByteChar;const Text:PFLRERawByteChar;TextLength:longint;Offset:longint=0):longint;
-type pptruint=^ptruint;
-const MaskA=ptruint({$ifdef cpu64}$fefefefefefefeff{$else}$fefefeff{$endif}); // it is: 0-$01010101 / 0-$0101010101010101
-      MaskB=ptruint({$ifdef cpu64}$8080808080808080{$else}$80808080{$endif});
+function PtrPosCharSetOf7(const SearchChar0,SearchChar1,SearchChar2,SearchChar3,SearchChar4,SearchChar5,SearchChar6:TFLRERawByteChar;const Text:PFLRERawByteChar;TextLength:TFLRESizeInt;Offset:TFLRESizeInt=0):TFLRESizeInt;
+type pptruint=^TFLREPtrUInt;
+const MaskA=TFLREPtrUInt({$ifdef cpu64}$fefefefefefefeff{$else}$fefefeff{$endif}); // it is: 0-$01010101 / 0-$0101010101010101
+      MaskB=TFLREPtrUInt({$ifdef cpu64}$8080808080808080{$else}$80808080{$endif});
 var CurrentChar:PFLRERawByteChar;
     CurrentChunk:pptruint;
-    XorMask0,XorMask1,XorMask2,XorMask3,XorMask4,XorMask5,XorMask6,XoredChunk0,XoredChunk1,XoredChunk2,XoredChunk3,XoredChunk4,XoredChunk5,XoredChunk6,CurrentChunkValue,Size:ptruint;
+    XorMask0,XorMask1,XorMask2,XorMask3,XorMask4,XorMask5,XorMask6,XoredChunk0,XoredChunk1,XoredChunk2,XoredChunk3,XoredChunk4,XoredChunk5,XoredChunk6,CurrentChunkValue,Size:TFLREPtrUInt;
     CharSet:TFLRERawByteCharSet;
 begin
  result:=-1;
 
- Size:=(TextLength-Offset)+1;
- if (Offset<TextLength) and (ptrint(Size)>0) then begin
+ Size:=TextLength-Offset;
+ if (Offset<TextLength) and (TFLREPtrInt(Size)>0) then begin
 
-  XorMask0:=byte(SearchChar0);
+  XorMask0:=TFLREUInt8(SearchChar0);
   XorMask0:=XorMask0 or (XorMask0 shl 8);
   XorMask0:=XorMask0 or (XorMask0 shl 16);
 {$ifdef cpu64}
   XorMask0:=XorMask0 or (XorMask0 shl 32);
 {$endif}
 
-  XorMask1:=byte(SearchChar1);
+  XorMask1:=TFLREUInt8(SearchChar1);
   XorMask1:=XorMask1 or (XorMask1 shl 8);
   XorMask1:=XorMask1 or (XorMask1 shl 16);
 {$ifdef cpu64}
   XorMask1:=XorMask1 or (XorMask1 shl 32);
 {$endif}
 
-  XorMask2:=byte(SearchChar2);
+  XorMask2:=TFLREUInt8(SearchChar2);
   XorMask2:=XorMask2 or (XorMask2 shl 8);
   XorMask2:=XorMask2 or (XorMask2 shl 16);
 {$ifdef cpu64}
   XorMask2:=XorMask2 or (XorMask2 shl 32);
 {$endif}
 
-  XorMask3:=byte(SearchChar3);
+  XorMask3:=TFLREUInt8(SearchChar3);
   XorMask3:=XorMask3 or (XorMask3 shl 8);
   XorMask3:=XorMask3 or (XorMask3 shl 16);
 {$ifdef cpu64}
   XorMask3:=XorMask3 or (XorMask3 shl 32);
 {$endif}
 
-  XorMask4:=byte(SearchChar4);
+  XorMask4:=TFLREUInt8(SearchChar4);
   XorMask4:=XorMask4 or (XorMask4 shl 8);
   XorMask4:=XorMask4 or (XorMask4 shl 16);
 {$ifdef cpu64}
   XorMask4:=XorMask4 or (XorMask4 shl 32);
 {$endif}
 
-  XorMask5:=byte(SearchChar5);
+  XorMask5:=TFLREUInt8(SearchChar5);
   XorMask5:=XorMask5 or (XorMask5 shl 8);
   XorMask5:=XorMask5 or (XorMask5 shl 16);
 {$ifdef cpu64}
   XorMask5:=XorMask5 or (XorMask5 shl 32);
 {$endif}
 
-  XorMask6:=byte(SearchChar6);
+  XorMask6:=TFLREUInt8(SearchChar6);
   XorMask6:=XorMask6 or (XorMask6 shl 8);
   XorMask6:=XorMask6 or (XorMask6 shl 16);
 {$ifdef cpu64}
@@ -6313,13 +6883,13 @@ begin
 
   CurrentChar:=@Text[Offset];
 
-  if Size>(SizeOf(ptruint)*2) then begin
+  if Size>(SizeOf(TFLREPtrUInt)*2) then begin
 
    // Alignment initialization
-   CurrentChunk:=pointer(ptruint(ptruint(CurrentChar) and not (SizeOf(ptruint)-1)));
+   CurrentChunk:=pointer(TFLREPtrUInt(TFLREPtrUInt(CurrentChar) and not (SizeOf(TFLREPtrUInt)-1)));
 
    // Try to get first chunk
-   if ptruint(CurrentChunk)>=ptruint(Text) then begin
+   if TFLREPtrUInt(CurrentChunk)>=TFLREPtrUInt(Text) then begin
     // Yes, we can the get first chunk
     CurrentChunkValue:=CurrentChunk^;
     XoredChunk0:=CurrentChunkValue xor XorMask0;
@@ -6344,7 +6914,7 @@ begin
    inc(CurrentChunk);
 
    // Subtract the first chunk from size
-   dec(ptruint(Size),ptruint(CurrentChunk)-ptruint(CurrentChar));
+   dec(TFLREPtrUInt(Size),TFLREPtrUInt(CurrentChunk)-TFLREPtrUInt(CurrentChar));
 
    // Scan first chunk
    if ((((XoredChunk0+MaskA) and not XoredChunk0) or
@@ -6354,9 +6924,9 @@ begin
         ((XoredChunk4+MaskA) and not XoredChunk4) or
         ((XoredChunk5+MaskA) and not XoredChunk5) or
         ((XoredChunk6+MaskA) and not XoredChunk6)) and MaskB)<>0 then begin
-    while ptruint(CurrentChar)<ptruint(CurrentChunk) do begin
+    while TFLREPtrUInt(CurrentChar)<TFLREPtrUInt(CurrentChunk) do begin
      if CurrentChar^ in CharSet then begin
-      result:=ptruint(CurrentChar)-ptruint(Text);
+      result:=TFLREPtrUInt(CurrentChar)-TFLREPtrUInt(Text);
       exit;
      end;
      inc(CurrentChar);
@@ -6364,7 +6934,7 @@ begin
    end;
 
    // Scan until the last whole chunk
-   while Size>=SizeOf(ptruint) do begin
+   while Size>=SizeOf(TFLREPtrUInt) do begin
     CurrentChunkValue:=CurrentChunk^;
     XoredChunk0:=CurrentChunkValue xor XorMask0;
     XoredChunk1:=CurrentChunkValue xor XorMask1;
@@ -6383,41 +6953,41 @@ begin
 {$ifdef POSCHARSAFECHECK}
      CurrentChar:=pointer(CurrentChunk);
      if CurrentChar[0] in CharSet then begin
-      result:=ptruint(pointer(@CurrentChar[0]))-ptruint(Text);
+      result:=TFLREPtrUInt(pointer(@CurrentChar[0]))-TFLREPtrUInt(Text);
       exit;
      end;
      if CurrentChar[1] in CharSet then begin
-      result:=ptruint(pointer(@CurrentChar[1]))-ptruint(Text);
+      result:=TFLREPtrUInt(pointer(@CurrentChar[1]))-TFLREPtrUInt(Text);
       exit;
      end;
      if CurrentChar[2] in CharSet then begin
-      result:=ptruint(pointer(@CurrentChar[2]))-ptruint(Text);
+      result:=TFLREPtrUInt(pointer(@CurrentChar[2]))-TFLREPtrUInt(Text);
       exit;
      end;
      if CurrentChar[3] in CharSet then begin
-      result:=ptruint(pointer(@CurrentChar[3]))-ptruint(Text);
+      result:=TFLREPtrUInt(pointer(@CurrentChar[3]))-TFLREPtrUInt(Text);
       exit;
      end;
 {$ifdef cpu64}
      if CurrentChar[4] in CharSet then begin
-      result:=ptruint(pointer(@CurrentChar[4]))-ptruint(Text);
+      result:=TFLREPtrUInt(pointer(@CurrentChar[4]))-TFLREPtrUInt(Text);
       exit;
      end;
      if CurrentChar[5] in CharSet then begin
-      result:=ptruint(pointer(@CurrentChar[5]))-ptruint(Text);
+      result:=TFLREPtrUInt(pointer(@CurrentChar[5]))-TFLREPtrUInt(Text);
       exit;
      end;
      if CurrentChar[6] in CharSet then begin
-      result:=ptruint(pointer(@CurrentChar[6]))-ptruint(Text);
+      result:=TFLREPtrUInt(pointer(@CurrentChar[6]))-TFLREPtrUInt(Text);
       exit;
      end;
      if CurrentChar[7] in CharSet then begin
-      result:=ptruint(pointer(@CurrentChar[7]))-ptruint(Text);
+      result:=TFLREPtrUInt(pointer(@CurrentChar[7]))-TFLREPtrUInt(Text);
       exit;
      end;
 {$endif}
 {$else}
-     CurrentChar:=pointer({$ifdef BIG_ENDIAN}ptruint(ptruint(CurrentChunk)+ptruint(SizeOf(ptruint)-1)){$else}CurrentChunk{$endif});
+     CurrentChar:=pointer({$ifdef BIG_ENDIAN}TFLREPtrUInt(TFLREPtrUInt(CurrentChunk)+TFLREPtrUInt(SizeOf(TFLREPtrUInt)-1)){$else}CurrentChunk{$endif});
      XoredChunk0:=XoredChunk0 xor XorMask0;
      XoredChunk1:=XoredChunk1 xor XorMask1;
      XoredChunk2:=XoredChunk2 xor XorMask2;
@@ -6425,31 +6995,62 @@ begin
      XoredChunk4:=XoredChunk4 xor XorMask4;
      XoredChunk5:=XoredChunk5 xor XorMask5;
      XoredChunk6:=XoredChunk6 xor XorMask6;
-     while ((XoredChunk0 or XoredChunk1 or XoredChunk2 or XoredChunk3 or XoredChunk4 or XoredChunk5 or XoredChunk6)<>0) and
-           ((XoredChunk0 and $ff)<>byte(SearchChar0)) and
-           ((XoredChunk1 and $ff)<>byte(SearchChar1)) and
-           ((XoredChunk2 and $ff)<>byte(SearchChar2)) and
-           ((XoredChunk3 and $ff)<>byte(SearchChar3)) and
-           ((XoredChunk4 and $ff)<>byte(SearchChar4)) and
-           ((XoredChunk5 and $ff)<>byte(SearchChar5)) and
-           ((XoredChunk6 and $ff)<>byte(SearchChar6)) do begin
-      XoredChunk0:=XoredChunk0 shr 8;
-      XoredChunk1:=XoredChunk1 shr 8;
-      XoredChunk2:=XoredChunk2 shr 8;
-      XoredChunk3:=XoredChunk3 shr 8;
-      XoredChunk4:=XoredChunk4 shr 8;
-      XoredChunk5:=XoredChunk5 shr 8;
-      XoredChunk6:=XoredChunk6 shr 8;
-      {$ifdef BIG_ENDIAN}dec{$else}inc{$endif}(CurrentChar);
+     if (TFLREUInt8(SearchChar0)=0) and (TFLREUInt8(SearchChar1)=0) and
+        (TFLREUInt8(SearchChar2)=0) and (TFLREUInt8(SearchChar3)=0) and
+        (TFLREUInt8(SearchChar4)=0) and (TFLREUInt8(SearchChar5)=0) and
+        (TFLREUInt8(SearchChar6)=0) then begin
+      // Special case
+      XoredChunk0:=not XoredChunk0;
+      XoredChunk1:=not XoredChunk1;
+      XoredChunk2:=not XoredChunk2;
+      XoredChunk3:=not XoredChunk3;
+      XoredChunk4:=not XoredChunk4;
+      XoredChunk5:=not XoredChunk5;
+      XoredChunk6:=not XoredChunk6;
+      while ((XoredChunk0 or XoredChunk1 or XoredChunk2 or XoredChunk3 or XoredChunk4 or XoredChunk5 or XoredChunk6)<>0) and
+            ((XoredChunk0 and $ff)<>$ff) and
+            ((XoredChunk1 and $ff)<>$ff) and
+            ((XoredChunk2 and $ff)<>$ff) and
+            ((XoredChunk3 and $ff)<>$ff) and
+            ((XoredChunk4 and $ff)<>$ff) and
+            ((XoredChunk5 and $ff)<>$ff) and
+            ((XoredChunk6 and $ff)<>$ff) do begin
+       XoredChunk0:=XoredChunk0 shr 8;
+       XoredChunk1:=XoredChunk1 shr 8;
+       XoredChunk2:=XoredChunk2 shr 8;
+       XoredChunk3:=XoredChunk3 shr 8;
+       XoredChunk4:=XoredChunk4 shr 8;
+       XoredChunk5:=XoredChunk5 shr 8;
+       XoredChunk6:=XoredChunk6 shr 8;
+       {$ifdef BIG_ENDIAN}dec{$else}inc{$endif}(CurrentChar);
+      end;
+     end else begin
+      while ((XoredChunk0 or XoredChunk1 or XoredChunk2 or XoredChunk3 or XoredChunk4 or XoredChunk5 or XoredChunk6)<>0) and
+            ((XoredChunk0 and $ff)<>TFLREUInt8(SearchChar0)) and
+            ((XoredChunk1 and $ff)<>TFLREUInt8(SearchChar1)) and
+            ((XoredChunk2 and $ff)<>TFLREUInt8(SearchChar2)) and
+            ((XoredChunk3 and $ff)<>TFLREUInt8(SearchChar3)) and
+            ((XoredChunk4 and $ff)<>TFLREUInt8(SearchChar4)) and
+            ((XoredChunk5 and $ff)<>TFLREUInt8(SearchChar5)) and
+            ((XoredChunk6 and $ff)<>TFLREUInt8(SearchChar6)) do begin
+       XoredChunk0:=XoredChunk0 shr 8;
+       XoredChunk1:=XoredChunk1 shr 8;
+       XoredChunk2:=XoredChunk2 shr 8;
+       XoredChunk3:=XoredChunk3 shr 8;
+       XoredChunk4:=XoredChunk4 shr 8;
+       XoredChunk5:=XoredChunk5 shr 8;
+       XoredChunk6:=XoredChunk6 shr 8;
+       {$ifdef BIG_ENDIAN}dec{$else}inc{$endif}(CurrentChar);
+      end;
      end;
      if (XoredChunk0 or XoredChunk1 or XoredChunk2 or XoredChunk3 or XoredChunk4 or XoredChunk5 or XoredChunk6)<>0 then begin
-      result:=ptruint(pointer(CurrentChar))-ptruint(Text);
+      result:=TFLREPtrUInt(pointer(CurrentChar))-TFLREPtrUInt(Text);
       exit;
      end;
 {$endif}
     end;
     inc(CurrentChunk);
-    dec(Size,SizeOf(ptruint));
+    dec(Size,SizeOf(TFLREPtrUInt));
    end;
 
    // Set chunkwise to charwise pointer
@@ -6459,7 +7060,7 @@ begin
   // Scan rest of the remained characters, if there are any
   while Size>0 do begin
    if CurrentChar^ in CharSet then begin
-    result:=ptruint(pointer(CurrentChar))-ptruint(Text);
+    result:=TFLREPtrUInt(pointer(CurrentChar))-TFLREPtrUInt(Text);
     exit;
    end;
    inc(CurrentChar);
@@ -6469,72 +7070,72 @@ begin
  end;
 end;
 
-function PtrPosCharSetOf8(const SearchChar0,SearchChar1,SearchChar2,SearchChar3,SearchChar4,SearchChar5,SearchChar6,SearchChar7:TFLRERawByteChar;const Text:PFLRERawByteChar;TextLength:longint;Offset:longint=0):longint;
-type pptruint=^ptruint;
-const MaskA=ptruint({$ifdef cpu64}$fefefefefefefeff{$else}$fefefeff{$endif}); // it is: 0-$01010101 / 0-$0101010101010101
-      MaskB=ptruint({$ifdef cpu64}$8080808080808080{$else}$80808080{$endif});
+function PtrPosCharSetOf8(const SearchChar0,SearchChar1,SearchChar2,SearchChar3,SearchChar4,SearchChar5,SearchChar6,SearchChar7:TFLRERawByteChar;const Text:PFLRERawByteChar;TextLength:TFLRESizeInt;Offset:TFLRESizeInt=0):TFLRESizeInt;
+type pptruint=^TFLREPtrUInt;
+const MaskA=TFLREPtrUInt({$ifdef cpu64}$fefefefefefefeff{$else}$fefefeff{$endif}); // it is: 0-$01010101 / 0-$0101010101010101
+      MaskB=TFLREPtrUInt({$ifdef cpu64}$8080808080808080{$else}$80808080{$endif});
 var CurrentChar:PFLRERawByteChar;
     CurrentChunk:pptruint;
     XorMask0,XorMask1,XorMask2,XorMask3,XorMask4,XorMask5,XorMask6,XorMask7,
     XoredChunk0,XoredChunk1,XoredChunk2,XoredChunk3,XoredChunk4,XoredChunk5,XoredChunk6,XoredChunk7,
-    CurrentChunkValue,Size:ptruint;
+    CurrentChunkValue,Size:TFLREPtrUInt;
     CharSet:TFLRERawByteCharSet;
 begin
  result:=-1;
 
- Size:=(TextLength-Offset)+1;
- if (Offset<TextLength) and (ptrint(Size)>0) then begin
+ Size:=TextLength-Offset;
+ if (Offset<TextLength) and (TFLREPtrInt(Size)>0) then begin
 
-  XorMask0:=byte(SearchChar0);
+  XorMask0:=TFLREUInt8(SearchChar0);
   XorMask0:=XorMask0 or (XorMask0 shl 8);
   XorMask0:=XorMask0 or (XorMask0 shl 16);
 {$ifdef cpu64}
   XorMask0:=XorMask0 or (XorMask0 shl 32);
 {$endif}
 
-  XorMask1:=byte(SearchChar1);
+  XorMask1:=TFLREUInt8(SearchChar1);
   XorMask1:=XorMask1 or (XorMask1 shl 8);
   XorMask1:=XorMask1 or (XorMask1 shl 16);
 {$ifdef cpu64}
   XorMask1:=XorMask1 or (XorMask1 shl 32);
 {$endif}
 
-  XorMask2:=byte(SearchChar2);
+  XorMask2:=TFLREUInt8(SearchChar2);
   XorMask2:=XorMask2 or (XorMask2 shl 8);
   XorMask2:=XorMask2 or (XorMask2 shl 16);
 {$ifdef cpu64}
   XorMask2:=XorMask2 or (XorMask2 shl 32);
 {$endif}
 
-  XorMask3:=byte(SearchChar3);
+  XorMask3:=TFLREUInt8(SearchChar3);
   XorMask3:=XorMask3 or (XorMask3 shl 8);
   XorMask3:=XorMask3 or (XorMask3 shl 16);
 {$ifdef cpu64}
   XorMask3:=XorMask3 or (XorMask3 shl 32);
 {$endif}
 
-  XorMask4:=byte(SearchChar4);
+  XorMask4:=TFLREUInt8(SearchChar4);
   XorMask4:=XorMask4 or (XorMask4 shl 8);
   XorMask4:=XorMask4 or (XorMask4 shl 16);
 {$ifdef cpu64}
   XorMask4:=XorMask4 or (XorMask4 shl 32);
 {$endif}
 
-  XorMask5:=byte(SearchChar5);
+  XorMask5:=TFLREUInt8(SearchChar5);
   XorMask5:=XorMask5 or (XorMask5 shl 8);
   XorMask5:=XorMask5 or (XorMask5 shl 16);
 {$ifdef cpu64}
   XorMask5:=XorMask5 or (XorMask5 shl 32);
 {$endif}
 
-  XorMask6:=byte(SearchChar6);
+  XorMask6:=TFLREUInt8(SearchChar6);
   XorMask6:=XorMask6 or (XorMask6 shl 8);
   XorMask6:=XorMask6 or (XorMask6 shl 16);
 {$ifdef cpu64}
   XorMask6:=XorMask6 or (XorMask6 shl 32);
 {$endif}
 
-  XorMask7:=byte(SearchChar7);
+  XorMask7:=TFLREUInt8(SearchChar7);
   XorMask7:=XorMask7 or (XorMask7 shl 8);
   XorMask7:=XorMask7 or (XorMask7 shl 16);
 {$ifdef cpu64}
@@ -6545,13 +7146,13 @@ begin
 
   CurrentChar:=@Text[Offset];
 
-  if Size>(SizeOf(ptruint)*2) then begin
+  if Size>(SizeOf(TFLREPtrUInt)*2) then begin
 
    // Alignment initialization
-   CurrentChunk:=pointer(ptruint(ptruint(CurrentChar) and not (SizeOf(ptruint)-1)));
+   CurrentChunk:=pointer(TFLREPtrUInt(TFLREPtrUInt(CurrentChar) and not (SizeOf(TFLREPtrUInt)-1)));
 
    // Try to get first chunk
-   if ptruint(CurrentChunk)>=ptruint(Text) then begin
+   if TFLREPtrUInt(CurrentChunk)>=TFLREPtrUInt(Text) then begin
     // Yes, we can the get first chunk
     CurrentChunkValue:=CurrentChunk^;
     XoredChunk0:=CurrentChunkValue xor XorMask0;
@@ -6578,7 +7179,7 @@ begin
    inc(CurrentChunk);
 
    // Subtract the first chunk from size
-   dec(ptruint(Size),ptruint(CurrentChunk)-ptruint(CurrentChar));
+   dec(TFLREPtrUInt(Size),TFLREPtrUInt(CurrentChunk)-TFLREPtrUInt(CurrentChar));
 
    // Scan first chunk
    if ((((XoredChunk0+MaskA) and not XoredChunk0) or
@@ -6589,9 +7190,9 @@ begin
         ((XoredChunk5+MaskA) and not XoredChunk5) or
         ((XoredChunk6+MaskA) and not XoredChunk6) or
         ((XoredChunk7+MaskA) and not XoredChunk7)) and MaskB)<>0 then begin
-    while ptruint(CurrentChar)<ptruint(CurrentChunk) do begin
+    while TFLREPtrUInt(CurrentChar)<TFLREPtrUInt(CurrentChunk) do begin
      if CurrentChar^ in CharSet then begin
-      result:=ptruint(CurrentChar)-ptruint(Text);
+      result:=TFLREPtrUInt(CurrentChar)-TFLREPtrUInt(Text);
       exit;
      end;
      inc(CurrentChar);
@@ -6599,7 +7200,7 @@ begin
    end;
 
    // Scan until the last whole chunk
-   while Size>=SizeOf(ptruint) do begin
+   while Size>=SizeOf(TFLREPtrUInt) do begin
     CurrentChunkValue:=CurrentChunk^;
     XoredChunk0:=CurrentChunkValue xor XorMask0;
     XoredChunk1:=CurrentChunkValue xor XorMask1;
@@ -6620,41 +7221,41 @@ begin
 {$ifdef POSCHARSAFECHECK}
      CurrentChar:=pointer(CurrentChunk);
      if CurrentChar[0] in CharSet then begin
-      result:=ptruint(pointer(@CurrentChar[0]))-ptruint(Text);
+      result:=TFLREPtrUInt(pointer(@CurrentChar[0]))-TFLREPtrUInt(Text);
       exit;
      end;
      if CurrentChar[1] in CharSet then begin
-      result:=ptruint(pointer(@CurrentChar[1]))-ptruint(Text);
+      result:=TFLREPtrUInt(pointer(@CurrentChar[1]))-TFLREPtrUInt(Text);
       exit;
      end;
      if CurrentChar[2] in CharSet then begin
-      result:=ptruint(pointer(@CurrentChar[2]))-ptruint(Text);
+      result:=TFLREPtrUInt(pointer(@CurrentChar[2]))-TFLREPtrUInt(Text);
       exit;
      end;
      if CurrentChar[3] in CharSet then begin
-      result:=ptruint(pointer(@CurrentChar[3]))-ptruint(Text);
+      result:=TFLREPtrUInt(pointer(@CurrentChar[3]))-TFLREPtrUInt(Text);
       exit;
      end;
 {$ifdef cpu64}
      if CurrentChar[4] in CharSet then begin
-      result:=ptruint(pointer(@CurrentChar[4]))-ptruint(Text);
+      result:=TFLREPtrUInt(pointer(@CurrentChar[4]))-TFLREPtrUInt(Text);
       exit;
      end;
      if CurrentChar[5] in CharSet then begin
-      result:=ptruint(pointer(@CurrentChar[5]))-ptruint(Text);
+      result:=TFLREPtrUInt(pointer(@CurrentChar[5]))-TFLREPtrUInt(Text);
       exit;
      end;
      if CurrentChar[6] in CharSet then begin
-      result:=ptruint(pointer(@CurrentChar[6]))-ptruint(Text);
+      result:=TFLREPtrUInt(pointer(@CurrentChar[6]))-TFLREPtrUInt(Text);
       exit;
      end;
      if CurrentChar[7] in CharSet then begin
-      result:=ptruint(pointer(@CurrentChar[7]))-ptruint(Text);
+      result:=TFLREPtrUInt(pointer(@CurrentChar[7]))-TFLREPtrUInt(Text);
       exit;
      end;
 {$endif}
 {$else}
-     CurrentChar:=pointer({$ifdef BIG_ENDIAN}ptruint(ptruint(CurrentChunk)+ptruint(SizeOf(ptruint)-1)){$else}CurrentChunk{$endif});
+     CurrentChar:=pointer({$ifdef BIG_ENDIAN}TFLREPtrUInt(TFLREPtrUInt(CurrentChunk)+TFLREPtrUInt(SizeOf(TFLREPtrUInt)-1)){$else}CurrentChunk{$endif});
      XoredChunk0:=XoredChunk0 xor XorMask0;
      XoredChunk1:=XoredChunk1 xor XorMask1;
      XoredChunk2:=XoredChunk2 xor XorMask2;
@@ -6663,33 +7264,67 @@ begin
      XoredChunk5:=XoredChunk5 xor XorMask5;
      XoredChunk6:=XoredChunk6 xor XorMask6;
      XoredChunk7:=XoredChunk7 xor XorMask7;
-     while ((XoredChunk0 or XoredChunk1 or XoredChunk2 or XoredChunk3 or XoredChunk4 or XoredChunk5 or XoredChunk6 or XoredChunk7)<>0) and
-           ((XoredChunk0 and $ff)<>byte(SearchChar0)) and
-           ((XoredChunk1 and $ff)<>byte(SearchChar1)) and
-           ((XoredChunk2 and $ff)<>byte(SearchChar2)) and
-           ((XoredChunk3 and $ff)<>byte(SearchChar3)) and
-           ((XoredChunk4 and $ff)<>byte(SearchChar4)) and
-           ((XoredChunk5 and $ff)<>byte(SearchChar5)) and
-           ((XoredChunk6 and $ff)<>byte(SearchChar6)) and
-           ((XoredChunk7 and $ff)<>byte(SearchChar7)) do begin
-      XoredChunk0:=XoredChunk0 shr 8;
-      XoredChunk1:=XoredChunk1 shr 8;
-      XoredChunk2:=XoredChunk2 shr 8;
-      XoredChunk3:=XoredChunk3 shr 8;
-      XoredChunk4:=XoredChunk4 shr 8;
-      XoredChunk5:=XoredChunk5 shr 8;
-      XoredChunk6:=XoredChunk6 shr 8;
-      XoredChunk7:=XoredChunk7 shr 8;
-      {$ifdef BIG_ENDIAN}dec{$else}inc{$endif}(CurrentChar);
+     if (TFLREUInt8(SearchChar0)=0) and (TFLREUInt8(SearchChar1)=0) and
+        (TFLREUInt8(SearchChar2)=0) and (TFLREUInt8(SearchChar3)=0) and
+        (TFLREUInt8(SearchChar4)=0) and (TFLREUInt8(SearchChar5)=0) and
+        (TFLREUInt8(SearchChar6)=0) and (TFLREUInt8(SearchChar7)=0) then begin
+      // Special case
+      XoredChunk0:=not XoredChunk0;
+      XoredChunk1:=not XoredChunk1;
+      XoredChunk2:=not XoredChunk2;
+      XoredChunk3:=not XoredChunk3;
+      XoredChunk4:=not XoredChunk4;
+      XoredChunk5:=not XoredChunk5;
+      XoredChunk6:=not XoredChunk6;
+      XoredChunk7:=not XoredChunk7;
+      while ((XoredChunk0 or XoredChunk1 or XoredChunk2 or XoredChunk3 or XoredChunk4 or XoredChunk5 or XoredChunk6 or XoredChunk7)<>0) and
+            ((XoredChunk0 and $ff)<>$ff) and
+            ((XoredChunk1 and $ff)<>$ff) and
+            ((XoredChunk2 and $ff)<>$ff) and
+            ((XoredChunk3 and $ff)<>$ff) and
+            ((XoredChunk4 and $ff)<>$ff) and
+            ((XoredChunk5 and $ff)<>$ff) and
+            ((XoredChunk6 and $ff)<>$ff) and
+            ((XoredChunk7 and $ff)<>$ff) do begin
+       XoredChunk0:=XoredChunk0 shr 8;
+       XoredChunk1:=XoredChunk1 shr 8;
+       XoredChunk2:=XoredChunk2 shr 8;
+       XoredChunk3:=XoredChunk3 shr 8;
+       XoredChunk4:=XoredChunk4 shr 8;
+       XoredChunk5:=XoredChunk5 shr 8;
+       XoredChunk6:=XoredChunk6 shr 8;
+       XoredChunk7:=XoredChunk7 shr 8;
+       {$ifdef BIG_ENDIAN}dec{$else}inc{$endif}(CurrentChar);
+      end;
+     end else begin
+      while ((XoredChunk0 or XoredChunk1 or XoredChunk2 or XoredChunk3 or XoredChunk4 or XoredChunk5 or XoredChunk6 or XoredChunk7)<>0) and
+            ((XoredChunk0 and $ff)<>TFLREUInt8(SearchChar0)) and
+            ((XoredChunk1 and $ff)<>TFLREUInt8(SearchChar1)) and
+            ((XoredChunk2 and $ff)<>TFLREUInt8(SearchChar2)) and
+            ((XoredChunk3 and $ff)<>TFLREUInt8(SearchChar3)) and
+            ((XoredChunk4 and $ff)<>TFLREUInt8(SearchChar4)) and
+            ((XoredChunk5 and $ff)<>TFLREUInt8(SearchChar5)) and
+            ((XoredChunk6 and $ff)<>TFLREUInt8(SearchChar6)) and
+            ((XoredChunk7 and $ff)<>TFLREUInt8(SearchChar7)) do begin
+       XoredChunk0:=XoredChunk0 shr 8;
+       XoredChunk1:=XoredChunk1 shr 8;
+       XoredChunk2:=XoredChunk2 shr 8;
+       XoredChunk3:=XoredChunk3 shr 8;
+       XoredChunk4:=XoredChunk4 shr 8;
+       XoredChunk5:=XoredChunk5 shr 8;
+       XoredChunk6:=XoredChunk6 shr 8;
+       XoredChunk7:=XoredChunk7 shr 8;
+       {$ifdef BIG_ENDIAN}dec{$else}inc{$endif}(CurrentChar);
+      end;
      end;
      if (XoredChunk0 or XoredChunk1 or XoredChunk2 or XoredChunk3 or XoredChunk4 or XoredChunk5 or XoredChunk6 or XoredChunk7)<>0 then begin
-      result:=ptruint(pointer(CurrentChar))-ptruint(Text);
+      result:=TFLREPtrUInt(pointer(CurrentChar))-TFLREPtrUInt(Text);
       exit;
      end;
 {$endif}
     end;
     inc(CurrentChunk);
-    dec(Size,SizeOf(ptruint));
+    dec(Size,SizeOf(TFLREPtrUInt));
    end;
 
    // Set chunkwise to charwise pointer
@@ -6699,7 +7334,7 @@ begin
   // Scan rest of the remained characters, if there are any
   while Size>0 do begin
    if CurrentChar^ in CharSet then begin
-    result:=ptruint(pointer(CurrentChar))-ptruint(Text);
+    result:=TFLREPtrUInt(pointer(CurrentChar))-TFLREPtrUInt(Text);
     exit;
    end;
    inc(CurrentChar);
@@ -6709,9 +7344,9 @@ begin
  end;
 end;
 
-function PtrPosCharPair(const SearchChar0,SearchChar1:TFLRERawByteChar;const Text:PFLRERawByteChar;TextLength:longint;Offset:longint=0):ptrint;
-var Index:longint;
-    CurrentChar:TFLRERawByteChar;
+function PtrPosCharPair(const SearchChar0,SearchChar1:TFLRERawByteChar;const Text:PFLRERawByteChar;TextLength:TFLRESizeInt;Offset:TFLRESizeInt=0):TFLRESizeInt;
+var Index:TFLRESizeInt;
+//  CurrentChar:TFLRERawByteChar;
 begin
  Index:=Offset;
  while Index<(TextLength-1) do begin
@@ -6729,9 +7364,9 @@ begin
  result:=-1;
 end;
 
-function PtrPosCharSetOf2Of2(const SearchChar0,SearchChar1:TFLRERawByteChar;const Text:PFLRERawByteChar;TextLength:longint;Offset:longint=0):ptrint;
-var Index:longint;
-    CurrentChar:TFLRERawByteChar;
+function PtrPosCharSetOf2Of2(const SearchChar0,SearchChar1:TFLRERawByteChar;const Text:PFLRERawByteChar;TextLength:TFLRESizeInt;Offset:TFLRESizeInt=0):TFLRESizeInt;
+var Index:TFLRESizeInt;
+//  CurrentChar:TFLRERawByteChar;
 begin
  Index:=Offset;
  while Index<(TextLength-1) do begin
@@ -6749,9 +7384,9 @@ begin
  result:=-1;
 end;
 
-function PtrPosCharSetOf2Of3(const SearchChar0,SearchChar1:TFLRERawByteChar;const Text:PFLRERawByteChar;TextLength:longint;Offset:longint=0):ptrint;
-var Index:longint;
-    CurrentChar:TFLRERawByteChar;
+function PtrPosCharSetOf2Of3(const SearchChar0,SearchChar1:TFLRERawByteChar;const Text:PFLRERawByteChar;TextLength:TFLRESizeInt;Offset:TFLRESizeInt=0):TFLRESizeInt;
+var Index:TFLRESizeInt;
+//  CurrentChar:TFLRERawByteChar;
 begin
  Index:=Offset;
  while Index<(TextLength-2) do begin
@@ -6770,9 +7405,9 @@ begin
  result:=-1;
 end;
 
-function PtrPosCharSetOf2Of4(const SearchChar0,SearchChar1:TFLRERawByteChar;const Text:PFLRERawByteChar;TextLength:longint;Offset:longint=0):ptrint;
-var Index:longint;
-    CurrentChar:TFLRERawByteChar;
+function PtrPosCharSetOf2Of4(const SearchChar0,SearchChar1:TFLRERawByteChar;const Text:PFLRERawByteChar;TextLength:TFLRESizeInt;Offset:TFLRESizeInt=0):TFLRESizeInt;
+var Index:TFLRESizeInt;
+//  CurrentChar:TFLRERawByteChar;
 begin
  Index:=Offset;
  while Index<(TextLength-3) do begin
@@ -6792,8 +7427,8 @@ begin
  result:=-1;
 end;
 
-function PtrPosCharRange(const SearchFromChar,SearchToChar:TFLRERawByteChar;const Text:PFLRERawByteChar;TextLength:longint;Offset:longint=0):ptrint;
-var Index:longint;
+function PtrPosCharRange(const SearchFromChar,SearchToChar:TFLRERawByteChar;const Text:PFLRERawByteChar;TextLength:TFLRESizeInt;Offset:TFLRESizeInt=0):TFLRESizeInt;
+var Index:TFLRESizeInt;
     CurrentChar:TFLRERawByteChar;
 begin
  for Index:=Offset to TextLength-1 do begin
@@ -6806,8 +7441,8 @@ begin
  result:=-1;
 end;
 
-function PtrPosCharRangeOf2(const SearchFromChar0,SearchToChar0,SearchFromChar1,SearchToChar1:TFLRERawByteChar;const Text:PFLRERawByteChar;TextLength:longint;Offset:longint=0):ptrint;
-var Index:longint;
+function PtrPosCharRangeOf2(const SearchFromChar0,SearchToChar0,SearchFromChar1,SearchToChar1:TFLRERawByteChar;const Text:PFLRERawByteChar;TextLength:TFLRESizeInt;Offset:TFLRESizeInt=0):TFLRESizeInt;
+var Index:TFLRESizeInt;
     CurrentChar:TFLRERawByteChar;
 begin
  for Index:=Offset to TextLength-2 do begin
@@ -6824,167 +7459,8 @@ begin
 end;
 {$endif}
 
-function PtrPosBoyerMoore(const Pattern:TFLRERawByteString;const Text:PFLRERawByteChar;const TextLength:longint;const Skip:TFLRECharPatternBitMasks;const Next:TFLREBoyerMooreNext;Position:longint=0):longint;
-{$if defined(cpux86_64) and defined(Windows) and not defined(fpc)}assembler; register;
-asm
- // r15 = Pattern
- // r14 = Text
- // eax = TextLength
- // r13 = Skip
- // r12 = Next
- // edi = Position
- // esi = result
- // ecx = PatternPosition
- // eax = BadSkip
- // edx = GoodSkip
- // ebx = PatternLength
-
- lea rsp,qword ptr [rsp-96]
- mov qword ptr [rbp-64],rbx
- mov qword ptr [rbp-56],rdi
- mov qword ptr [rbp-48],rsi
- mov qword ptr [rbp-40],r12
- mov qword ptr [rbp-32],r13
- mov qword ptr [rbp-24],r14
- mov qword ptr [rbp-16],r15
- mov r15,rcx
- mov r14,rdx
- mov eax,r8d
- mov qword ptr [rbp-8],rax
- mov r13,r9
- mov r12,qword ptr [rbp+48]
- mov edi,dword ptr [rbp+56]
-
- // PatternLength:=length(Pattern);
- mov rax,r15
- test rax,rax
- je @SkipPatternLengthRead
- mov rax,qword ptr [rax-8]
- @SkipPatternLengthRead:
-
- mov ebx,eax
-
- // result:=-1;
- mov esi,-1
-
- // if PatternLength<>0 then begin
- test ebx,ebx
- je @Done
-
- // Position:=PtrPosChar(Pattern[1],Text,TextLength,Position);
- mov r9d,edi
- mov eax,dword ptr [rbp-8]
- mov r8d,eax
- mov rdx,r14
- movzx ecx,byte ptr [r15]
-
- call PtrPosChar
- mov edi,eax
-
- // if Position>=0 then begin
- cmp edi,0
- jnge @Done
-
- // inc(Position,PatternLength-1);
- lea eax,dword ptr [ebx-1]
- add edi,eax
-
- // while Position<TextLength do begin
- jmp @Loop0Start
-
- .align 8
-@Loop0:
-
- // PatternPosition:=0;
- mov ecx,0
-
- // while (PatternPosition<PatternLength) and (Text[Position-PatternPosition]=Pattern[PatternLength-PatternPosition]) do begin
- jmp @Loop1Start
-
- .align 8
-@Loop1:
-
- // inc(PatternPosition);
- add ecx,1
-
-@Loop1Start:
- cmp ecx,ebx
- jnl @Loop1Break
-
- movsxd r9,edi
- movsxd r8,ecx
- sub r9,r8
- mov r10,r9
- movsxd r9,ebx
- sub r9,r8
- mov r8b,byte ptr [r14+r10*1]
- cmp r8b,byte ptr [r15+r9*1-1]
- je @Loop1
-
-@Loop1Break:
-
- // if PatternPosition<>PatternLength then begin
- cmp ecx,ebx
- je @Break
-
- // BadSkip:=Skip[Text[Position-PatternPosition]];
- movsxd r8,edi
- movsxd r9,ecx
- sub r8,r9
- movzx r8d,byte ptr [r14+r8*1]
- mov eax,dword ptr [r13+r8*4]
-
- // GoodSkip:=Next[PatternPosition];
- movsxd r8,ecx
- mov edx,dword ptr [r12+r8*4]
-
- // if BadSkip>GoodSkip then begin
- cmp eax,edx
- jng @GoodSkip
-
- // inc(Position,BadSkip-PatternPosition);
- mov r8d,eax
- sub r8d,ecx
- add edi,r8d
- jmp @NextInLoop0
-
-@GoodSkip:
-
- // inc(Position,GoodSkip);
- add edi,edx
- jmp @NextInLoop0
-
-@Break:
- // result:=(Position-PatternLength)+1;
- mov r8d,edi
- sub r8d,ebx
- lea r8d,dword ptr [r8d+1]
- mov esi,r8d
-
- // exit;
- jmp @Done
-
-@NextInLoop0:
-@Loop0Start:
-
- mov r8d,dword ptr [rbp-8]
- cmp edi,r8d
- jl @Loop0
-
-@Done:
-
- // end;
- mov eax,esi
- mov rbx,qword ptr [rbp-64]
- mov rdi,qword ptr [rbp-56]
- mov rsi,qword ptr [rbp-48]
- mov r12,qword ptr [rbp-40]
- mov r13,qword ptr [rbp-32]
- mov r14,qword ptr [rbp-24]
- mov r15,qword ptr [rbp-16]
-end;
-{$else}
-var PatternPosition,BadSkip,GoodSkip,PatternLength:longint;
+function PtrPosBoyerMoore(const Pattern:TFLRERawByteString;const Text:PFLRERawByteChar;const TextLength:TFLRESizeInt;const Skip:TFLRECharPatternBitMasks;const Next:TFLREBoyerMooreNext;Position:TFLRESizeInt=0):TFLRESizeInt;
+var PatternPosition,BadSkip,GoodSkip,PatternLength:TFLRESizeInt;
 begin
  PatternLength:=length(Pattern);
  result:=-1;
@@ -7013,53 +7489,9 @@ begin
   end;
  end;
 end;
-{$ifend}
 
-function PtrPosPatternCharClass(const Text:PFLRERawByteChar;TextLength:longint;const PatternCharClass:TFLRECharClass;Position:longint=0):longint;
-{$if defined(cpux86_64) and defined(Windows) and not defined(fpc)}assembler; register;
-asm
- // rcx = Text
- // edx = TextLength
- // r8 = PatternCharClass
- // r9d = Position
- // eax = result
- // r9d = Index
-
- // for Index:=Position to TextLength-1 do begin
- lea edx,dword ptr [edx-1]
- cmp edx,r9d
- jl @Fail
- sub r9d,1
-
- .align 8
-@Loop:
- add r9d,1
-
- // if Text[Index] in PatternCharClass then begin
- movsxd r10,r9d
- movzx r10d,byte ptr [rcx+r10*1]
- bt dword ptr [r8],r10d
- jnc @NextInLoop
-
- // result:=Index;
- mov eax,r9d
-
- // exit;
- jmp @Done
-
-@NextInLoop:
- cmp edx,r9d
- jg @Loop
-
-@Fail:
- // result:=-1;
- mov eax,-1
-
-@Done:
-end;
-{$else}
-{$ifdef cpu386}register;{$endif}
-var Index:longint;
+function PtrPosPatternCharClass(const Text:PFLRERawByteChar;TextLength:TFLRESizeInt;const PatternCharClass:TFLRECharClass;Position:TFLRESizeInt=0):TFLRESizeInt; {$ifdef cpu386}register;{$endif}
+var Index:TFLRESizeInt;
 begin
  for Index:=Position to TextLength-1 do begin
   if Text[Index] in PatternCharClass then begin
@@ -7069,106 +7501,10 @@ begin
  end;
  result:=-1;
 end;
-{$ifend}
 
-function PtrPosPatternSBNDMQ1(PatternLength:longint;const Text:PFLRERawByteChar;TextLength:longint;const PatternBitMasks:TFLRECharPatternBitMasks;Position:longint=0):longint;
-{$if defined(cpux86_64) and defined(Windows) and not defined(fpc)}assembler; register;
-asm
- // ecx = PatternLength
- // rdx = Text
- // r8d = TextLength
- // r9 = PatternBitMasks
- // r11d = Position
- // eax = result
- // ebx = CheckPosition
- // esi = State
- lea rsp,qword ptr [rsp-32]
- mov qword ptr [rbp-24],rbx
- mov qword ptr [rbp-16],rdi
- mov qword ptr [rbp-8],rsi
- mov r11d,dword ptr [rbp+48]
-
- // inc(Position,PatternLength-1);
- lea eax,dword ptr [ecx-1]
- add r11d,eax
-
- // while Position<TextLength do begin
- jmp @Loop0Start
-
- .align 8
-@Loop0:
-
- // State:=PatternBitMasks[Text[Position]];
- movsxd r10,r11d
- movzx r10d,byte ptr [rdx+r10*1]
- mov esi,dword ptr [r9+r10*4]
-
- // if State<>0 then begin
- test esi,esi
- je @NextPosition
-
- // CheckPosition:=Position-PatternLength;
- mov r10d,r11d
- sub r10d,ecx
- mov ebx,r10d
-
- .align 8
- @Loop1:
-
- // dec(Position);
- sub r11d,1
-
- // if Position<0 then begin
- js @Loop1Break
-//cmp r11d,0
-//jl @Loop1Break
-
- // State:=(State shr 1) and PatternBitMasks[Text[Position]];
- movsxd r10,r11d
- movzx edi,byte ptr [rdx+r10*1]
- mov r10d,esi
- shr r10d,1
- mov edi,dword ptr [r9+rdi*4]
- and r10d,edi
- mov esi,r10d
-
- // until State=0;
- test esi,esi
- jne @Loop1
-@Loop1Break:
-
- // if Position=CheckPosition then begin
- cmp r11d,ebx
- jne @NextPosition
-
- // result:=CheckPosition+1;
- lea r10d,dword ptr [ebx+1]
- mov eax,r10d
-
- // exit;
- jmp @Done
-
-@NextPosition:
- // inc(Position,PatternLength);
- add r11d,ecx
-
-@Loop0Start:
- cmp r11d,r8d
- jl @Loop0
-
- // result:=-1;
- mov eax,-1
-
-@Done:
-
- // end;
- mov rbx,qword ptr [rbp-24]
- mov rdi,qword ptr [rbp-16]
- mov rsi,qword ptr [rbp-8]
-end;
-{$else}
-var CheckPosition:longint;
-    State:longword;
+function PtrPosPatternSBNDMQ1(PatternLength:TFLRESizeInt;const Text:PFLRERawByteChar;TextLength:TFLRESizeInt;const PatternBitMasks:TFLRECharPatternBitMasks;Position:TFLRESizeInt=0):TFLRESizeInt;
+var CheckPosition:TFLRESizeInt;
+    State:TFLREUInt32;
 begin
  inc(Position,PatternLength-1);
  while Position<TextLength do begin
@@ -7191,117 +7527,10 @@ begin
  end;
  result:=-1;
 end;
-{$ifend}
 
-function PtrPosPatternSBNDMQ2(PatternLength:longint;const Text:PFLRERawByteChar;TextLength:longint;const PatternBitMasks:TFLRECharPatternBitMasks;Position:longint=0):longint;
-{$if defined(cpux86_64) and defined(Windows) and not defined(fpc)}assembler; register;
-asm
- // ecx = PatternLength
- // rdx = Text
- // r8d = TextLength
- // r9 = PatternBitMasks
- // r11d = Position
- // eax = result
- // esi = CheckPosition
- // edi = State
- lea rsp,qword ptr [rsp-32]
- mov qword ptr [rbp-24],rbx
- mov qword ptr [rbp-16],rdi
- mov qword ptr [rbp-8],rsi
- mov r11d,dword ptr [rbp+48]
-
- // inc(Position,PatternLength-2);
- lea eax,dword ptr [ecx-2]
- add r11d,eax
-
- // dec(TextLength):
- sub r8d,1
-
- // while Position<TextLength do begin
- jmp @Loop0Start
-
- .align 8
-@Loop0:
-
- // State:=(PatternBitMasks[Text[Position+1]] shr 1) and PatternBitMasks[Text[Position]];
- movsxd r10,r11d
- movzx ebx,byte ptr [rdx+r10*1+1]
- mov ebx,dword ptr [r9+rbx*4]
- shr ebx,1
- movzx r10d,byte ptr [rdx+r10*1]
- mov r10d,dword ptr [r9+r10*4]
- and r10d,ebx
- mov edi,r10d
-
- // if State<>0 then begin
- test edi,edi
- je @NextPosition
-
- // CheckPosition:=Position-(PatternLength-1);
- lea ebx,dword ptr [ecx-1]
- mov r10d,r11d
- sub r10d,ebx
- mov esi,r10d
-
- .align 8
-@Loop1:
-
- // dec(Position);
- sub r11d,1
-
- // if Position<0 then begin
- js @Loop1Break
-//cmp r11d,0
-//jl @Loop1Break
-
- // State:=(State shr 1) and PatternBitMasks[Text[Position]];
- movsxd r10,r11d
- movzx ebx,byte ptr [rdx+r10*1]
- mov r10d,edi
- shr r10d,1
- mov ebx,dword ptr [r9+rbx*4]
- and r10d,ebx
- mov edi,r10d
-
- // until State=0;
- test edi,edi
- jne @Loop1
-@Loop1Break:
-
- // if Position=CheckPosition then begin
- cmp r11d,esi
- jne @NextPosition
-
- // result:=CheckPosition+1;
- lea r10d,dword ptr [esi+1]
- mov eax,r10d
-
- // exit;
- jmp @Done
-
-@NextPosition:
-
- // inc(Position,PatternLength-1);
- lea r10d,dword ptr [ecx-1]
- add r11d,r10d
-
-@Loop0Start:
- cmp r11d,r8d
- jl @Loop0
-
- // result:=-1;
- mov eax,-1
-
-@Done:
-
- // end;
- mov rbx,qword ptr [rbp-24]
- mov rdi,qword ptr [rbp-16]
- mov rsi,qword ptr [rbp-8]
-end;
-{$else}
-var CheckPosition:longint;
-    State:longword;
+function PtrPosPatternSBNDMQ2(PatternLength:TFLRESizeInt;const Text:PFLRERawByteChar;TextLength:TFLRESizeInt;const PatternBitMasks:TFLRECharPatternBitMasks;Position:TFLRESizeInt=0):TFLRESizeInt;
+var CheckPosition:TFLRESizeInt;
+    State:TFLREUInt32;
 begin
  inc(Position,PatternLength-2);
  dec(TextLength);
@@ -7325,9 +7554,8 @@ begin
  end;
  result:=-1;
 end;
-{$ifend}
 
-function FLREPtrCopy(const Src:PFLRERawByteChar;const From,Len:longint):TFLRERawByteString;
+function FLREPtrCopy(const Src:PFLRERawByteChar;const From,Len:TFLRESizeInt):TFLRERawByteString;
 begin
  SetLength(result,Len);
  if Len>0 then begin
@@ -7335,8 +7563,8 @@ begin
  end;
 end;
 
-function GetMinimalPerfectHashTableValueHashFromString(Seed:longword;const s:TFLRERawByteString):longword;
-var Index:longint;
+function GetMinimalPerfectHashTableValueHashFromString(Seed:TFLREUInt32;const s:TFLRERawByteString):TFLREUInt32;
+var Index:TFLRESizeInt;
 begin
  if Seed=0 then begin
   result:=$811c9dc5;
@@ -7344,40 +7572,40 @@ begin
   result:=Seed;
  end;
  for Index:=1 to length(s) do begin
-  result:=(result+(result shl 1)+(result shl 4)+(result shl 7)+(result shl 8)+(result shl 24)) xor byte(TFLRERawByteChar(s[Index]));
+  result:=(result+(result shl 1)+(result shl 4)+(result shl 7)+(result shl 8)+(result shl 24)) xor TFLREUInt8(TFLRERawByteChar(s[Index]));
  end;
  result:=result and $7fffffff;
 end;
 
-function GetMinimalPerfectHashTableValue(const Seeds,Keys,Values:pointer;const SeedBits,ValueBits,Size:longint;const Key:TFLRERawByteString):int64;
-type PShortints=^TShortints;
-     TShortints=array[0..0] of shortint;
-     PSmallints=^TSmallints;
-     TSmallints=array[0..0] of smallint;
-     PIntegers=^TIntegers;
-     TIntegers=array[0..0] of longint;
-     PBytes=^TBytes;
-     TBytes=array[0..0] of byte;
-     PWords=^TWords;
-     TWords=array[0..0] of word;
-     PLongwords=^TLongwords;
-     TLongwords=array[0..0] of longword;
-     PInt64s=^TInt64s;
-     TInt64s=array[0..0] of int64;
+function GetMinimalPerfectHashTableValue(const Seeds,Keys,Values:pointer;const SeedBits,ValueBits,Size:TFLREInt32;const Key:TFLRERawByteString):TFLREInt64;
+type PFLREInt8s=^TFLREInt8s;
+     TFLREInt8s=array[0..0] of TFLREInt8;
+     PFLREInt16s=^TFLREInt16s;
+     TFLREInt16s=array[0..0] of TFLREInt16;
+     PFLREInt32s=^TFLREInt32s;
+     TFLREInt32s=array[0..0] of TFLREInt32;
+     PFLREUInt8s=^TFLREUInt8s;
+     TFLREUInt8s=array[0..0] of TFLREUInt8;
+     PFLREUInt16s=^TFLREUInt16s;
+     TFLREUInt16s=array[0..0] of TFLREUInt16;
+     PTFLREUInt32s=^TTFLREUInt32s;
+     TTFLREUInt32s=array[0..0] of TFLREUInt32;
+     PTFLREInt64s=^TTFLREInt64s;
+     TTFLREInt64s=array[0..0] of TFLREInt64;
      PRawByteStrings=^TRawByteStrings;
      TRawByteStrings=array[0..0] of TFLRERawByteString;
-var Seed,Index:longint;
+var Seed,Index:TFLREInt32;
 begin
- Index:=longint(GetMinimalPerfectHashTableValueHashFromString(0,Key)) mod Size;
+ Index:=TFLREInt32(GetMinimalPerfectHashTableValueHashFromString(0,Key)) mod Size;
  case SeedBits of
   8:begin
-   Seed:=PShortints(Seeds)^[Index]; // Signed 8-bit
+   Seed:=PFLREInt8s(Seeds)^[Index]; // Signed 8-bit
   end;
   16:begin
-   Seed:=PSmallints(Seeds)^[Index]; // Signed 16-bit
+   Seed:=PFLREInt16s(Seeds)^[Index]; // Signed 16-bit
   end;
   32:begin
-   Seed:=PIntegers(Seeds)^[Index]; // Signed 32-bit
+   Seed:=PFLREInt32s(Seeds)^[Index]; // Signed 32-bit
   end;
   else begin
    result:=-1;
@@ -7387,21 +7615,21 @@ begin
  if Seed<0 then begin
   Index:=-(Seed+1);
  end else begin
-  Index:=longint(GetMinimalPerfectHashTableValueHashFromString(longword(Seed),Key)) mod Size;
+  Index:=TFLREInt32(GetMinimalPerfectHashTableValueHashFromString(TFLREUInt32(Seed),Key)) mod Size;
  end;
  if (Index>=0) and (Index<Size) and (PRawByteStrings(Keys)^[Index]=Key) then begin
   case ValueBits of
    8:begin
-    result:=PBytes(Values)^[Index]; // Unsigned 8-bit
+    result:=PFLREUInt8s(Values)^[Index]; // Unsigned 8-bit
    end;
    16:begin
-    result:=PWords(Values)^[Index]; // Unsigned 16-bit
+    result:=PFLREUInt16s(Values)^[Index]; // Unsigned 16-bit
    end;
    32:begin
-    result:=PLongwords(Values)^[Index]; // Unsigned 32-bit
+    result:=PTFLREUInt32s(Values)^[Index]; // Unsigned 32-bit
    end;
    64:begin
-    result:=PInt64s(Values)^[Index]; // Signed 64-bit
+    result:=PTFLREInt64s(Values)^[Index]; // Signed 64-bit
    end;
    else begin
     result:=-1;
@@ -7412,10 +7640,10 @@ begin
  end;
 end;
 
-function HashString(const Str:TFLRERawByteString):longword;
+function HashString(const Str:TFLRERawByteString):TFLREUInt32;
 {$ifdef cpuarm}
 var b:PFLRERawByteChar;
-    len,h,i:longword;
+    len,h,i:TFLREUInt32;
 begin
  result:=2166136261;
  len:=length(Str);
@@ -7423,7 +7651,7 @@ begin
  if len>0 then begin
   b:=PFLRERawByteChar(Str);
   while len>3 do begin
-   i:=longword(pointer(b)^);
+   i:=TFLREUInt32(pointer(b)^);
    h:=(h xor i) xor $2e63823a;
    inc(h,(h shl 15) or (h shr (32-15)));
    dec(h,(h shl 9) or (h shr (32-9)));
@@ -7436,7 +7664,7 @@ begin
    dec(len,4);
   end;
   if len>1 then begin
-   i:=word(pointer(b)^);
+   i:=TFLREUInt16(pointer(b)^);
    h:=(h xor i) xor $2e63823a;
    inc(h,(h shl 15) or (h shr (32-15)));
    dec(h,(h shl 9) or (h shr (32-9)));
@@ -7449,7 +7677,7 @@ begin
    dec(len,2);
   end;
   if len>0 then begin
-   i:=byte(b^);
+   i:=TFLREUInt8(b^);
    h:=(h xor i) xor $2e63823a;
    inc(h,(h shl 15) or (h shr (32-15)));
    dec(h,(h shl 9) or (h shr (32-9)));
@@ -7466,11 +7694,11 @@ begin
  end;
 end;
 {$else}
-const m=longword($57559429);
-      n=longword($5052acdb);
+const m=TFLREUInt32($57559429);
+      n=TFLREUInt32($5052acdb);
 var b:PFLRERawByteChar;
-    h,k,len:longword;
-    p:{$ifdef fpc}qword{$else}int64{$endif};
+    h,k,len:TFLREUInt32;
+    p:{$ifdef fpc}TFLREUInt64{$else}TFLREInt64{$endif};
 begin
  len:=length(Str);
  h:=len;
@@ -7479,46 +7707,46 @@ begin
   b:=PFLRERawByteChar(Str);
   while len>7 do begin
    begin
-    p:=longword(pointer(b)^)*{$ifdef fpc}qword{$else}int64{$endif}(n);
-    h:=h xor longword(p and $ffffffff);
-    k:=k xor longword(p shr 32);
+    p:=TFLREUInt32(pointer(b)^)*{$ifdef fpc}TFLREUInt64{$else}TFLREInt64{$endif}(n);
+    h:=h xor TFLREUInt32(p and $ffffffff);
+    k:=k xor TFLREUInt32(p shr 32);
     inc(b,4);
    end;
    begin
-    p:=longword(pointer(b)^)*{$ifdef fpc}qword{$else}int64{$endif}(m);
-    k:=k xor longword(p and $ffffffff);
-    h:=h xor longword(p shr 32);
+    p:=TFLREUInt32(pointer(b)^)*{$ifdef fpc}TFLREUInt64{$else}TFLREInt64{$endif}(m);
+    k:=k xor TFLREUInt32(p and $ffffffff);
+    h:=h xor TFLREUInt32(p shr 32);
     inc(b,4);
    end;
    dec(len,8);
   end;
   if len>3 then begin
-   p:=longword(pointer(b)^)*{$ifdef fpc}qword{$else}int64{$endif}(n);
-   h:=h xor longword(p and $ffffffff);
-   k:=k xor longword(p shr 32);
+   p:=TFLREUInt32(pointer(b)^)*{$ifdef fpc}TFLREUInt64{$else}TFLREInt64{$endif}(n);
+   h:=h xor TFLREUInt32(p and $ffffffff);
+   k:=k xor TFLREUInt32(p shr 32);
    inc(b,4);
    dec(len,4);
   end;
   if len>0 then begin
    if len>1 then begin
-    p:=word(pointer(b)^);
+    p:=TFLREUInt16(pointer(b)^);
     inc(b,2);
     dec(len,2);
    end else begin
     p:=0;
    end;
    if len>0 then begin
-    p:=p or (byte(b^) shl 16);
+    p:=p or (TFLREUInt8(b^) shl 16);
    end;
-   p:=p*{$ifdef fpc}qword{$else}int64{$endif}(m);
-   k:=k xor longword(p and $ffffffff);
-   h:=h xor longword(p shr 32);
+   p:=p*{$ifdef fpc}TFLREUInt64{$else}TFLREInt64{$endif}(m);
+   k:=k xor TFLREUInt32(p and $ffffffff);
+   h:=h xor TFLREUInt32(p shr 32);
   end;
  end;
  begin
-  p:=(h xor (k+n))*{$ifdef fpc}qword{$else}int64{$endif}(n);
-  h:=h xor longword(p and $ffffffff);
-  k:=k xor longword(p shr 32);
+  p:=(h xor (k+n))*{$ifdef fpc}TFLREUInt64{$else}TFLREInt64{$endif}(n);
+  h:=h xor TFLREUInt32(p and $ffffffff);
+  k:=k xor TFLREUInt32(p shr 32);
  end;
  result:=k xor h;
  if result=0 then begin
@@ -7527,17 +7755,17 @@ begin
 end;
 {$endif}
 
-function HashData(const Data:pointer;Len:longword):longword;
+function HashData(const Data:pointer;Len:TFLREUInt32):TFLREUInt32;
 {$ifdef cpuarm}
 var b:PFLRERawByteChar;
-    h,i:longword;
+    h,i:TFLREUInt32;
 begin
  result:=$811c9dc5;
  h:=Len;
  if Len>0 then begin
   b:=Data;
   while Len>3 do begin
-   i:=longword(pointer(b)^);
+   i:=TFLREUInt32(pointer(b)^);
    h:=(h xor i) xor $2e63823a;
    inc(h,(h shl 15) or (h shr (32-15)));
    dec(h,(h shl 9) or (h shr (32-9)));
@@ -7550,7 +7778,7 @@ begin
    dec(Len,4);
   end;
   if Len>1 then begin
-   i:=word(pointer(b)^);
+   i:=TFLREUInt16(pointer(b)^);
    h:=(h xor i) xor $2e63823a;
    inc(h,(h shl 15) or (h shr (32-15)));
    dec(h,(h shl 9) or (h shr (32-9)));
@@ -7563,7 +7791,7 @@ begin
    dec(Len,2);
   end;
   if Len>0 then begin
-   i:=byte(b^);
+   i:=TFLREUInt8(b^);
    h:=(h xor i) xor $2e63823a;
    inc(h,(h shl 15) or (h shr (32-15)));
    dec(h,(h shl 9) or (h shr (32-9)));
@@ -7580,11 +7808,11 @@ begin
  end;
 end;
 {$else}
-const m=longword($57559429);
-      n=longword($5052acdb);
+const m=TFLREUInt32($57559429);
+      n=TFLREUInt32($5052acdb);
 var b:PFLRERawByteChar;
-    h,k:longword;
-    p:{$ifdef fpc}qword{$else}int64{$endif};
+    h,k:TFLREUInt32;
+    p:TFLREUInt64;
 begin
  h:=Len;
  k:=h+n+1;
@@ -7592,46 +7820,46 @@ begin
   b:=Data;
   while Len>7 do begin
    begin
-    p:=longword(pointer(b)^)*qword(n);
-    h:=h xor longword(p and $ffffffff);
-    k:=k xor longword(p shr 32);
+    p:=TFLREUInt32(pointer(b)^)*TFLREUInt64(n);
+    h:=h xor TFLREUInt32(p and $ffffffff);
+    k:=k xor TFLREUInt32(p shr 32);
     inc(b,4);
    end;
    begin
-    p:=longword(pointer(b)^)*qword(m);
-    k:=k xor longword(p and $ffffffff);
-    h:=h xor longword(p shr 32);
+    p:=TFLREUInt32(pointer(b)^)*TFLREUInt64(m);
+    k:=k xor TFLREUInt32(p and $ffffffff);
+    h:=h xor TFLREUInt32(p shr 32);
     inc(b,4);
    end;
    dec(Len,8);
   end;
   if Len>3 then begin
-   p:=longword(pointer(b)^)*qword(n);
-   h:=h xor longword(p and $ffffffff);
-   k:=k xor longword(p shr 32);
+   p:=TFLREUInt32(pointer(b)^)*TFLREUInt64(n);
+   h:=h xor TFLREUInt32(p and $ffffffff);
+   k:=k xor TFLREUInt32(p shr 32);
    inc(b,4);
    dec(Len,4);
   end;
   if Len>0 then begin
    if Len>1 then begin
-    p:=word(pointer(b)^);
+    p:=TFLREUInt16(pointer(b)^);
     inc(b,2);
     dec(Len,2);
    end else begin
     p:=0;
    end;
    if Len>0 then begin
-    p:=p or (byte(b^) shl 16);
+    p:=p or (TFLREUInt8(b^) shl 16);
    end;
-   p:=p*qword(m);
-   k:=k xor longword(p and $ffffffff);
-   h:=h xor longword(p shr 32);
+   p:=p*TFLREUInt64(m);
+   k:=k xor TFLREUInt32(p and $ffffffff);
+   h:=h xor TFLREUInt32(p shr 32);
   end;
  end;
  begin
-  p:=(h xor (k+n))*qword(n);
-  h:=h xor longword(p and $ffffffff);
-  k:=k xor longword(p shr 32);
+  p:=(h xor (k+n))*TFLREUInt64(n);
+  h:=h xor TFLREUInt32(p and $ffffffff);
+  k:=k xor TFLREUInt32(p shr 32);
  end;
  result:=k xor h;
  if result=0 then begin
@@ -7640,69 +7868,83 @@ begin
 end;
 {$endif}
 
-function UTF8RangeToRegEx(Lo,Hi:longword):TFLRERawByteString;
+{$warnings off}
+function HashPointer(Data:pointer):TFLREUInt32;
+const m=TFLREUInt32($57559429);
+      n=TFLREUInt32($5052acdb);
+var Temporary:TFLREUInt64;
+begin
+ Temporary:=TFLREUInt32(TFLREPtrUInt(Pointer(Data)) and $ffffffff)*TFLREUInt64(n);
+ result:=m xor (Temporary and $ffffffff) xor (Temporary shr 32);
+{$ifdef CPU64}
+ result:=result xor TFLREUInt32(TFLREPtrUInt(Pointer(Data)) shr 32);
+{$endif}
+end;
+{$warnings on}
+
+function UTF8RangeToRegEx(Lo,Hi:TFLREUInt32):TFLRERawByteString;
 type TString6Chars=array[0..6] of TFLRERawByteChar;
-const Seq0010ffff:array[0..6,0..4,0..1] of longint=((($00,$7f),(-1,-1),(-1,-1),(-1,-1),(-1,-1)),        // 00-7F
-                                                    (($c2,$df),($80,$bf),(-1,-1),(-1,-1),(-1,-1)),      // C2-DF 80-BF
-                                                    (($e0,$e0),($a0,$bf),($80,$bf),(-1,-1),(-1,-1)),    // E0-E0 A0-BF 80-BF
-                                                    (($e1,$ef),($80,$bf),($80,$bf),(-1,-1),(-1,-1)),    // E1-EF 80-BF 80-BF
-                                                    (($f0,$f0),($80,$bf),($80,$bf),($80,$bf),(-1,-1)),  // F0-F0 90-BF 80-BF 80-BF
-                                                    (($f1,$f3),($80,$bf),($80,$bf),($80,$bf),(-1,-1)),  // F1-F3 80-BF 80-BF 80-BF
-                                                    (($f4,$f4),($80,$bf),($80,$bf),($80,$bf),(-1,-1))); // F4-F4 80-8F 80-BF 80-BF
+const Seq0010ffff:array[0..6,0..4,0..1] of TFLREInt32=((($00,$7f),(-1,-1),(-1,-1),(-1,-1),(-1,-1)),        // 00-7F
+                                                       (($c2,$df),($80,$bf),(-1,-1),(-1,-1),(-1,-1)),      // C2-DF 80-BF
+                                                       (($e0,$e0),($a0,$bf),($80,$bf),(-1,-1),(-1,-1)),    // E0-E0 A0-BF 80-BF
+                                                       (($e1,$ef),($80,$bf),($80,$bf),(-1,-1),(-1,-1)),    // E1-EF 80-BF 80-BF
+                                                       (($f0,$f0),($80,$bf),($80,$bf),($80,$bf),(-1,-1)),  // F0-F0 90-BF 80-BF 80-BF
+                                                       (($f1,$f3),($80,$bf),($80,$bf),($80,$bf),(-1,-1)),  // F1-F3 80-BF 80-BF 80-BF
+                                                       (($f4,$f4),($80,$bf),($80,$bf),($80,$bf),(-1,-1))); // F4-F4 80-8F 80-BF 80-BF
       HexChars:array[$0..$f] of TFLRERawByteChar='0123456789ABCDEF';
 var OutputCharSequence:TFLRERawByteString;
- function ToString(CharValue:longword):TString6Chars;
+ function ToString(CharValue:TFLREUInt32):TString6Chars;
  begin
   case CharValue of
    $00000000..$0000007f:begin
-    result[0]:=TFLRERawByteChar(byte(1));
-    result[1]:=TFLRERawByteChar(byte(CharValue));
+    result[0]:=TFLRERawByteChar(TFLREUInt8(1));
+    result[1]:=TFLRERawByteChar(TFLREUInt8(CharValue));
    end;
    $00000080..$000007ff:begin
-    result[0]:=TFLRERawByteChar(byte(2));
-    result[1]:=TFLRERawByteChar(byte($c0 or ((CharValue shr 6) and $1f)));
-    result[2]:=TFLRERawByteChar(byte($80 or (CharValue and $3f)));
+    result[0]:=TFLRERawByteChar(TFLREUInt8(2));
+    result[1]:=TFLRERawByteChar(TFLREUInt8($c0 or ((CharValue shr 6) and $1f)));
+    result[2]:=TFLRERawByteChar(TFLREUInt8($80 or (CharValue and $3f)));
    end;
 // {$ifdef PLREStrictUTF8}$00000800..$0000d7ff,$0000e000..$0000ffff{$else}$00000800..$0000ffff{$endif}:begin
    $00000800..$0000ffff:begin
-    result[0]:=TFLRERawByteChar(byte(3));
-    result[1]:=TFLRERawByteChar(byte($e0 or ((CharValue shr 12) and $0f)));
-    result[2]:=TFLRERawByteChar(byte($80 or ((CharValue shr 6) and $3f)));
-    result[3]:=TFLRERawByteChar(byte($80 or (CharValue and $3f)));
+    result[0]:=TFLRERawByteChar(TFLREUInt8(3));
+    result[1]:=TFLRERawByteChar(TFLREUInt8($e0 or ((CharValue shr 12) and $0f)));
+    result[2]:=TFLRERawByteChar(TFLREUInt8($80 or ((CharValue shr 6) and $3f)));
+    result[3]:=TFLRERawByteChar(TFLREUInt8($80 or (CharValue and $3f)));
    end;
    $00010000..$0010ffff:begin
-    result[0]:=TFLRERawByteChar(byte(4));
-    result[1]:=TFLRERawByteChar(byte($f0 or ((CharValue shr 18) and $07)));
-    result[2]:=TFLRERawByteChar(byte($80 or ((CharValue shr 12) and $3f)));
-    result[3]:=TFLRERawByteChar(byte($80 or ((CharValue shr 6) and $3f)));
-    result[4]:=TFLRERawByteChar(byte($80 or (CharValue and $3f)));
+    result[0]:=TFLRERawByteChar(TFLREUInt8(4));
+    result[1]:=TFLRERawByteChar(TFLREUInt8($f0 or ((CharValue shr 18) and $07)));
+    result[2]:=TFLRERawByteChar(TFLREUInt8($80 or ((CharValue shr 12) and $3f)));
+    result[3]:=TFLRERawByteChar(TFLREUInt8($80 or ((CharValue shr 6) and $3f)));
+    result[4]:=TFLRERawByteChar(TFLREUInt8($80 or (CharValue and $3f)));
    end;
    $00200000..$03ffffff:begin
-    result[0]:=TFLRERawByteChar(byte(5));
-    result[1]:=TFLRERawByteChar(byte($f8 or ((CharValue shr 24) and $03)));
-    result[2]:=TFLRERawByteChar(byte($80 or ((CharValue shr 18) and $3f)));
-    result[3]:=TFLRERawByteChar(byte($80 or ((CharValue shr 12) and $3f)));
-    result[4]:=TFLRERawByteChar(byte($80 or ((CharValue shr 6) and $3f)));
-    result[5]:=TFLRERawByteChar(byte($80 or (CharValue and $3f)));
+    result[0]:=TFLRERawByteChar(TFLREUInt8(5));
+    result[1]:=TFLRERawByteChar(TFLREUInt8($f8 or ((CharValue shr 24) and $03)));
+    result[2]:=TFLRERawByteChar(TFLREUInt8($80 or ((CharValue shr 18) and $3f)));
+    result[3]:=TFLRERawByteChar(TFLREUInt8($80 or ((CharValue shr 12) and $3f)));
+    result[4]:=TFLRERawByteChar(TFLREUInt8($80 or ((CharValue shr 6) and $3f)));
+    result[5]:=TFLRERawByteChar(TFLREUInt8($80 or (CharValue and $3f)));
    end;
    $04000000..$7fffffff:begin
-    result[0]:=TFLRERawByteChar(byte(6));
-    result[1]:=TFLRERawByteChar(byte($fc or ((CharValue shr 30) and $01)));
-    result[2]:=TFLRERawByteChar(byte($80 or ((CharValue shr 24) and $3f)));
-    result[3]:=TFLRERawByteChar(byte($80 or ((CharValue shr 18) and $3f)));
-    result[4]:=TFLRERawByteChar(byte($80 or ((CharValue shr 12) and $3f)));
-    result[5]:=TFLRERawByteChar(byte($80 or ((CharValue shr 6) and $3f)));
-    result[6]:=TFLRERawByteChar(byte($80 or (CharValue and $3f)));
+    result[0]:=TFLRERawByteChar(TFLREUInt8(6));
+    result[1]:=TFLRERawByteChar(TFLREUInt8($fc or ((CharValue shr 30) and $01)));
+    result[2]:=TFLRERawByteChar(TFLREUInt8($80 or ((CharValue shr 24) and $3f)));
+    result[3]:=TFLRERawByteChar(TFLREUInt8($80 or ((CharValue shr 18) and $3f)));
+    result[4]:=TFLRERawByteChar(TFLREUInt8($80 or ((CharValue shr 12) and $3f)));
+    result[5]:=TFLRERawByteChar(TFLREUInt8($80 or ((CharValue shr 6) and $3f)));
+    result[6]:=TFLRERawByteChar(TFLREUInt8($80 or (CharValue and $3f)));
    end;
    else begin
-    result[0]:=TFLRERawByteChar(byte(3));
+    result[0]:=TFLRERawByteChar(TFLREUInt8(3));
     result[1]:=#$ef;
     result[2]:=#$bf;
     result[3]:=#$bd;
    end;
   end;
  end;
- procedure AddRange(Lo,Hi:byte);
+ procedure AddRange(Lo,Hi:TFLREUInt8);
  var Data:array[0..11] of TFLRERawByteChar;
  begin
   Data:='[\x00-\x00]';
@@ -7712,8 +7954,8 @@ var OutputCharSequence:TFLRERawByteString;
   Data[9]:=HexChars[Hi and $f];
   OutputCharSequence:=OutputCharSequence+Data;
  end;
- procedure ProcessRange(Lo,Hi:longword);
- var i,m:longword;
+ procedure ProcessRange(Lo,Hi:TFLREUInt32);
+ var i,m:TFLREUInt32;
      StrLo,StrHi:TString6Chars;
  begin
   if Hi>$0010ffff then begin
@@ -7726,7 +7968,7 @@ var OutputCharSequence:TFLRERawByteString;
       if Seq0010ffff[m,i,0]<0 then begin
        break;
       end;
-      AddRange(byte(Seq0010ffff[m,i,0]),byte(Seq0010ffff[m,i,1]));
+      AddRange(TFLREUInt8(Seq0010ffff[m,i,0]),TFLREUInt8(Seq0010ffff[m,i,1]));
      end;
      OutputCharSequence:=OutputCharSequence+'|';
     end;
@@ -7736,7 +7978,7 @@ var OutputCharSequence:TFLRERawByteString;
       if Seq0010ffff[m,i,0]<0 then begin
        break;
       end;
-      AddRange(byte(Seq0010ffff[m,i,0]),byte(Seq0010ffff[m,i,1]));
+      AddRange(TFLREUInt8(Seq0010ffff[m,i,0]),TFLREUInt8(Seq0010ffff[m,i,1]));
      end;
      OutputCharSequence:=OutputCharSequence+'|';
     end;
@@ -7774,9 +8016,9 @@ var OutputCharSequence:TFLRERawByteString;
      end;
      StrLo:=ToString(Lo);
      StrHi:=ToString(Hi);
-     if byte(TFLRERawByteChar(StrLo[0]))=byte(TFLRERawByteChar(StrHi[0])) then begin
-      for i:=1 to byte(TFLRERawByteChar(StrLo[0])) do begin
-       AddRange(byte(StrLo[i]),byte(StrHi[i]));
+     if TFLREUInt8(TFLRERawByteChar(StrLo[0]))=TFLREUInt8(TFLRERawByteChar(StrHi[0])) then begin
+      for i:=1 to TFLREUInt8(TFLRERawByteChar(StrLo[0])) do begin
+       AddRange(TFLREUInt8(StrLo[i]),TFLREUInt8(StrHi[i]));
       end;
       OutputCharSequence:=OutputCharSequence+'|';
      end;
@@ -7790,11 +8032,11 @@ begin
  result:=copy(OutputCharSequence,1,length(OutputCharSequence)-1);
 end;
 
-function HashDFAState(const Key:PFLREDFAState):longword;
+function HashDFAState(const Key:PFLREDFAState):TFLREUInt32;
 begin
  if assigned(Key) and (Key.CountInstructions>0) then begin
   result:=HashData(@Key.Instructions[0],Key.CountInstructions*sizeof(PFLREInstruction));
-  result:=result xor ((longword(Key.CountInstructions) shr 16) or (longword(Key.CountInstructions) shl 16));
+  result:=result xor ((TFLREUInt32(Key.CountInstructions) shr 16) or (TFLREUInt32(Key.CountInstructions) shl 16));
   result:=result xor (((Key.Flags and sfDFACacheMask) shl 19) or ((Key.Flags and sfDFACacheMask) shr 13));
   if result=0 then begin
    result:=$ffffffff;
@@ -7805,7 +8047,7 @@ begin
 end;
 
 function CompareDFAState(const a,b:PFLREDFAState):boolean;
-var i:longint;
+var i:TFLREInt32;
 begin
  result:=a=b;
  if not result then begin
@@ -7827,7 +8069,7 @@ begin
  result:=assigned(Instruction^.Next) and ((Instruction^.Next^.IDandOpcode and $ff) in [opNONE,opSINGLECHAR,opCHAR,opANY]);
 end;
 
-const bncmmMemoryBlockSignature:ptruint={$ifdef cpu64}$1337bab3deadc0d3{$else}$deadc0d3{$endif};
+const bncmmMemoryBlockSignature:TFLREPtrUInt={$ifdef cpu64}$1337bab3deadc0d3{$else}$deadc0d3{$endif};
 
 constructor TFLRENativeCodeMemoryManager.Create;
 {$ifdef windows}
@@ -7874,7 +8116,7 @@ begin
 end;
 
 function TFLRENativeCodeMemoryManager.AllocateBlockContainer(BlockContainerSize:TFLREPtrUInt):PFLRENativeCodeMemoryManagerBlockContainer;
-var Size:ptruint;
+var Size:TFLREPtrUInt;
     Block:PFLRENativeCodeMemoryManagerBlock;
 begin
  if BlockContainerSize>0 then begin
@@ -7947,7 +8189,7 @@ end;
 function TFLRENativeCodeMemoryManager.GetMemory(Size:TFLREPtrUInt):pointer;
 var BlockContainer:PFLRENativeCodeMemoryManagerBlockContainer;
     CurrentBlock,NewBlock:PFLRENativeCodeMemoryManagerBlock;
-    DestSize,BlockContainerSize:ptruint;
+    DestSize,BlockContainerSize:TFLREPtrUInt;
 begin
  result:=nil;
  if Size>0 then begin
@@ -7958,8 +8200,8 @@ begin
     if (BlockContainer^.Used+DestSize)<=BlockContainer^.Size then begin
      CurrentBlock:=BlockContainer^.First;
      while assigned(CurrentBlock) and (CurrentBlock^.Signature=bncmmMemoryBlockSignature) and assigned(CurrentBlock^.Next) do begin
-      NewBlock:=pointer(ptruint(RoundUpToMask(ptruint(pointer(@PFLRERawByteChar(CurrentBlock)[(sizeof(TFLRENativeCodeMemoryManagerBlock)*2)+CurrentBlock^.Size])),Alignment)-sizeof(TFLRENativeCodeMemoryManagerBlock)));
-      if (ptruint(CurrentBlock^.Next)-ptruint(NewBlock))>=DestSize then begin
+      NewBlock:=pointer(TFLREPtrUInt(RoundUpToMask(TFLREPtrUInt(pointer(@PFLRERawByteChar(CurrentBlock)[(sizeof(TFLRENativeCodeMemoryManagerBlock)*2)+CurrentBlock^.Size])),Alignment)-sizeof(TFLRENativeCodeMemoryManagerBlock)));
+      if (TFLREPtrUInt(CurrentBlock^.Next)-TFLREPtrUInt(NewBlock))>=DestSize then begin
        NewBlock^.Signature:=bncmmMemoryBlockSignature;
        NewBlock^.Previous:=CurrentBlock;
        NewBlock^.Next:=CurrentBlock^.Next;
@@ -7995,8 +8237,8 @@ var BlockContainer:PFLRENativeCodeMemoryManagerBlockContainer;
 begin
  BlockContainer:=First;
  while assigned(BlockContainer) do begin
-  if ((ptruint(BlockContainer^.Base)+sizeof(TFLRENativeCodeMemoryManagerBlock))<=ptruint(p)) and ((ptruint(p)+sizeof(TFLRENativeCodeMemoryManagerBlock))<(ptruint(BlockContainer^.Base)+BlockContainer^.Size)) then begin
-   CurrentBlock:=pointer(ptruint(ptruint(p)-sizeof(TFLRENativeCodeMemoryManagerBlock)));
+  if ((TFLREPtrUInt(BlockContainer^.Base)+sizeof(TFLRENativeCodeMemoryManagerBlock))<=TFLREPtrUInt(p)) and ((TFLREPtrUInt(p)+sizeof(TFLRENativeCodeMemoryManagerBlock))<(TFLREPtrUInt(BlockContainer^.Base)+BlockContainer^.Size)) then begin
+   CurrentBlock:=pointer(TFLREPtrUInt(TFLREPtrUInt(p)-sizeof(TFLRENativeCodeMemoryManagerBlock)));
    if (CurrentBlock^.Signature=bncmmMemoryBlockSignature) and (CurrentBlock<>BlockContainer^.First) and (CurrentBlock<>BlockContainer^.Last) then begin
     dec(BlockContainer^.Used,CurrentBlock^.Size+sizeof(TFLRENativeCodeMemoryManagerBlock));
     CurrentBlock^.Signature:=0;
@@ -8015,7 +8257,7 @@ end;
 function TFLRENativeCodeMemoryManager.ReallocMemory(p:pointer;Size:TFLREPtrUInt):pointer;
 var BlockContainer:PFLRENativeCodeMemoryManagerBlockContainer;
     CurrentBlock:PFLRENativeCodeMemoryManagerBlock;
-    DestSize:ptruint;
+    DestSize:TFLREPtrUInt;
 begin
  result:=nil;
  if assigned(p) then begin
@@ -8025,10 +8267,10 @@ begin
    DestSize:=Size+sizeof(TFLRENativeCodeMemoryManagerBlock);
    BlockContainer:=First;
    while assigned(BlockContainer) do begin
-    if ((ptruint(BlockContainer^.Base)+sizeof(TFLRENativeCodeMemoryManagerBlock))<=ptruint(p)) and ((ptruint(p)+sizeof(TFLRENativeCodeMemoryManagerBlock))<(ptruint(BlockContainer^.Base)+BlockContainer^.Size)) then begin
-     CurrentBlock:=pointer(ptruint(ptruint(p)-sizeof(TFLRENativeCodeMemoryManagerBlock)));
+    if ((TFLREPtrUInt(BlockContainer^.Base)+sizeof(TFLRENativeCodeMemoryManagerBlock))<=TFLREPtrUInt(p)) and ((TFLREPtrUInt(p)+sizeof(TFLRENativeCodeMemoryManagerBlock))<(TFLREPtrUInt(BlockContainer^.Base)+BlockContainer^.Size)) then begin
+     CurrentBlock:=pointer(TFLREPtrUInt(TFLREPtrUInt(p)-sizeof(TFLRENativeCodeMemoryManagerBlock)));
      if (CurrentBlock^.Signature=bncmmMemoryBlockSignature) and (CurrentBlock<>BlockContainer^.First) and (CurrentBlock<>BlockContainer^.Last) then begin
-      if (ptruint(CurrentBlock^.Next)-ptruint(CurrentBlock))>=DestSize then begin
+      if (TFLREPtrUInt(CurrentBlock^.Next)-TFLREPtrUInt(CurrentBlock))>=DestSize then begin
        CurrentBlock^.Size:=Size;
        result:=p;
        exit;
@@ -8085,9 +8327,9 @@ begin
  Resize;
 end;
 
-function TFLREDFAStateHashMap.FindCell(const Key:PFLREDFAState):longword;
-var HashCode,Mask,Step:longword;
-    Entity:longint;
+function TFLREDFAStateHashMap.FindCell(const Key:PFLREDFAState):TFLREUInt32;
+var HashCode,Mask,Step:TFLREUInt32;
+    Entity:TFLREInt32;
 begin
  HashCode:=HashDFAState(Key);
  Mask:=(2 shl LogSize)-1;
@@ -8107,8 +8349,8 @@ begin
 end;
 
 function TFLREDFAStateHashMap.Add(const Key:PFLREDFAState):PFLREDFAStateHashMapEntity;
-var Entity:longint;
-    Cell:longword;
+var Entity:TFLREInt32;
+    Cell:TFLREUInt32;
 begin
  result:=nil;
  while RealSize>=(1 shl LogSize) do begin
@@ -8133,7 +8375,7 @@ begin
 end;
 
 procedure TFLREDFAStateHashMap.Resize;
-var NewLogSize,NewSize,Cell,Entity,Counter:longint;
+var NewLogSize,NewSize,Cell,Entity,Counter:TFLREInt32;
     OldEntities:TFLREDFAStateHashMapEntities;
     OldCellToEntityIndex:TFLREDFAStateHashMapEntityIndices;
     OldEntityToCellIndex:TFLREDFAStateHashMapEntityIndices;
@@ -8177,8 +8419,8 @@ begin
 end;
 
 function TFLREDFAStateHashMap.Get(const Key:PFLREDFAState):PFLREDFAState;
-var Entity:longint;
-    Cell:longword;
+var Entity:TFLREInt32;
+    Cell:TFLREUInt32;
 begin
  result:=nil;
  Cell:=FindCell(Key);
@@ -8189,8 +8431,8 @@ begin
 end;
 
 function TFLREDFAStateHashMap.Delete(const Key:PFLREDFAState):boolean;
-var Entity:longint;
-    Cell:longword;
+var Entity:TFLREInt32;
+    Cell:TFLREUInt32;
 begin
  result:=false;
  Cell:=FindCell(Key);
@@ -8205,7 +8447,7 @@ begin
  end;
 end;
 
-constructor TFLRESparseSet.Create(MaximumSize:longint=0);
+constructor TFLRESparseSet.Create(MaximumSize:TFLREInt32=0);
 begin
  inherited Create;
  Size:=0;
@@ -8214,8 +8456,8 @@ begin
  Dense:=nil;
  SetLength(SparseToDense,MaxSize);
  SetLength(Dense,MaxSize);
- FillChar(SparseToDense[0],MaxSize*SizeOf(longint),$ff);
- FillChar(Dense[0],MaxSize*SizeOf(longint),$ff);
+ FillChar(SparseToDense[0],MaxSize*SizeOf(TFLREInt32),$ff);
+ FillChar(Dense[0],MaxSize*SizeOf(TFLREInt32),$ff);
 end;
 
 destructor TFLRESparseSet.Destroy;
@@ -8230,23 +8472,23 @@ begin
  Size:=0;
 end;
 
-procedure TFLRESparseSet.Resize(NewMaximumSize:longint);
+procedure TFLRESparseSet.Resize(NewMaximumSize:TFLREInt32);
 begin
  SetLength(SparseToDense,NewMaximumSize);
  SetLength(Dense,NewMaximumSize);
  if MaxSize<NewMaximumSize then begin
-  FillChar(SparseToDense[MaxSize],(MaxSize-NewMaximumSize)*SizeOf(longint),$ff);
-  FillChar(Dense[MaxSize],(MaxSize-NewMaximumSize)*SizeOf(longint),$ff);
+  FillChar(SparseToDense[MaxSize],(MaxSize-NewMaximumSize)*SizeOf(TFLREInt32),$ff);
+  FillChar(Dense[MaxSize],(MaxSize-NewMaximumSize)*SizeOf(TFLREInt32),$ff);
  end;
  MaxSize:=NewMaximumSize;
 end;
 
-function TFLRESparseSet.Contains(const Value:longint):boolean;
+function TFLRESparseSet.Contains(const Value:TFLREInt32):boolean;
 begin
  result:=((Value>=0) and (Value<MaxSize) and (SparseToDense[Value]<Size)) and (Dense[SparseToDense[Value]]=Value);
 end;
 
-procedure TFLRESparseSet.Add(const Value:longint);
+procedure TFLRESparseSet.Add(const Value:TFLREInt32);
 begin
  if (Value>=0) and (Value<MaxSize) then begin
   SparseToDense[Value]:=Size;
@@ -8255,14 +8497,14 @@ begin
  end;
 end;
 
-procedure TFLRESparseSet.AddNew(const Value:longint);
+procedure TFLRESparseSet.AddNew(const Value:TFLREInt32);
 begin
  if not Contains(Value) then begin
   Add(Value);
  end;
 end;
 
-constructor TFLREDFAWorkQueue.Create(Preallocated:longint=16);
+constructor TFLREDFAWorkQueue.Create(Preallocated:TFLREInt32=16);
 begin
  inherited Create;
  Instructions:=nil;
@@ -8310,14 +8552,14 @@ begin
 end;
 
 function TFLREDFAWorkQueue.Contains(const Instruction:PFLREInstruction):boolean;
-var ID:longint;
+var ID:TFLREInt32;
 begin
  ID:=Instruction^.IDandOpcode shr 8;
  result:=((ID>=0) and (ID<AllocatedIDs) and (SparseToDenseIDs[ID]<CountIDs)) and (DenseIDs[SparseToDenseIDs[ID]]=ID);
 end;
 
 procedure TFLREDFAWorkQueue.AddNew(const Instruction:PFLREInstruction);
-var ID:longint;
+var ID:TFLREInt32;
 begin
  ID:=Instruction^.IDandOpcode shr 8;
  if (ID+1)>AllocatedIDs then begin
@@ -8366,15 +8608,15 @@ begin
  ReallocMem(List,0);
 end;
 
-procedure TFLREIntegerList.SetCapacity(NewCapacity:longint);
+procedure TFLREIntegerList.SetCapacity(NewCapacity:TFLREInt32);
 begin
  if NewCapacity>=0 then begin
-  ReallocMem(List,NewCapacity*sizeof(longint));
+  ReallocMem(List,NewCapacity*sizeof(TFLREInt32));
   Allocated:=NewCapacity;
  end;
 end;
 
-procedure TFLREIntegerList.SetCount(NewCount:longint);
+procedure TFLREIntegerList.SetCount(NewCount:TFLREInt32);
 begin
  if NewCount>=0 then begin
   if NewCount<CountItems then begin
@@ -8384,18 +8626,18 @@ begin
     SetCapacity((CountItems+4096) and not 4095);
    end;
    if CountItems<NewCount then begin
-    FillChar(List^[CountItems],(NewCount-CountItems)*sizeof(longint),#0);
+    FillChar(List^[CountItems],(NewCount-CountItems)*sizeof(TFLREInt32),#0);
    end;
    CountItems:=NewCount;
   end;
  end;
 end;
 
-function TFLREIntegerList.Add(Item:longint):longint;
+function TFLREIntegerList.Add(Item:TFLREInt32):TFLREInt32;
 begin
  if CountItems>=Allocated then begin
   Allocated:=(CountItems+4096) and not 4095;
-  ReallocMem(List,Allocated*sizeof(longint));
+  ReallocMem(List,Allocated*sizeof(TFLREInt32));
  end;
  List^[CountItems]:=Item;
  result:=CountItems;
@@ -8403,8 +8645,8 @@ begin
  IsSorted:=false;
 end;
 
-procedure TFLREIntegerList.AddSorted(Item:longint);
-var i:longint;
+procedure TFLREIntegerList.AddSorted(Item:TFLREInt32);
+var i:TFLREInt32;
 begin
  if IsSorted then begin
   if CountItems=0 then begin
@@ -8423,8 +8665,8 @@ begin
  end;
 end;
 
-procedure TFLREIntegerList.Insert(Index:longint;Item:longint);
-var i:longint;
+procedure TFLREIntegerList.Insert(Index:TFLREInt32;Item:TFLREInt32);
+var i:TFLREInt32;
 begin
  if (Index>=0) and (Index<CountItems) then begin
   SetCount(CountItems+1);
@@ -8441,8 +8683,8 @@ begin
  IsSorted:=false;
 end;
 
-procedure TFLREIntegerList.Delete(Index:longint);
-var i,j,k:longint;
+procedure TFLREIntegerList.Delete(Index:TFLREInt32);
+var i,j,k:TFLREInt32;
 begin
  if (Index>=0) and (Index<CountItems) then begin
   k:=CountItems-1;
@@ -8454,8 +8696,8 @@ begin
  end;
 end;
 
-function TFLREIntegerList.Remove(Item:longint):longint;
-var i,j,k:longint;
+function TFLREIntegerList.Remove(Item:TFLREInt32):TFLREInt32;
+var i,j,k:TFLREInt32;
 begin
  result:=-1;
  k:=CountItems;
@@ -8476,8 +8718,8 @@ begin
  end;
 end;
 
-function TFLREIntegerList.Find(Item:longint):longint;
-var i,l,r:longint;
+function TFLREIntegerList.Find(Item:TFLREInt32):TFLREInt32;
+var i,l,r:TFLREInt32;
 begin
  result:=-1;
  if IsSorted then begin
@@ -8506,13 +8748,13 @@ begin
  end;
 end;
 
-function TFLREIntegerList.IndexOf(Item:longint):longint;
+function TFLREIntegerList.IndexOf(Item:TFLREInt32):TFLREInt32;
 begin
  result:=Find(Item);
 end;
 
-procedure TFLREIntegerList.Exchange(Index1,Index2:longint);
-var TempInteger:longint;
+procedure TFLREIntegerList.Exchange(Index1,Index2:TFLREInt32);
+var TempInteger:TFLREInt32;
 begin
  if (Index1>=0) and (Index1<CountItems) and (Index2>=0) and (Index2<CountItems) then begin
   TempInteger:=List^[Index1];
@@ -8522,7 +8764,7 @@ begin
  end;
 end;
 
-function TFLREIntegerList.GetItem(Index:longint):longint;
+function TFLREIntegerList.GetItem(Index:TFLREInt32):TFLREInt32;
 begin
  if (Index>=0) and (Index<CountItems) then begin
   result:=List^[Index];
@@ -8531,7 +8773,7 @@ begin
  end;
 end;
 
-procedure TFLREIntegerList.SetItem(Index:longint;Value:longint);
+procedure TFLREIntegerList.SetItem(Index:TFLREInt32;Value:TFLREInt32);
 begin
  if (Index>=0) and (Index<CountItems) then begin
   List^[Index]:=Value;
@@ -8539,7 +8781,7 @@ begin
  end;
 end;
 
-function TFLREIntegerList.GetItemPointer(Index:longint):pointer;
+function TFLREIntegerList.GetItemPointer(Index:TFLREInt32):pointer;
 begin
  if (Index>=0) and (Index<CountItems) then begin
   result:=@List^[Index];
@@ -8549,10 +8791,10 @@ begin
 end;
 
 procedure TFLREIntegerList.Sort;
- procedure IntroSort(Left,Right,Depth:longint);
-  procedure SiftDown(Current,MaxIndex:longint);
-  var SiftLeft,SiftRight,Largest:longint;
-      v:longint;
+ procedure IntroSort(Left,Right,Depth:TFLREInt32);
+  procedure SiftDown(Current,MaxIndex:TFLREInt32);
+  var SiftLeft,SiftRight,Largest:TFLREInt32;
+      v:TFLREInt32;
   begin
    SiftLeft:=Left+(2*(Current-Left))+1;
    SiftRight:=Left+(2*(Current-Left))+2;
@@ -8571,8 +8813,8 @@ procedure TFLREIntegerList.Sort;
    end;
   end;
   procedure InsertionSort;
-  var i,j:longint;
-      t:longint;
+  var i,j:TFLREInt32;
+      t:TFLREInt32;
   begin
    i:=Left+1;
    while i<=Right do begin
@@ -8587,8 +8829,8 @@ procedure TFLREIntegerList.Sort;
    end;
   end;
   procedure HeapSort;
-  var i:longint;
-      v:longint;
+  var i:TFLREInt32;
+      v:TFLREInt32;
   begin
    i:=((Left+Right+1) div 2)-1;
    while i>=Left do begin
@@ -8605,8 +8847,8 @@ procedure TFLREIntegerList.Sort;
    end;
   end;
   procedure QuickSortWidthMedianOfThreeOptimization;
-  var Middle,i,j:longint;
-      Pivot,v:longint;
+  var Middle,i,j:TFLREInt32;
+      Pivot,v:TFLREInt32;
   begin
    Middle:=(Left+Right) div 2;
    if (Right-Left)>3 then begin
@@ -8659,9 +8901,9 @@ procedure TFLREIntegerList.Sort;
    end;
   end;
  end;
- procedure QuickSort(L,R:longint);
- var Pivot,vL,vR:longint;
-     v:longint;
+ procedure QuickSort(L,R:TFLREInt32);
+ var Pivot,vL,vR:TFLREInt32;
+     v:TFLREInt32;
  begin
   if (R-L)<=1 then begin
    if (L<R) and (List[R]<List[L]) then begin
@@ -8697,9 +8939,9 @@ procedure TFLREIntegerList.Sort;
    end;
   end;
  end;
- procedure QuickSortEx(Left,Right:longint);
- var Pivot,i,j:longint;
-     v:longint;
+ procedure QuickSortEx(Left,Right:TFLREInt32);
+ var Pivot,i,j:TFLREInt32;
+     v:TFLREInt32;
  begin
   i:=Left;
   j:=Right;
@@ -8727,8 +8969,8 @@ procedure TFLREIntegerList.Sort;
   end;
  end;
  procedure BeRoSort;
- var i:longint;
-     v:longint;
+ var i:TFLREInt32;
+     v:TFLREInt32;
  begin
   i:=0;
   while i<(CountItems-1) do begin
@@ -8753,6 +8995,169 @@ begin
  end;
 end;
 
+constructor TFLRENodeHashSet.Create;
+begin
+ inherited Create;
+ RealSize:=0;
+ LogSize:=0;
+ Size:=0;
+ Entities:=nil;
+ EntityToCellIndex:=nil;
+ CellToEntityIndex:=nil;
+ Resize;
+end;
+
+destructor TFLRENodeHashSet.Destroy;
+var Counter:TFLREInt32;
+begin
+ Clear;
+ for Counter:=0 to length(Entities)-1 do begin
+  Entities[Counter]:=nil;
+ end;
+ SetLength(Entities,0);
+ SetLength(EntityToCellIndex,0);
+ SetLength(CellToEntityIndex,0);
+ inherited Destroy;
+end;
+
+procedure TFLRENodeHashSet.Clear;
+var Counter:TFLREInt32;
+begin
+ for Counter:=0 to length(Entities)-1 do begin
+  Entities[Counter]:=nil;
+ end;
+ RealSize:=0;
+ LogSize:=0;
+ Size:=0;
+ SetLength(Entities,0);
+ SetLength(EntityToCellIndex,0);
+ SetLength(CellToEntityIndex,0);
+ Resize;
+end;
+
+function TFLRENodeHashSet.FindCell(const Key:PFLRENode):TFLREUInt32;
+var HashCode,Mask,Step:TFLREUInt32;
+    Entity:TFLREInt32;
+begin
+ HashCode:=HashPointer(Key);
+ Mask:=(2 shl LogSize)-1;
+ Step:=((HashCode shl 1)+1) and Mask;
+ if LogSize<>0 then begin
+  result:=HashCode shr (32-LogSize);
+ end else begin
+  result:=0;
+ end;
+ repeat
+  Entity:=CellToEntityIndex[result];
+  if (Entity=ENT_EMPTY) or ((Entity<>ENT_DELETED) and (Entities[Entity]=Key)) then begin
+   exit;
+  end;
+  result:=(result+Step) and Mask;
+ until false;
+end;
+
+procedure TFLRENodeHashSet.Resize;
+var NewLogSize,NewSize,Cell,Entity,Counter:TFLREInt32;
+    OldEntities:TFLRENodeHashSetEntities;
+    OldCellToEntityIndex:TFLRENodeHashSetEntityIndices;
+    OldEntityToCellIndex:TFLRENodeHashSetEntityIndices;
+begin
+ NewLogSize:=0;
+ NewSize:=RealSize;
+ while NewSize<>0 do begin
+  NewSize:=NewSize shr 1;
+  inc(NewLogSize);
+ end;
+ if NewLogSize<1 then begin
+  NewLogSize:=1;
+ end;
+ Size:=0;
+ RealSize:=0;
+ LogSize:=NewLogSize;
+ OldEntities:=Entities;
+ OldCellToEntityIndex:=CellToEntityIndex;
+ OldEntityToCellIndex:=EntityToCellIndex;
+ Entities:=nil;
+ CellToEntityIndex:=nil;
+ EntityToCellIndex:=nil;
+ SetLength(Entities,2 shl LogSize);
+ SetLength(CellToEntityIndex,2 shl LogSize);
+ SetLength(EntityToCellIndex,2 shl LogSize);
+ for Counter:=0 to length(CellToEntityIndex)-1 do begin
+  CellToEntityIndex[Counter]:=ENT_EMPTY;
+ end;
+ for Counter:=0 to length(EntityToCellIndex)-1 do begin
+  EntityToCellIndex[Counter]:=CELL_EMPTY;
+ end;
+ for Counter:=0 to length(OldEntityToCellIndex)-1 do begin
+  Cell:=OldEntityToCellIndex[Counter];
+  if Cell>=0 then begin
+   Entity:=OldCellToEntityIndex[Cell];
+   if Entity>=0 then begin
+    Add(OldEntities[Counter]);
+   end;
+  end;
+ end;
+end;
+
+procedure TFLRENodeHashSet.Toggle(const Key:PFLRENode;aInclude:boolean);
+begin
+ if Contains(Key)<>aInclude then begin
+  if aInclude then begin
+   Add(Key);
+  end else begin
+   Delete(key);
+  end;
+ end;
+end;
+
+procedure TFLRENodeHashSet.Add(const Key:PFLRENode);
+var Entity:TFLREInt32;
+    Cell:TFLREUInt32;
+begin
+ while RealSize>=(1 shl LogSize) do begin
+  Resize;
+ end;
+ Cell:=FindCell(Key);
+ Entity:=CellToEntityIndex[Cell];
+ if Entity>=0 then begin
+  Entities[Entity]:=Key;
+  exit;
+ end;
+ Entity:=Size;
+ inc(Size);
+ if Entity<(2 shl LogSize) then begin
+  CellToEntityIndex[Cell]:=Entity;
+  EntityToCellIndex[Entity]:=Cell;
+  inc(RealSize);
+  Entities[Entity]:=Key;
+ end;
+end;
+
+function TFLRENodeHashSet.Contains(const Key:PFLRENode):boolean;
+var Entity:TFLREInt32;
+    Cell:TFLREUInt32;
+begin
+ Cell:=FindCell(Key);
+ Entity:=CellToEntityIndex[Cell];
+ result:=Entity>=0;
+end;
+
+function TFLRENodeHashSet.Delete(const Key:PFLRENode):boolean;
+var Entity:TFLREInt32;
+    Cell:TFLREUInt32;
+begin
+ result:=false;
+ Cell:=FindCell(Key);
+ Entity:=CellToEntityIndex[Cell];
+ if Entity>=0 then begin
+  Entities[Entity]:=nil;
+  EntityToCellIndex[Entity]:=CELL_DELETED;
+  CellToEntityIndex[Cell]:=ENT_DELETED;
+  result:=true;
+ end;
+end;
+
 constructor TFLREStringIntegerPairHashMap.Create;
 begin
  inherited Create;
@@ -8766,7 +9171,7 @@ begin
 end;
 
 destructor TFLREStringIntegerPairHashMap.Destroy;
-var Counter:longint;
+var Counter:TFLREInt32;
 begin
  Clear;
  for Counter:=0 to length(Entities)-1 do begin
@@ -8779,7 +9184,7 @@ begin
 end;
 
 procedure TFLREStringIntegerPairHashMap.Clear;
-var Counter:longint;
+var Counter:TFLREInt32;
 begin
  for Counter:=0 to length(Entities)-1 do begin
   Entities[Counter].Key:='';
@@ -8794,7 +9199,7 @@ begin
 end;
 
 procedure TFLREStringIntegerPairHashMap.LowerCaseAssignFrom(const HashMap:TFLREStringIntegerPairHashMap);
-var Counter:longint;
+var Counter:TFLREInt32;
 begin
  Clear;
  for Counter:=0 to length(HashMap.EntityToCellIndex)-1 do begin
@@ -8804,9 +9209,9 @@ begin
  end;
 end;
 
-function TFLREStringIntegerPairHashMap.FindCell(const Key:TFLRERawByteString):longword;
-var HashCode,Mask,Step:longword;
-    Entity:longint;
+function TFLREStringIntegerPairHashMap.FindCell(const Key:TFLRERawByteString):TFLREUInt32;
+var HashCode,Mask,Step:TFLREUInt32;
+    Entity:TFLREInt32;
 begin
  HashCode:=HashString(Key);
  Mask:=(2 shl LogSize)-1;
@@ -8826,7 +9231,7 @@ begin
 end;
 
 procedure TFLREStringIntegerPairHashMap.Resize;
-var NewLogSize,NewSize,Cell,Entity,Counter:longint;
+var NewLogSize,NewSize,Cell,Entity,Counter:TFLREInt32;
     OldEntities:TFLREStringIntegerPairHashMapEntities;
     OldCellToEntityIndex:TFLREStringIntegerPairHashMapEntityIndices;
     OldEntityToCellIndex:TFLREStringIntegerPairHashMapEntityIndices;
@@ -8876,8 +9281,8 @@ begin
 end;
 
 function TFLREStringIntegerPairHashMap.Add(const Key:TFLRERawByteString;Value:TFLREStringIntegerPairHashMapData):PFLREStringIntegerPairHashMapEntity;
-var Entity:longint;
-    Cell:longword;
+var Entity:TFLREInt32;
+    Cell:TFLREUInt32;
 begin
  result:=nil;
  while RealSize>=(1 shl LogSize) do begin
@@ -8904,8 +9309,8 @@ begin
 end;
 
 function TFLREStringIntegerPairHashMap.Get(const Key:TFLRERawByteString;CreateIfNotExist:boolean=false):PFLREStringIntegerPairHashMapEntity;
-var Entity:longint;
-    Cell:longword;
+var Entity:TFLREInt32;
+    Cell:TFLREUInt32;
 begin
  result:=nil;
  Cell:=FindCell(Key);
@@ -8918,8 +9323,8 @@ begin
 end;
 
 function TFLREStringIntegerPairHashMap.Delete(const Key:TFLRERawByteString):boolean;
-var Entity:longint;
-    Cell:longword;
+var Entity:TFLREInt32;
+    Cell:TFLREUInt32;
 begin
  result:=false;
  Cell:=FindCell(Key);
@@ -8934,8 +9339,8 @@ begin
 end;
 
 function TFLREStringIntegerPairHashMap.GetValue(const Key:TFLRERawByteString):TFLREStringIntegerPairHashMapData;
-var Entity:longint;
-    Cell:longword;
+var Entity:TFLREInt32;
+    Cell:TFLREUInt32;
 begin
  Cell:=FindCell(Key);
  Entity:=CellToEntityIndex[Cell];
@@ -8983,9 +9388,9 @@ begin
  Resize;
 end;
 
-function TFLRECharClassHashMap.FindCell(const Key:TFLRECharClass):longword;
-var HashCode,Mask,Step:longword;
-    Entity:longint;
+function TFLRECharClassHashMap.FindCell(const Key:TFLRECharClass):TFLREUInt32;
+var HashCode,Mask,Step:TFLREUInt32;
+    Entity:TFLREInt32;
 begin
  HashCode:=HashData(@Key,SizeOf(TFLRECharClass));
  Mask:=(2 shl LogSize)-1;
@@ -9005,7 +9410,7 @@ begin
 end;
 
 procedure TFLRECharClassHashMap.Resize;
-var NewLogSize,NewSize,Cell,Entity,Counter:longint;
+var NewLogSize,NewSize,Cell,Entity,Counter:TFLREInt32;
     OldEntities:TFLRECharClassHashMapEntities;
     OldCellToEntityIndex:TFLRECharClassHashMapEntityIndices;
     OldEntityToCellIndex:TFLRECharClassHashMapEntityIndices;
@@ -9052,8 +9457,8 @@ begin
 end;
 
 function TFLRECharClassHashMap.Add(const Key:TFLRECharClass;Value:TFLRECharClassHashMapData):PFLRECharClassHashMapEntity;
-var Entity:longint;
-    Cell:longword;
+var Entity:TFLREInt32;
+    Cell:TFLREUInt32;
 begin
  result:=nil;
  while RealSize>=(1 shl LogSize) do begin
@@ -9080,8 +9485,8 @@ begin
 end;
 
 function TFLRECharClassHashMap.Get(const Key:TFLRECharClass;CreateIfNotExist:boolean=false):PFLRECharClassHashMapEntity;
-var Entity:longint;
-    Cell:longword;
+var Entity:TFLREInt32;
+    Cell:TFLREUInt32;
 begin
  result:=nil;
  Cell:=FindCell(Key);
@@ -9094,8 +9499,8 @@ begin
 end;
 
 function TFLRECharClassHashMap.Delete(const Key:TFLRECharClass):boolean;
-var Entity:longint;
-    Cell:longword;
+var Entity:TFLREInt32;
+    Cell:TFLREUInt32;
 begin
  result:=false;
  Cell:=FindCell(Key);
@@ -9110,8 +9515,8 @@ begin
 end;
 
 function TFLRECharClassHashMap.GetValue(const Key:TFLRECharClass):TFLRECharClassHashMapData;
-var Entity:longint;
-    Cell:longword;
+var Entity:TFLREInt32;
+    Cell:TFLREUInt32;
 begin
  Cell:=FindCell(Key);
  Entity:=CellToEntityIndex[Cell];
@@ -9133,10 +9538,10 @@ type TFLREUnicodeCharClass=class;
       public
        CharClass:TFLREUnicodeCharClass;
        Previous,Next,Left,Right:TFLREUnicodeCharClassRange;
-       Lo,Hi:longword;
-       constructor Create(ACharClass:TFLREUnicodeCharClass;ALo,AHi:longword);
-       constructor CreateBefore(ACharClass:TFLREUnicodeCharClass;ABefore:TFLREUnicodeCharClassRange;ALo,AHi:longword);
-       constructor CreateAfter(ACharClass:TFLREUnicodeCharClass;AAfter:TFLREUnicodeCharClassRange;ALo,AHi:longword);
+       Lo,Hi:TFLREUInt32;
+       constructor Create(ACharClass:TFLREUnicodeCharClass;ALo,AHi:TFLREUInt32);
+       constructor CreateBefore(ACharClass:TFLREUnicodeCharClass;ABefore:TFLREUnicodeCharClassRange;ALo,AHi:TFLREUInt32);
+       constructor CreateAfter(ACharClass:TFLREUnicodeCharClass;AAfter:TFLREUnicodeCharClassRange;ALo,AHi:TFLREUInt32);
        destructor Destroy; override;
      end;
 
@@ -9156,12 +9561,12 @@ type TFLREUnicodeCharClass=class;
        procedure Dump;
        procedure DebugDump;
        procedure Optimize;
-       procedure AddRange(Lo,Hi:longword;IgnoreCase:boolean=false);
-       procedure AddChar(c:longword;IgnoreCase:boolean=false);
-       procedure AddUnicodeCategory(CategoryFlags:longword;IgnoreCase:boolean=false);
-       procedure AddUnicodeScript(Script:longword;IgnoreCase:boolean=false);
-       procedure AddUnicodeBlock(Block:longword;IgnoreCase:boolean=false);
-       procedure AddUnicodeAdditionalBlock(Block:longword;IgnoreCase:boolean=false);
+       procedure AddRange(Lo,Hi:TFLREUInt32;IgnoreCase:boolean=false);
+       procedure AddChar(c:TFLREUInt32;IgnoreCase:boolean=false);
+       procedure AddUnicodeCategory(CategoryFlags:TFLREUInt32;IgnoreCase:boolean=false);
+       procedure AddUnicodeScript(Script:TFLREUInt32;IgnoreCase:boolean=false);
+       procedure AddUnicodeBlock(Block:TFLREUInt32;IgnoreCase:boolean=false);
+       procedure AddUnicodeAdditionalBlock(Block:TFLREUInt32;IgnoreCase:boolean=false);
        procedure Combine(From:TFLREUnicodeCharClass);
        function Subtraction(From,SubtractWith:TFLREUnicodeCharClass):boolean;
        function Intersection(From,IntersectWith:TFLREUnicodeCharClass):boolean;
@@ -9175,15 +9580,15 @@ type TFLREUnicodeCharClass=class;
        procedure CompileBinarySearchTree;
        procedure CompileCharset;
        procedure Finalize;
-       function Count:longword;
-       function Contains(c:longword):boolean;
+       function Count:TFLREUInt32;
+       function Contains(c:TFLREUInt32):boolean;
        function Intersects(Other:TFLREUnicodeCharClass):boolean;
        function IsSingle:boolean;
-       function HashCode:longword;
+       function HashCode:TFLREUInt32;
        function EqualsTo(OtherObject:TFLREUnicodeCharClass):boolean;
      end;
 
-constructor TFLREUnicodeCharClassRange.Create(ACharClass:TFLREUnicodeCharClass;ALo,AHi:longword);
+constructor TFLREUnicodeCharClassRange.Create(ACharClass:TFLREUnicodeCharClass;ALo,AHi:TFLREUInt32);
 begin
  inherited Create;
  CharClass:=ACharClass;
@@ -9204,7 +9609,7 @@ begin
  Right:=nil;
 end;
 
-constructor TFLREUnicodeCharClassRange.CreateBefore(ACharClass:TFLREUnicodeCharClass;ABefore:TFLREUnicodeCharClassRange;ALo,AHi:longword);
+constructor TFLREUnicodeCharClassRange.CreateBefore(ACharClass:TFLREUnicodeCharClass;ABefore:TFLREUnicodeCharClassRange;ALo,AHi:TFLREUInt32);
 begin
  inherited Create;
  CharClass:=ACharClass;
@@ -9220,7 +9625,7 @@ begin
  end;
 end;
 
-constructor TFLREUnicodeCharClassRange.CreateAfter(ACharClass:TFLREUnicodeCharClass;AAfter:TFLREUnicodeCharClassRange;ALo,AHi:longword);
+constructor TFLREUnicodeCharClassRange.CreateAfter(ACharClass:TFLREUnicodeCharClass;AAfter:TFLREUnicodeCharClassRange;ALo,AHi:TFLREUInt32);
 begin
  inherited Create;
  CharClass:=ACharClass;
@@ -9334,9 +9739,9 @@ begin
  end;
 end;
 
-procedure TFLREUnicodeCharClass.AddRange(Lo,Hi:longword;IgnoreCase:boolean=false);
+procedure TFLREUnicodeCharClass.AddRange(Lo,Hi:TFLREUInt32;IgnoreCase:boolean=false);
 var Range,TempRange:TFLREUnicodeCharClassRange;
-    c,cl,cu:longword;
+    c,cl,cu:TFLREUInt32;
     Temp,OtherTemp:TFLREUnicodeCharClass;
 begin
  if IgnoreCase then begin
@@ -9386,15 +9791,15 @@ begin
  end;
 end;
 
-procedure TFLREUnicodeCharClass.AddChar(c:longword;IgnoreCase:boolean=false);
+procedure TFLREUnicodeCharClass.AddChar(c:TFLREUInt32;IgnoreCase:boolean=false);
 begin
  AddRange(c,c,IgnoreCase);
 end;
 
-procedure TFLREUnicodeCharClass.AddUnicodeCategory(CategoryFlags:longword;IgnoreCase:boolean=false);
-var Range:longint;
+procedure TFLREUnicodeCharClass.AddUnicodeCategory(CategoryFlags:TFLREUInt32;IgnoreCase:boolean=false);
+var Range:TFLREInt32;
     UnicodeCharRanges:PPUCUUnicodeCharRanges;
-    Bits,Category:longword;
+    Bits,Category:TFLREUInt32;
 begin
  Bits:=CategoryFlags;
  while Bits<>0 do begin
@@ -9415,8 +9820,8 @@ begin
  end;
 end;
 
-procedure TFLREUnicodeCharClass.AddUnicodeScript(Script:longword;IgnoreCase:boolean=false);
-var Range:longint;
+procedure TFLREUnicodeCharClass.AddUnicodeScript(Script:TFLREUInt32;IgnoreCase:boolean=false);
+var Range:TFLREInt32;
     UnicodeCharRanges:PPUCUUnicodeCharRanges;
 begin
  if Script<PUCUUnicodeScriptCount then begin
@@ -9434,8 +9839,8 @@ begin
  end;
 end;
 
-procedure TFLREUnicodeCharClass.AddUnicodeBlock(Block:longword;IgnoreCase:boolean=false);
-var Range:longint;
+procedure TFLREUnicodeCharClass.AddUnicodeBlock(Block:TFLREUInt32;IgnoreCase:boolean=false);
+var Range:TFLREInt32;
     UnicodeCharRanges:PPUCUUnicodeCharRanges;
 begin
  if Block<PUCUUnicodeBlockCount then begin
@@ -9453,8 +9858,8 @@ begin
  end;
 end;
 
-procedure TFLREUnicodeCharClass.AddUnicodeAdditionalBlock(Block:longword;IgnoreCase:boolean=false);
-var Range:longint;
+procedure TFLREUnicodeCharClass.AddUnicodeAdditionalBlock(Block:TFLREUInt32;IgnoreCase:boolean=false);
+var Range:TFLREInt32;
     UnicodeCharRanges:PPUCUUnicodeCharRanges;
 begin
  if IgnoreCase then begin
@@ -9489,7 +9894,7 @@ end;
                                  
 function TFLREUnicodeCharClass.Subtraction(From,SubtractWith:TFLREUnicodeCharClass):boolean;
 var Range1,Range2:TFLREUnicodeCharClassRange;
-    First,Min,Max:longword;
+    First,Min,Max:TFLREUInt32;
 begin
  result:=false;
  if ((assigned(From) and assigned(SubtractWith)) and (assigned(From.First) and assigned(SubtractWith.First))) and ((From.First.Lo<=SubtractWith.Last.Hi) and (SubtractWith.First.Lo<=From.Last.Hi)) then begin
@@ -9528,7 +9933,7 @@ end;
 
 function TFLREUnicodeCharClass.Intersection(From,IntersectWith:TFLREUnicodeCharClass):boolean;
 var Range1,Range2:TFLREUnicodeCharClassRange;
-    Min,Max:longword;
+    Min,Max:TFLREUInt32;
 begin
  result:=false;
  if ((assigned(From) and assigned(IntersectWith)) and (assigned(From.First) and assigned(IntersectWith.First))) and ((From.First.Lo<=IntersectWith.Last.Hi) and (IntersectWith.First.Lo<=From.Last.Hi)) then begin
@@ -9561,9 +9966,9 @@ begin
 end;
 
 function TFLREUnicodeCharClass.IntersectionWithLowerUpperCaseUnicodeCharClass(From:TFLREUnicodeCharClass):boolean;
-var Range2:longint;
+var Range2:TFLREInt32;
     Range1:TFLREUnicodeCharClassRange;
-    Min,Max:longword;
+    Min,Max:TFLREUInt32;
 begin
  result:=false;
  if (assigned(From) and assigned(From.First)) and
@@ -9720,7 +10125,7 @@ end;
 procedure TFLREUnicodeCharClass.Invert;
 var NewList:TFLREUnicodeCharClass;
     Range:TFLREUnicodeCharClassRange;
-    Lo,Hi:longword;
+    Lo,Hi:TFLREUInt32;
 begin
  Optimize;
  Inverted:=not Inverted;
@@ -9814,8 +10219,8 @@ end;
 procedure TFLREUnicodeCharClass.CompileBinarySearchTree;
 type PTFLREUnicodeCharClassRange=^TFLREUnicodeCharClassRange;
 var Ranges:TFLREUnicodeCharClassRanges;
- procedure Process(Parent:PTFLREUnicodeCharClassRange;LowIndex,HighIndex:longint);
- var Middle:longint;
+ procedure Process(Parent:PTFLREUnicodeCharClassRange;LowIndex,HighIndex:TFLREInt32);
+ var Middle:TFLREInt32;
  begin
   while LowIndex<=HighIndex do begin
    Middle:=(LowIndex+HighIndex) div 2;
@@ -9842,7 +10247,7 @@ var Ranges:TFLREUnicodeCharClassRanges;
   end;
  end;
 var Range:TFLREUnicodeCharClassRange;
-    Count:longint;
+    Count:TFLREInt32;
 begin
  Root:=nil;
  Ranges:=nil;
@@ -9876,12 +10281,12 @@ begin
  Range:=First;
  while assigned(Range) and (Range.Lo<256) do begin
   if Range.Lo=Range.Hi then begin
-   System.Include(CharSet,TFLRERawByteChar(byte(Range.Lo)));
+   System.Include(CharSet,TFLRERawByteChar(TFLREUInt8(Range.Lo)));
   end else begin
    if Range.Hi<256 then begin
-    CharSet:=CharSet+[TFLRERawByteChar(byte(Range.Lo))..TFLRERawByteChar(byte(Range.Hi))];
+    CharSet:=CharSet+[TFLRERawByteChar(TFLREUInt8(Range.Lo))..TFLRERawByteChar(TFLREUInt8(Range.Hi))];
    end else begin
-    CharSet:=CharSet+[TFLRERawByteChar(byte(Range.Lo))..#$ff];
+    CharSet:=CharSet+[TFLRERawByteChar(TFLREUInt8(Range.Lo))..#$ff];
    end;
   end;
   Range:=Range.Next;
@@ -9894,7 +10299,7 @@ begin
  CompileBinarySearchTree;
 end;
 
-function TFLREUnicodeCharClass.Count:longword;
+function TFLREUnicodeCharClass.Count:TFLREUInt32;
 var Range:TFLREUnicodeCharClassRange;
 begin
  result:=0;
@@ -9905,7 +10310,7 @@ begin
  end;
 end;
 
-function TFLREUnicodeCharClass.Contains(c:longword):boolean;
+function TFLREUnicodeCharClass.Contains(c:TFLREUInt32):boolean;
 var Range:TFLREUnicodeCharClassRange;
 begin
  result:=false;
@@ -9916,7 +10321,7 @@ begin
    exit;
   end else begin
    if c<256 then begin
-    result:=TFLRERawByteChar(byte(c)) in CharSet;
+    result:=TFLRERawByteChar(TFLREUInt8(c)) in CharSet;
    end else begin
     repeat
      if (c>=Range.Lo) and (c<=Range.Hi) then begin
@@ -9964,9 +10369,9 @@ begin
  result:=(First=Last) and ((assigned(First) and (First.Lo=First.Hi)) or not assigned(First));
 end;
 
-function TFLREUnicodeCharClass.HashCode:longword;
+function TFLREUnicodeCharClass.HashCode:TFLREUInt32;
 var Range:TFLREUnicodeCharClassRange;
-    h,i:longword;
+    h,i:TFLREUInt32;
 begin
  result:=$811c9dc5;
  Range:=First;
@@ -10003,18 +10408,18 @@ begin
  end;
 end;
 
-function CompareCharClasses(c1,c2:TFLREUnicodeCharClass):longint;
+function CompareCharClasses(c1,c2:TFLREUnicodeCharClass):TFLREInt32;
 var r1,r2:TFLREUnicodeCharClassRange;
 begin
  r1:=c1.First;
  r2:=c2.First;
  while assigned(r1) and assigned(r2) do begin
   if r1.Lo<>r2.Lo then begin
-   result:=longint(r1.Lo)-longint(r2.Lo);
+   result:=TFLREInt32(r1.Lo)-TFLREInt32(r2.Lo);
    exit;
   end;
   if r1.Hi<>r2.Hi then begin
-   result:=longint(r1.Hi)-longint(r2.Hi);
+   result:=TFLREInt32(r1.Hi)-TFLREInt32(r2.Hi);
    exit;
   end;
   r1:=r1.Next;
@@ -10034,12 +10439,12 @@ begin
  result:=CompareCharClasses(self,TFLREUnicodeCharClass(OtherObject))=0;
 end;
 
-function TFLREPrefilterNodeList.GetNodeItem(Index:longint):TFLREPrefilterNode;
+function TFLREPrefilterNodeList.GetNodeItem(Index:TFLREInt32):TFLREPrefilterNode;
 begin
  result:=TFLREPrefilterNode(inherited Items[Index]);
 end;
 
-procedure TFLREPrefilterNodeList.SetNodeItem(Index:longint;Value:TFLREPrefilterNode);
+procedure TFLREPrefilterNodeList.SetNodeItem(Index:TFLREInt32;Value:TFLREPrefilterNode);
 begin
  inherited Items[Index]:=Value;
 end;
@@ -10054,7 +10459,7 @@ begin
 end;
 
 destructor TFLREPrefilterNode.Destroy;
-var Counter:longint;
+var Counter:TFLREInt32;
 begin
  for Counter:=0 to Subs.Count-1 do begin
   Subs[Counter].Free;
@@ -10065,7 +10470,7 @@ begin
 end;
 
 function TFLREPrefilterNode.Clone:TFLREPrefilterNode;
-var Counter:longint;
+var Counter:TFLREInt32;
 begin
  result:=TFLREPrefilterNode.Create;
  result.Operation:=Operation;
@@ -10077,7 +10482,7 @@ begin
 end;
 
 function TFLREPrefilterNode.Expression:TFLRERawByteString;
-var Counter:longint;
+var Counter:TFLREInt32;
     s:TFLRERawByteString;
 begin
  result:='';
@@ -10154,7 +10559,7 @@ begin
 end;
 
 function TFLREPrefilterNode.ShortExpression:TFLRERawByteString;
-var Counter:longint;
+var Counter:TFLREInt32;
     s:TFLRERawByteString;
 begin
  result:='';
@@ -10224,7 +10629,7 @@ begin
 end;
 
 function TFLREPrefilterNode.SQLBooleanFullTextExpression:TFLRERawByteString;
-var Counter:longint;
+var Counter:TFLREInt32;
     s:TFLRERawByteString;
 begin
  result:='';
@@ -10316,7 +10721,7 @@ begin
 end;
 
 function TFLREPrefilterNode.SQLExpression(const Field:TFLRERawByteString):TFLRERawByteString;
-var Counter:longint;
+var Counter:TFLREInt32;
     s:TFLRERawByteString;
 begin
  result:='';
@@ -10403,11 +10808,13 @@ begin
     end;
    end;
   end;
+  else begin
+  end;
  end;
 end;
 
 constructor TFLREParallelNFA.Create(const AThreadLocalStorageInstance:TFLREThreadLocalStorageInstance);
-var Index:longint;
+var Index:TFLRESizeInt;
 begin
  inherited Create;
 
@@ -10434,7 +10841,7 @@ begin
  SetLength(ParallelNFAStack,Instance.CountForwardInstructions*2);
 
  FreeStates:=nil;
- AllStates:=TList.Create;
+ AllStates:=TFLREPointerList.Create;
 
 end;
 
@@ -10463,7 +10870,7 @@ begin
  inherited Destroy;
 end;
 
-function TFLREParallelNFA.StateAllocate(const Count:longint;const SubMatchesBitmap:longword):PFLREParallelNFAState; {$ifdef caninline}inline;{$endif}
+function TFLREParallelNFA.StateAllocate(const Count:TFLREInt32;const SubMatchesBitmap:TFLREUInt32):PFLREParallelNFAState;
 begin
  if assigned(FreeStates) then begin
   result:=FreeStates;
@@ -10479,13 +10886,13 @@ begin
  result^.SubMatchesBitmap:=SubMatchesBitmap;
 end;
 
-function TFLREParallelNFA.StateAcquire(const State:PFLREParallelNFAState):PFLREParallelNFAState; {$ifdef caninline}inline;{$endif}
+function TFLREParallelNFA.StateAcquire(const State:PFLREParallelNFAState):PFLREParallelNFAState;
 begin
  inc(State^.ReferenceCounter);
  result:=State;
 end;
 
-procedure TFLREParallelNFA.StateRelease(const State:PFLREParallelNFAState); {$ifdef caninline}inline;{$endif}
+procedure TFLREParallelNFA.StateRelease(const State:PFLREParallelNFAState);
 begin
  dec(State^.ReferenceCounter);
  if State^.ReferenceCounter=0 then begin
@@ -10494,9 +10901,11 @@ begin
  end;
 end;
 
-function TFLREParallelNFA.StateUpdate(const State:PFLREParallelNFAState;const Index,Position:longint):PFLREParallelNFAState; {$ifndef cpu386}{$ifdef caninline}inline;{$endif}{$endif}
-var Counter:longint;
-    SubMatchesBitmap:longword;
+function TFLREParallelNFA.StateUpdate(const State:PFLREParallelNFAState;const Index:TFLREInt32;const Position:TFLRESizeInt):PFLREParallelNFAState;
+var Counter:TFLREInt32;
+{$ifndef cpu386}
+    SubMatchesBitmap:TFLREUInt32;
+{$endif}    
 begin
  result:=State;
  if result^.ReferenceCounter>1 then begin
@@ -10534,7 +10943,7 @@ begin
    pop ebx
   end;
 {$else}
-  if (result^.SubMatchesBitmap and longword($80000000))=0 then begin
+  if (result^.SubMatchesBitmap and TFLREUInt32($80000000))=0 then begin
    SubMatchesBitmap:=result^.SubMatchesBitmap;
    while SubMatchesBitmap<>0 do begin
     Counter:=PopFirstOneBit(SubMatchesBitmap);
@@ -10546,23 +10955,23 @@ begin
 {$endif}
   dec(State^.ReferenceCounter);
  end;
- if (result^.SubMatchesBitmap and longword($80000000))=0 then begin
+ if (result^.SubMatchesBitmap and TFLREUInt32($80000000))=0 then begin
   if Index>30 then begin
    for Counter:=0 to 30 do begin
-    if (result^.SubMatchesBitmap and (longword(1) shl Counter))=0 then begin
+    if (result^.SubMatchesBitmap and (TFLREUInt32(1) shl Counter))=0 then begin
      result^.SubMatches[Counter]:=0;
     end;
    end;
    result^.SubMatchesBitmap:=$ffffffff;
   end else begin
-   result^.SubMatchesBitmap:=result^.SubMatchesBitmap or (longword(1) shl Index);
+   result^.SubMatchesBitmap:=result^.SubMatchesBitmap or (TFLREUInt32(1) shl Index);
   end;
  end;
  result^.SubMatches[Index]:=Position;
 end;
 
-function TFLREParallelNFA.BackReferenceAssertion(const State:PFLREParallelNFAState;const CaptureSubMatch,BackReferenceSubMatch:longint;const IgnoreCase:boolean):boolean;
-var CaptureStart,CaptureEnd,BackReferenceStart,BackReferenceEnd:longint;
+function TFLREParallelNFA.BackReferenceAssertion(const State:PFLREParallelNFAState;const CaptureSubMatch,BackReferenceSubMatch:TFLREInt32;const IgnoreCase:boolean):boolean;
+var CaptureStart,CaptureEnd,BackReferenceStart,BackReferenceEnd:TFLRESizeInt;
 begin
  result:=false;
  if (CaptureSubMatch>=0) and (BackReferenceSubMatch>=0) then begin
@@ -10572,22 +10981,22 @@ begin
    BackReferenceStart:=State^.SubMatches[BackReferenceSubMatch];
    BackReferenceEnd:=State^.SubMatches[BackReferenceSubMatch+1];
   end else begin
-   if (State^.SubMatchesBitmap and (longword(1) shl CaptureSubMatch))<>0 then begin
+   if (State^.SubMatchesBitmap and (TFLREUInt32(1) shl CaptureSubMatch))<>0 then begin
     CaptureStart:=State^.SubMatches[CaptureSubMatch];
    end else begin
     exit;
    end;
-   if (State^.SubMatchesBitmap and (longword(1) shl (CaptureSubMatch+1)))<>0 then begin
+   if (State^.SubMatchesBitmap and (TFLREUInt32(1) shl (CaptureSubMatch+1)))<>0 then begin
     CaptureEnd:=State^.SubMatches[CaptureSubMatch+1];
    end else begin
     exit;
    end;
-   if (State^.SubMatchesBitmap and (longword(1) shl BackReferenceSubMatch))<>0 then begin
+   if (State^.SubMatchesBitmap and (TFLREUInt32(1) shl BackReferenceSubMatch))<>0 then begin
     BackReferenceStart:=State^.SubMatches[BackReferenceSubMatch];
    end else begin
     exit;
    end;
-   if (State^.SubMatchesBitmap and (longword(1) shl (BackReferenceSubMatch+1)))<>0 then begin
+   if (State^.SubMatchesBitmap and (TFLREUInt32(1) shl (BackReferenceSubMatch+1)))<>0 then begin
     BackReferenceEnd:=State^.SubMatches[BackReferenceSubMatch+1];
    end else begin
     exit;
@@ -10597,10 +11006,10 @@ begin
  end;
 end;
 
-procedure TFLREParallelNFA.AddThread(const ThreadList:PFLREParallelNFAThreadList;Instruction:PFLREInstruction;State:PFLREParallelNFAState;const Position:longint);
+procedure TFLREParallelNFA.AddThread(const ThreadList:PFLREParallelNFAThreadList;Instruction:PFLREInstruction;State:PFLREParallelNFAState;const Position:TFLRESizeInt);
 var Thread:PFLREParallelNFAThread;
     StackItem:PFLREParallelNFAStackItem;
-    StackSize,InstructionID:longint;
+    StackSize,InstructionID:TFLREInt32;
 begin
  StackSize:=0;
  StackItem:=@ParallelNFAStack[StackSize];
@@ -10644,7 +11053,7 @@ begin
       if CurrentSatisfyFlags=$ffffffff then begin
        CurrentSatisfyFlags:=ThreadLocalStorageInstance.GetSatisfyFlags(Position);
       end;
-      if ((longword(Instruction^.Value) and sfEmptyAllFlags) and not CurrentSatisfyFlags)=0 then begin
+      if ((TFLREUInt32(Instruction^.Value) and sfEmptyAllFlags) and not CurrentSatisfyFlags)=0 then begin
        Instruction:=Instruction^.Next;
        continue;
       end else begin
@@ -10693,15 +11102,15 @@ begin
  end;
 end;
 
-function TFLREParallelNFA.SearchMatch(var Captures:TFLRECaptures;const StartPosition,UntilExcludingPosition:longint;const UnanchoredStart:boolean):boolean;
-var LocalInputLength,CurrentPosition,Counter,ThreadIndex,CurrentLength,LastPosition,Index:longint;
+function TFLREParallelNFA.SearchMatch(var Captures:TFLRECaptures;const StartPosition,UntilExcludingPosition:TFLRESizeInt;const UnanchoredStart:boolean):boolean;
+var LocalInputLength,CurrentPosition,Counter,ThreadIndex,CurrentLength,LastPosition,Index:TFLRESizeInt;
     CurrentThreadList,NewThreadList,TemporaryThreadList:PFLREParallelNFAThreadList;
     State,Matched,BestState:PFLREParallelNFAState;
     CurrentThread:PFLREParallelNFAThread;
     Instruction:PFLREInstruction;
-    CurrentChar:longint;
+    CurrentChar:TFLREInt32;
     Capture:PFLRECapture;
-    SubMatchesBitmap:longword;
+    SubMatchesBitmap:TFLREUInt32;
     LocalInput:PFLRERawByteChar;
 begin
  result:=false;
@@ -10737,7 +11146,7 @@ begin
    break;
   end;
   if CurrentPosition<LocalInputLength then begin
-   CurrentChar:=byte(TFLRERawByteChar(LocalInput[CurrentPosition]));
+   CurrentChar:=TFLREUInt8(TFLRERawByteChar(LocalInput[CurrentPosition]));
   end else begin
    CurrentChar:=-1;
   end;
@@ -10766,7 +11175,7 @@ begin
       end;
      end;
      opCHAR:begin
-      if (CurrentChar>=0) and (TFLRERawByteChar(byte(CurrentChar)) in PFLRECharClass(pointer(ptruint(Instruction^.Value)))^) then begin
+      if (CurrentChar>=0) and (TFLRERawByteChar(TFLREUInt8(CurrentChar)) in PFLRECharClass(pointer(TFLREPtrUInt(Instruction^.Value)))^) then begin
        AddThread(NewThreadList,Instruction^.Next,State,CurrentPosition+1);
       end else begin
        StateRelease(State);
@@ -10832,16 +11241,16 @@ begin
   for Counter:=0 to Instance.CountCaptures-1 do begin
    Capture:=@Captures[Counter];
    Index:=Instance.CapturesToSubMatchesMap[Counter] shl 1;
-   if (SubMatchesBitmap and longword($80000000))<>0 then begin
+   if (SubMatchesBitmap and TFLREUInt32($80000000))<>0 then begin
     CurrentPosition:=Matched^.SubMatches[Index];
     CurrentLength:=Matched^.SubMatches[Index or 1]-CurrentPosition;
    end else begin
-    if (SubMatchesBitmap and (longword(1) shl Index))<>0 then begin
+    if (SubMatchesBitmap and (TFLREUInt32(1) shl Index))<>0 then begin
      CurrentPosition:=Matched^.SubMatches[Index];
     end else begin
      CurrentPosition:=0;
     end;
-    if (SubMatchesBitmap and (longword(1) shl (Index or 1)))<>0 then begin
+    if (SubMatchesBitmap and (TFLREUInt32(1) shl (Index or 1)))<>0 then begin
      CurrentLength:=Matched^.SubMatches[Index or 1]-CurrentPosition;
     end else begin
      CurrentLength:=0;
@@ -10892,12 +11301,13 @@ begin
  inherited Destroy;
 end;
 
-function TFLREOnePassNFA.SearchMatch(var Captures:TFLRECaptures;const StartPosition,UntilExcludingPosition:longint):boolean;
+function TFLREOnePassNFA.SearchMatch(var Captures:TFLRECaptures;const StartPosition,UntilExcludingPosition:TFLRESizeInt):boolean;
 var State,Nodes:PFLREOnePassNFAState;
-    CurrentPosition,StateSize,CountSubMatches,Counter,Index:longint;
+    CurrentPosition:TFLRESizeInt;
+    StateSize,CountSubMatches,Counter,Index:TFLREInt32;
     LocalByteMap:PFLREByteMap;
     Done:boolean;
-    NextMatchCondition,MatchCondition,Condition,NextIndex:longword;
+    NextMatchCondition,MatchCondition,Condition,NextIndex:TFLREUInt32;
     LocalInput:PFLRERawByteChar;
 begin
 
@@ -10922,18 +11332,18 @@ begin
  Done:=false;
 
  NextMatchCondition:=State^.MatchCondition;
- Condition:=0;
+//Condition:=0;
  CurrentPosition:=StartPosition;
 
  while CurrentPosition<UntilExcludingPosition do begin
- 
-  Condition:=State^.Action[LocalByteMap^[byte(TFLRERawByteChar(LocalInput[CurrentPosition]))]];
+
+  Condition:=State^.Action[LocalByteMap^[TFLREUInt8(TFLRERawByteChar(LocalInput[CurrentPosition]))]];
   MatchCondition:=NextMatchCondition;
 
   if ((Condition and sfEmptyAllFlags)=0) or
      (((Condition and sfEmptyAllFlags) and not ThreadLocalStorageInstance.GetSatisfyFlags(CurrentPosition))=0) then begin
    NextIndex:=Condition shr sfIndexShift;
-   State:=pointer(@PFLRERawByteChar(Nodes)[StateSize*longint(NextIndex)]);
+   State:=pointer(@PFLRERawByteChar(Nodes)[StateSize*TFLREInt32(NextIndex)]);
    NextMatchCondition:=State^.MatchCondition;
   end else begin
    State:=nil;
@@ -11037,19 +11447,22 @@ begin
  inherited Destroy;
 end;
 
-function TFLREBitStateNFA.SearchMatch(var Captures:TFLRECaptures;const StartPosition,UntilExcludingPosition:longint;const UnanchoredStart:boolean):longint;
-var LocalInputLength,BasePosition,Len:longint;
+function TFLREBitStateNFA.SearchMatch(var Captures:TFLRECaptures;const StartPosition,UntilExcludingPosition:TFLRESizeInt;const UnanchoredStart:boolean):TFLREInt32;
+var LocalInputLength,BasePosition,Len:TFLRESizeInt;
     LocalInput:PFLRERawByteChar;
- function ShouldVisit(const Instruction:PFLREInstruction;const Position:longint):boolean; {$ifdef caninline}inline;{$endif}
- var i:longword;
+ function ShouldVisit(const Instruction:PFLREInstruction;const Position:TFLRESizeInt):boolean; {$ifdef fpc}{$ifdef caninline}inline;{$endif}{$endif}
+ var Index:TFLRESizeUInt;
+     Mask:TFLREUInt32;
  begin
-  i:=(ptruint(Instruction^.IDandOpcode shr 8)*longword(Len+1))+longword(longint(Position-BasePosition));
-  result:=(Visited[i shr 5] and (1 shl (i and 31)))=0;
+  Index:=(TFLREPtrUInt(Instruction^.IDandOpcode shr 8)*TFLRESizeUInt(TFLRESizeUInt(Len)+1))+TFLRESizeUInt(TFLRESizeInt(Position-BasePosition));
+  Mask:=TFLREUInt32(1) shl TFLREUInt32(TFLRESizeUInt(Index and 31));
+  Index:=Index shr 5;
+  result:=(Index<length(Visited)) and ((Visited[Index] and Mask)=0);
   if result then begin
-   Visited[i shr 5]:=Visited[i shr 5] or (1 shl (i and 31));
+   Visited[Index]:=Visited[Index] or Mask;
   end;
  end;
- procedure Push(const Instruction:PFLREInstruction;const Position,Argument:longint);
+ procedure Push(const Instruction:PFLREInstruction;const Position:TFLRESizeInt;const Argument:TFLREInt32);
  var Job:PFLREBitStateNFAJob;
  begin
   if assigned(Instruction) and not ((Argument=0) and not ShouldVisit(Instruction,Position)) then begin
@@ -11063,10 +11476,11 @@ var LocalInputLength,BasePosition,Len:longint;
    Job^.Argument:=Argument;
   end;
  end;
- function TrySearch(StartInstruction:PFLREInstruction;var Position:longint):boolean;
+ function TrySearch(StartInstruction:PFLREInstruction;var Position:TFLRESizeInt):boolean;
  var Job:PFLREBitStateNFAJob;
      Instruction:PFLREInstruction;
-     Argument,i,LastPosition:longint;
+     Argument,Index:TFLREInt32;
+     LastPosition:TFLRESizeInt;
  begin
   result:=false;
 
@@ -11106,7 +11520,7 @@ var LocalInputLength,BasePosition,Len:longint;
      end;
 {    opSPLITMATCH:begin
       if IsInstructionGreedy(Instruction) then begin
-       // Greedy (Byte, match)
+       // Greedy (TFLREUInt8, match)
        Push(Instruction^.OtherNext,Position,0);
        Instruction:=Instruction^.OtherNext;
        Position:=UntilExcludingPosition-1;
@@ -11114,7 +11528,7 @@ var LocalInputLength,BasePosition,Len:longint;
         continue;
        end;
       end else begin
-       // Non-greedy (Match, byte)
+       // Non-greedy (Match, TFLREUInt8)
        Push(Instruction^.Next,UntilExcludingPosition-1,0);
        Instruction:=Instruction^.Next;
        if ShouldVisit(Instruction,Position) then begin
@@ -11126,7 +11540,7 @@ var LocalInputLength,BasePosition,Len:longint;
       // Match against nothing
      end;
      opSINGLECHAR:begin
-      if (Position<LocalInputLength) and (byte(TFLRERawByteChar(LocalInput[Position]))=Instruction^.Value) then begin
+      if (Position<LocalInputLength) and (TFLREUInt8(TFLRERawByteChar(LocalInput[Position]))=Instruction^.Value) then begin
        inc(Position);
        Instruction:=Instruction^.Next;
        if ShouldVisit(Instruction,Position) then begin
@@ -11135,7 +11549,7 @@ var LocalInputLength,BasePosition,Len:longint;
       end;
      end;
      opCHAR:begin
-      if (Position<LocalInputLength) and (LocalInput[Position] in PFLRECharClass(pointer(ptruint(Instruction^.Value)))^) then begin
+      if (Position<LocalInputLength) and (LocalInput[Position] in PFLRECharClass(pointer(TFLREPtrUInt(Instruction^.Value)))^) then begin
        inc(Position);
        Instruction:=Instruction^.Next;
        if ShouldVisit(Instruction,Position) then begin
@@ -11165,13 +11579,13 @@ var LocalInputLength,BasePosition,Len:longint;
        end;
        if LastPosition<Position then begin
         LastPosition:=Position;
-        for i:=0 to Instance.CountSubMatches-1 do begin
-         MatchSubMatches[i]:=WorkSubMatches[i];
+        for Index:=0 to Instance.CountSubMatches-1 do begin
+         MatchSubMatches[Index]:=WorkSubMatches[Index];
         end;
        end;
       end else begin
-       for i:=0 to Instance.CountSubMatches-1 do begin
-        MatchSubMatches[i]:=WorkSubMatches[i];
+       for Index:=0 to Instance.CountSubMatches-1 do begin
+        MatchSubMatches[Index]:=WorkSubMatches[Index];
        end;
        exit;
       end;
@@ -11200,7 +11614,7 @@ var LocalInputLength,BasePosition,Len:longint;
       end;
      end;
      opZEROWIDTH:begin
-      if ((longword(Instruction^.Value) and sfEmptyAllFlags) and not ThreadLocalStorageInstance.GetSatisfyFlags(Position))=0 then begin
+      if ((TFLREUInt32(Instruction^.Value) and sfEmptyAllFlags) and not ThreadLocalStorageInstance.GetSatisfyFlags(Position))=0 then begin
        Instruction:=Instruction^.Next;
        if ShouldVisit(Instruction,Position) then begin
         continue;
@@ -11245,8 +11659,9 @@ var LocalInputLength,BasePosition,Len:longint;
   end;
 
  end;
-var VisitedLength:longword;
-    Position,Counter,Index:longint;
+var VisitedLength:TFLRESizeUInt;
+    Position:TFLRESizeInt;
+    Counter,Index:TFLREInt32;
     StartInstruction:PFLREInstruction;
 begin
  result:=BitStateNFAError;
@@ -11257,17 +11672,20 @@ begin
  Len:=UntilExcludingPosition-StartPosition;
  if Len<1 then begin
   exit;
+ end else if Len>=Instance.MaxBitStateNFATextSize then begin
+  // Too big for 32kb visited bitmap
+  exit;
  end;
 
  BasePosition:=StartPosition;
  Position:=StartPosition;
 
- VisitedLength:=longword(qword((qword(Len+1)*longword(Instance.CountForwardInstructions))+31) shr 5);
- if longword(VisitedLength)>longword(SizeOf(TFLREBitStateNFAVisited) div SizeOf(longword)) then begin
+ VisitedLength:=TFLRESizeUInt(TFLREUInt64((TFLREUInt64(Len+1)*TFLREUInt32(Instance.CountForwardInstructions))+31) shr 5);
+ if TFLRESizeUInt(VisitedLength)>TFLRESizeUInt(SizeOf(TFLREBitStateNFAVisited) div SizeOf(TFLREUInt32)) then begin
   // Too big for 32kb visited bitmap
   exit;
  end;
- FillChar(Visited[0],VisitedLength*SizeOf(longword),#0);
+ FillChar(Visited[0],VisitedLength*SizeOf(TFLREUInt32),#0);
 
  if UnanchoredStart then begin
   StartInstruction:=Instance.UnanchoredStartInstruction;
@@ -11296,8 +11714,8 @@ begin
 
 end;
 
-constructor TFLREDFA.Create(const AThreadLocalStorageInstance:TFLREThreadLocalStorageInstance;const AReversed:boolean;const AMaximalDFAStates:longint);
-var Index:longint;
+constructor TFLREDFA.Create(const AThreadLocalStorageInstance:TFLREThreadLocalStorageInstance;const AReversed:boolean;const AMaximalDFAStates:TFLREInt32);
+var Index:TFLREInt32;
     FLREDFAStateCreateTempDFAState:TFLREDFAState;
     DFAState:PFLREDFAState;
 begin
@@ -11359,7 +11777,7 @@ begin
   StatePoolFree:=nil;
 
   NextStatesSize:=(Instance.ByteMapCount+1)*sizeof(PFLREDFAState);
-  StateSize:=ptrint(ptruint(pointer(@FLREDFAStateCreateTempDFAState.NextStates))-ptruint(pointer(@FLREDFAStateCreateTempDFAState)))+NextStatesSize;
+  StateSize:=TFLREPtrInt(TFLREPtrUInt(pointer(@FLREDFAStateCreateTempDFAState.NextStates))-TFLREPtrUInt(pointer(@FLREDFAStateCreateTempDFAState)))+NextStatesSize;
 
   StatePoolSize:=(65536 div StateSize)*StateSize;
   if StatePoolSize=0 then begin
@@ -11464,7 +11882,7 @@ begin
 end;
 
 destructor TFLREDFA.Destroy;
-var Index:longint;
+var Index:TFLREInt32;
 begin
  SetLength(QueueInstructionArray,0);
  SetLength(QueueStack,0);
@@ -11488,7 +11906,7 @@ begin
  inherited Destroy;
 end;
 
-function TFLREDFA.CacheState(const State:PFLREDFAState):PFLREDFAState; {$ifdef caninline}inline;{$endif}
+function TFLREDFA.CacheState(const State:PFLREDFAState):PFLREDFAState;
 begin
 
  // Is it already cached?
@@ -11524,7 +11942,7 @@ begin
   State:=Pool^.States;
   while assigned(State) and (State<>Pool^.EndState) do begin
    FreeState(State);
-   inc(ptruint(State),StateSize);
+   inc(TFLREPtrUInt(State),StateSize);
   end;
   FreeMem(Pool^.States);
   FreeMem(Pool);
@@ -11543,7 +11961,7 @@ begin
   State:=Pool^.States;
   while assigned(State) and (State<>Pool^.EndState) do begin
    FreeState(State);
-   inc(ptruint(State),StateSize);
+   inc(TFLREPtrUInt(State),StateSize);
   end;
   FillChar(Pool^.States^,StatePoolSize,#0);
   Pool^.Next:=StatePoolFree;
@@ -11562,7 +11980,7 @@ begin
   FillChar(result^,SizeOf(TFLREDFAStatePool),#0);
   GetMem(result^.States,StatePoolSizePowerOfTwo);
   FillChar(result^.States^,StatePoolSize,#0);
-  result^.EndState:=pointer(ptruint(ptruint(result^.States)+ptruint(StatePoolSize)));
+  result^.EndState:=pointer(TFLREPtrUInt(TFLREPtrUInt(result^.States)+TFLREPtrUInt(StatePoolSize)));
  end;
  result^.Next:=StatePoolUsed;
  StatePoolUsed:=result;
@@ -11575,7 +11993,7 @@ begin
   AllocateNewStatePool;
  end;
  result:=StatePoolUsed^.NextState;
- inc(ptruint(StatePoolUsed^.NextState),StateSize);
+ inc(TFLREPtrUInt(StatePoolUsed^.NextState),StateSize);
 end;
 
 function TFLREDFA.TakeOverState(TakeOverFrom:PFLREDFAState):PFLREDFAState;
@@ -11594,16 +12012,16 @@ begin
  if assigned(State) then begin
   SetLength(State^.Instructions,0);
   if assigned(StatePoolUsed) and
-     ((ptruint(ptruint(State)-ptruint(StatePoolUsed^.States))<StatePoolSize) and
-      (pointer(ptruint(ptruint(StatePoolUsed^.NextState)-ptruint(StateSize)))=State)) then begin
+     ((TFLREPtrUInt(TFLREPtrUInt(State)-TFLREPtrUInt(StatePoolUsed^.States))<StatePoolSize) and
+      (pointer(TFLREPtrUInt(TFLREPtrUInt(StatePoolUsed^.NextState)-TFLREPtrUInt(StateSize)))=State)) then begin
    FillChar(State^,StateSize,#0);
-   dec(ptruint(StatePoolUsed^.NextState),StateSize);
+   dec(TFLREPtrUInt(StatePoolUsed^.NextState),StateSize);
   end;
  end;
 end;
 
 procedure TFLREDFA.Reset;
-var Index:longint;
+var Index:TFLREInt32;
     State:PFLREDFAState;
 begin
 
@@ -11632,7 +12050,7 @@ begin
 end;
 
 procedure TFLREDFA.FastAddInstructionThread(const State:PFLREDFAState;Instruction:PFLREInstruction); {$ifdef cpu386}register;{$endif}
-var StackPointer:longint;
+var StackPointer:TFLREInt32;
     Stack:PPFLREInstructionsStatic;
 begin
  Stack:=@StackInstructions[0];
@@ -11680,7 +12098,7 @@ begin
 end;
 
 function TFLREDFA.FastProcessNextState(State:PFLREDFAState;const CurrentChar:TFLRERawByteChar):PFLREDFAState; {$ifdef cpu386}register;{$endif}
-var Counter:longint;        
+var Counter:TFLREInt32;        
     Instruction:PFLREInstruction;
 begin
 
@@ -11703,12 +12121,12 @@ begin
     // Match against nothing
    end;
    opSINGLECHAR:begin
-    if byte(TFLRERawByteChar(CurrentChar))=Instruction^.Value then begin
+    if TFLREUInt8(TFLRERawByteChar(CurrentChar))=Instruction^.Value then begin
      FastAddInstructionThread(@NewState,Instruction^.Next);
     end;
    end;
    opCHAR:begin
-    if CurrentChar in PFLRECharClass(pointer(ptruint(Instruction^.Value)))^ then begin
+    if CurrentChar in PFLRECharClass(pointer(TFLREPtrUInt(Instruction^.Value)))^ then begin
      FastAddInstructionThread(@NewState,Instruction^.Next);
     end;
    end;
@@ -11722,7 +12140,7 @@ begin
     end;
    end;
    else begin
-    // Oops?! Invalid byte code instruction for the DFA processing context! So abort and fallback to NFA...
+    // Oops?! Invalid TFLREUInt8 code instruction for the DFA processing context! So abort and fallback to NFA...
     result:=nil;
     exit;
    end;
@@ -11742,13 +12160,13 @@ begin
 
  if not HadReset then begin
   // Connect the last state to the new state with the current char
-  State.NextStates[Instance.ByteMap[byte(TFLRERawByteChar(CurrentChar))]]:=result;
+  State.NextStates[Instance.ByteMap[TFLREUInt8(TFLRERawByteChar(CurrentChar))]]:=result;
  end;
 
 end;
 
-function TFLREDFA.SearchMatchFast(const StartPosition,UntilExcludingPosition:longint;out MatchEnd:longint;const UnanchoredStart:longbool):longint; {$ifdef cpu386}assembler; stdcall;
-var ResultValue:longint;
+function TFLREDFA.SearchMatchFast(const StartPosition,UntilExcludingPosition:TFLRESizeInt;out MatchEnd:TFLRESizeInt;const UnanchoredStart:longbool):TFLREInt32; {$ifdef cpu386}assembler; stdcall;
+var ResultValue:TFLREInt32;
     StartOffset:pointer;
 asm
  push ebx
@@ -11789,10 +12207,10 @@ asm
 
   @Loop:
 
-    movzx eax,byte ptr [esi]
+    movzx eax,TFLREUInt8 ptr [esi]
     inc esi
 
-    movzx ebx,byte ptr [edx+eax]
+    movzx ebx,TFLREUInt8 ptr [edx+eax]
     mov ebx,dword ptr [edi+TFLREDFAState.NextStates+ebx*4]
     xchg edi,ebx
     test edi,edi
@@ -11830,8 +12248,8 @@ asm
     jz @IsNotStartState
      cmp ecx,2
      jb @IsStartStateSkip
-      movzx eax,byte ptr [esi]
-      movzx eax,byte ptr [edx+eax]
+      movzx eax,TFLREUInt8 ptr [esi]
+      movzx eax,TFLREUInt8 ptr [edx+eax]
       mov eax,dword ptr [edi+TFLREDFAState.NextStates+eax*4]
       test eax,eax
       jz @IsStartStateSkip
@@ -11839,7 +12257,7 @@ asm
       jz @IsStartStateSkip
        push ecx
        push edx
-        dec ecx // because "dec ecx" comes after @BackToLoop first, but "inc esi" already directly after fetching the char byte
+        dec ecx // because "dec ecx" comes after @BackToLoop first, but "inc esi" already directly after fetching the char TFLREUInt8
         mov edx,esi
         mov eax,self
         mov eax,dword ptr [eax+TFLREDFA.Instance]
@@ -11880,7 +12298,7 @@ asm
  pop ebx
 end;
 {$else}
-var Position,Offset:longint;
+var Position,Offset:TFLRESizeInt;
     State,LastState,TemporaryTestState:PFLREDFAState;
     LocalInput:PFLRERawByteChar;
     LocalByteMap:PFLREByteMap;
@@ -11900,7 +12318,7 @@ begin
  Position:=StartPosition;
  while Position<UntilExcludingPosition do begin
   LastState:=State;
-  State:=State^.NextStates[LocalByteMap[byte(TFLRERawByteChar(LocalInput[Position]))]];
+  State:=State^.NextStates[LocalByteMap[TFLREUInt8(TFLRERawByteChar(LocalInput[Position]))]];
   inc(Position);
   if not assigned(State) then begin
    State:=FastProcessNextState(LastState,LocalInput[Position-1]);
@@ -11922,7 +12340,7 @@ begin
    end;
    if (State^.Flags and sfDFAStart)<>0 then begin
     if Position<UntilExcludingPosition then begin
-     TemporaryTestState:=State^.NextStates[LocalByteMap[byte(TFLRERawByteChar(LocalInput[Position]))]];
+     TemporaryTestState:=State^.NextStates[LocalByteMap[TFLREUInt8(TFLRERawByteChar(LocalInput[Position]))]];
      if assigned(TemporaryTestState) and ((TemporaryTestState^.Flags and sfDFAStart)<>0) then begin
       Offset:=Instance.SearchNextPossibleStartForDFA(@LocalInput[Position],UntilExcludingPosition-Position);
       if Offset<0 then begin
@@ -11937,8 +12355,8 @@ begin
 end;
 {$endif}
 
-function TFLREDFA.SearchMatchFastReversed(const StartPosition,UntilIncludingPosition:longint;out MatchBegin:longint;const UnanchoredStart:longbool):longint; {$ifdef cpu386}assembler; stdcall;
-var ResultValue:longint;
+function TFLREDFA.SearchMatchFastReversed(const StartPosition,UntilIncludingPosition:TFLRESizeInt;out MatchBegin:TFLRESizeInt;const UnanchoredStart:longbool):TFLREInt32; {$ifdef cpu386}assembler; stdcall;
+var ResultValue:TFLREInt32;
     StartOffset:pointer;
 asm
  push ebx
@@ -11972,10 +12390,10 @@ asm
 
   @Loop:
 
-    movzx eax,byte ptr [esi]
+    movzx eax,TFLREUInt8 ptr [esi]
     dec esi
 
-    movzx ebx,byte ptr [edx+eax]
+    movzx ebx,TFLREUInt8 ptr [edx+eax]
     mov ebx,dword ptr [edi+TFLREDFAState.NextStates+ebx*4]
     xchg edi,ebx
     test edi,edi
@@ -12034,7 +12452,7 @@ asm
  pop ebx
 end;
 {$else}
-var Position:longint;
+var Position:TFLRESizeInt;
     State,LastState:PFLREDFAState;
     LocalInput:PFLRERawByteChar;
     LocalByteMap:PFLREByteMap;
@@ -12049,7 +12467,7 @@ begin
  end;
  for Position:=StartPosition downto UntilIncludingPosition do begin
   LastState:=State;
-  State:=State^.NextStates[LocalByteMap[byte(TFLRERawByteChar(LocalInput[Position]))]];
+  State:=State^.NextStates[LocalByteMap[TFLREUInt8(TFLRERawByteChar(LocalInput[Position]))]];
   if not assigned(State) then begin
    State:=FastProcessNextState(LastState,LocalInput[Position]);
    if not assigned(State) then begin
@@ -12073,9 +12491,9 @@ begin
 end;
 {$endif}
 
-function TFLREDFA.WorkQueueToCachedState(const WorkQueue:TFLREDFAWorkQueue;Flags:longword):PFLREDFAState;
-var Index,CountInstructions,Count:longint;
-    NeedFlags:longword;
+function TFLREDFA.WorkQueueToCachedState(const WorkQueue:TFLREDFAWorkQueue;Flags:TFLREUInt32):PFLREDFAState;
+var Index,CountInstructions,Count:TFLREInt32;
+    NeedFlags:TFLREUInt32;
     SawMatch,SawMark:boolean;
     Instruction:PFLREInstruction;
     CurrentItem,EndItem,MarkItem:PPFLREInstruction;
@@ -12123,7 +12541,7 @@ begin
     QueueInstructionArray[CountInstructions]:=Instruction;
     inc(CountInstructions);
     if (Instruction^.IDandOpcode and $ff)=opZEROWIDTH then begin
-     NeedFlags:=NeedFlags or longword(Instruction^.Value);
+     NeedFlags:=NeedFlags or TFLREUInt32(Instruction^.Value);
     end;
     if ((Instruction^.IDandOpcode and $ff)=opMATCH) and not (fifEndTextAnchor in Instance.InternalFlags) then begin
      SawMatch:=true;
@@ -12156,15 +12574,15 @@ begin
   // Sort in longest match mode to reduce the number of distinct sets which must be stored
   CurrentItem:=@QueueInstructionArray[0];
   EndItem:=@QueueInstructionArray[CountInstructions];
-  while PtrUInt(pointer(CurrentItem))<PtrUInt(pointer(EndItem)) do begin
+  while TFLREPtrUInt(pointer(CurrentItem))<TFLREPtrUInt(pointer(EndItem)) do begin
    MarkItem:=CurrentItem;
    Count:=0;
-   while (PtrUInt(pointer(MarkItem))<PtrUInt(pointer(EndItem))) and (MarkItem^<>Mark) do begin
+   while (TFLREPtrUInt(pointer(MarkItem))<TFLREPtrUInt(pointer(EndItem))) and (MarkItem^<>Mark) do begin
     inc(MarkItem);
     inc(Count);
    end;
    IndirectIntroSort(pointer(CurrentItem),0,Count-1,CompareInstruction);
-   if PtrUInt(pointer(MarkItem))<PtrUInt(pointer(EndItem)) then begin
+   if TFLREPtrUInt(pointer(MarkItem))<TFLREPtrUInt(pointer(EndItem)) then begin
     inc(MarkItem);
    end;
    CurrentItem:=MarkItem;
@@ -12186,7 +12604,7 @@ begin
 end;
 
 procedure TFLREDFA.StateToWorkQueue(const DFAState:PFLREDFAState;const WorkQueue:TFLREDFAWorkQueue);
-var Index:longint;
+var Index:TFLREInt32;
 begin
  WorkQueue.Clear;
  for Index:=0 to DFAState^.CountInstructions-1 do begin
@@ -12198,8 +12616,8 @@ begin
  end;
 end;
 
-procedure TFLREDFA.AddToWorkQueue(const WorkQueue:TFLREDFAWorkQueue;Instruction:PFLREInstruction;Flags:longword);
-var StackPointer:longint;
+procedure TFLREDFA.AddToWorkQueue(const WorkQueue:TFLREDFAWorkQueue;Instruction:PFLREInstruction;Flags:TFLREUInt32);
+var StackPointer:TFLREInt32;
 begin
  StackPointer:=0;
  if (StackPointer+1)>length(QueueStack) then begin
@@ -12240,7 +12658,7 @@ begin
      inc(StackPointer);
     end;
     opZEROWIDTH:begin
-     if (longword(Instruction^.Value) and not Flags)=0 then begin
+     if (TFLREUInt32(Instruction^.Value) and not Flags)=0 then begin
       if (StackPointer+1)>length(QueueStack) then begin
        SetLength(QueueStack,(StackPointer+1)*2);
       end;
@@ -12253,8 +12671,8 @@ begin
  end;
 end;
 
-procedure TFLREDFA.ProcessWorkQueueOnZeroWidthString(const OldWorkQueue,NewWorkQueue:TFLREDFAWorkQueue;Flags:longword);
-var Index:longint;
+procedure TFLREDFA.ProcessWorkQueueOnZeroWidthString(const OldWorkQueue,NewWorkQueue:TFLREDFAWorkQueue;Flags:TFLREUInt32);
+var Index:TFLREInt32;
     Instruction:PFLREInstruction;
 begin
  NewWorkQueue.Clear;
@@ -12268,8 +12686,8 @@ begin
  end;
 end;
 
-procedure TFLREDFA.ProcessWorkQueueOnByte(const OldWorkQueue,NewWorkQueue:TFLREDFAWorkQueue;CurrentChar,Flags:longword;var IsMatch:boolean);
-var Index:longint;
+procedure TFLREDFA.ProcessWorkQueueOnByte(const OldWorkQueue,NewWorkQueue:TFLREDFAWorkQueue;CurrentChar,Flags:TFLREUInt32;var IsMatch:boolean);
+var Index:TFLREInt32;
     Instruction:PFLREInstruction;
 begin
  NewWorkQueue.Clear;
@@ -12289,12 +12707,12 @@ begin
      // Match against nothing
     end;
     opSINGLECHAR:begin
-     if CurrentChar=longword(Instruction^.Value) then begin
+     if CurrentChar=TFLREUInt32(Instruction^.Value) then begin
       AddToWorkQueue(NewWorkQueue,Instruction^.Next,Flags);
      end;
     end;
     opCHAR:begin
-     if (CurrentChar<>256) and (TFLRERawByteChar(byte(CurrentChar)) in PFLRECharClass(pointer(ptruint(Instruction^.Value)))^) then begin
+     if (CurrentChar<>256) and (TFLRERawByteChar(TFLREUInt8(CurrentChar)) in PFLRECharClass(pointer(TFLREPtrUInt(Instruction^.Value)))^) then begin
       AddToWorkQueue(NewWorkQueue,Instruction^.Next,Flags);
      end;
     end;
@@ -12316,8 +12734,8 @@ begin
  end;
 end;
 
-function TFLREDFA.RunStateOnByte(State:PFLREDFAState;const Position:longint;const CurrentChar:longword):PFLREDFAState;
-var NeedFlags,BeforeFlags,OldBeforeFlags,AfterFlags,Flags,UnicodeChar:longword;
+function TFLREDFA.RunStateOnByte(State:PFLREDFAState;const Position:TFLRESizeInt;const CurrentChar:TFLREUInt32):PFLREDFAState;
+var NeedFlags,BeforeFlags,OldBeforeFlags,AfterFlags,Flags,UnicodeChar:TFLREUInt32;
     IsMatch,IsWordChar:boolean;
     Queues:array[0..2] of TFLREDFAWorkQueue;
 begin
@@ -12422,9 +12840,9 @@ begin
 
 end;
 
-function TFLREDFA.InitializeStartState(const StartPosition:longint;const UnanchoredStart:boolean):PFLREDFAState;
-var LocalInputLength,Start,PreviousPosition,NextPosition:longint;
-    PreviousChar,NextChar,Flags:longword;
+function TFLREDFA.InitializeStartState(const StartPosition:TFLRESizeInt;const UnanchoredStart:boolean):PFLREDFAState;
+var LocalInputLength,Start,PreviousPosition,NextPosition:TFLRESizeInt;
+    PreviousChar,NextChar,Flags:TFLREUInt32;
     LocalInput:PFLRERawByteChar;
     StartInstruction:PFLREInstruction;
     StartState:PPFLREDFAState;
@@ -12439,7 +12857,7 @@ begin
    Start:=sskBeginText;
    Flags:=sfEmptyBeginText or sfEmptyBeginLine;
   end else begin
-   if (rfUTF8 in Instance.Flags) and ((byte(TFLRERawByteChar(LocalInput[StartPosition])) and $80)<>0) then begin
+   if (rfUTF8 in Instance.Flags) and ((TFLREUInt8(TFLRERawByteChar(LocalInput[StartPosition])) and $80)<>0) then begin
     NextPosition:=StartPosition;
     UTF8PtrSafeInc(LocalInput,LocalInputLength,NextPosition);
     if (NextPosition>=0) and (NextPosition<ThreadLocalStorageInstance.InputLength) then begin
@@ -12448,7 +12866,7 @@ begin
      NextChar:=$ffffffff;
     end;
    end else begin
-    NextChar:=byte(TFLRERawByteChar(LocalInput[StartPosition+1]));
+    NextChar:=TFLREUInt8(TFLRERawByteChar(LocalInput[StartPosition+1]));
    end;
    case NextChar of
     $0a,$0d,$85,$2028,$2029:begin
@@ -12485,7 +12903,7 @@ begin
      PreviousChar:=$ffffffff;
     end;
    end else begin
-    PreviousChar:=byte(TFLRERawByteChar(LocalInput[StartPosition-1]));
+    PreviousChar:=TFLREUInt8(TFLRERawByteChar(LocalInput[StartPosition-1]));
    end;
    case PreviousChar of
     $0a,$0d,$85,$2028,$2029:begin
@@ -12529,16 +12947,16 @@ begin
 
 end;
 
-function TFLREDFA.SearchMatchFull(const StartPosition,UntilExcludingPosition:longint;out MatchEnd:longint;const UnanchoredStart:longbool):longint;
+function TFLREDFA.SearchMatchFull(const StartPosition,UntilExcludingPosition:TFLRESizeInt;out MatchEnd:TFLRESizeInt;const UnanchoredStart:longbool):TFLREInt32;
 {$ifdef cpu386}
 label ProcessNewStartState,SkipProcessNewStartState,NewStartState,ExitFunction;
 {$endif}
-var Position,LocalInputLength,Index,Offset:longint;
+var Position,LocalInputLength{,Index},Offset:TFLRESizeInt;
     State,LastState,TemporaryTestState:PFLREDFAState;
     LocalInput:PFLRERawByteChar;
-    Flags,CurrentChar:longword;
+    {Flags,}CurrentChar:TFLREUInt32;
     LocalByteMap:PFLREDFAByteMap;
-    Instruction:PFLREInstruction;
+//  Instruction:PFLREInstruction;
 begin
 
  result:=DFAFail;
@@ -12552,6 +12970,8 @@ begin
 
  LocalInput:=ThreadLocalStorageInstance.Input;
  LocalInputLength:=ThreadLocalStorageInstance.InputLength;
+ if LocalInputLength<>0 then begin
+ end;
 
  LocalByteMap:=@ByteMap;
 
@@ -12582,7 +13002,7 @@ begin
 
     @Loop:
 
-     movzx eax,byte ptr [esi]
+     movzx eax,TFLREUInt8 ptr [esi]
      inc esi
 
      mov ebx,dword ptr [edx+eax*4]
@@ -12670,7 +13090,7 @@ begin
  end;
  ProcessNewStartState:
   if Position<UntilExcludingPosition then begin
-   TemporaryTestState:=State^.NextStates[LocalByteMap^[byte(TFLRERawByteChar(LocalInput[Position]))]];
+   TemporaryTestState:=State^.NextStates[LocalByteMap^[TFLREUInt8(TFLRERawByteChar(LocalInput[Position]))]];
    if assigned(TemporaryTestState) and ((TemporaryTestState^.Flags and sfDFAStart)<>0) then begin
     Offset:=Instance.SearchNextPossibleStartForDFA(@LocalInput[Position],UntilExcludingPosition-Position);
     if Offset<0 then begin
@@ -12688,7 +13108,7 @@ begin
  SkipProcessNewStartState:
 {$else}
  while Position<UntilExcludingPosition do begin
-  CurrentChar:=byte(TFLRERawByteChar(LocalInput[Position]));
+  CurrentChar:=TFLREUInt8(TFLRERawByteChar(LocalInput[Position]));
   inc(Position);
   LastState:=State;
 //write(chr(CurrentChar),' ',LocalByteMap^[CurrentChar],' ');
@@ -12721,7 +13141,7 @@ begin
    end;
    if (State^.Flags and sfDFAStart)<>0 then begin
     if Position<UntilExcludingPosition then begin
-     TemporaryTestState:=State^.NextStates[LocalByteMap^[byte(TFLRERawByteChar(LocalInput[Position]))]];
+     TemporaryTestState:=State^.NextStates[LocalByteMap^[TFLREUInt8(TFLRERawByteChar(LocalInput[Position]))]];
      if assigned(TemporaryTestState) and ((TemporaryTestState^.Flags and sfDFAStart)<>0) then begin
       Offset:=Instance.SearchNextPossibleStartForDFA(@LocalInput[Position],UntilExcludingPosition-Position);
       if Offset<0 then begin
@@ -12743,7 +13163,7 @@ begin
  Position:=UntilExcludingPosition;
 
  if (Position>=0) and (Position<LocalInputLength) then begin
-  CurrentChar:=byte(TFLRERawByteChar(LocalInput[Position]));
+  CurrentChar:=TFLREUInt8(TFLRERawByteChar(LocalInput[Position]));
  end else begin
   CurrentChar:=256;
  end;
@@ -12790,16 +13210,16 @@ begin
 {$endif}
 end;
 
-function TFLREDFA.SearchMatchFullReversed(const StartPosition,UntilExcludingPosition:longint;out MatchEnd:longint;const UnanchoredStart:longbool):longint;
+function TFLREDFA.SearchMatchFullReversed(const StartPosition,UntilExcludingPosition:TFLRESizeInt;out MatchEnd:TFLRESizeInt;const UnanchoredStart:longbool):TFLREInt32;
 {$ifdef cpu386}
 label ExitFunction;
 {$endif}
-var Position,LocalInputLength:longint;
+var Position,LocalInputLength:TFLRESizeInt;
     State,LastState:PFLREDFAState;
     LocalInput:PFLRERawByteChar;
-    Flags,CurrentChar:longword;
+    {Flags,}CurrentChar:TFLREUInt32;
     LocalByteMap:PFLREDFAByteMap;
-    Instruction:PFLREInstruction;
+//  Instruction:PFLREInstruction;
 begin
 
  result:=DFAFail;
@@ -12813,6 +13233,8 @@ begin
 
  LocalInput:=ThreadLocalStorageInstance.Input;
  LocalInputLength:=ThreadLocalStorageInstance.InputLength;
+ if LocalInputLength<>0 then begin
+ end;
 
  LocalByteMap:=@ByteMap;
 
@@ -12839,7 +13261,7 @@ begin
 
    @Loop:
 
-    movzx eax,byte ptr [esi]
+    movzx eax,TFLREUInt8 ptr [esi]
     dec esi
 
     mov ebx,dword ptr [edx+eax*4]
@@ -12916,7 +13338,7 @@ begin
  end;
 {$else}
  for Position:=StartPosition downto UntilExcludingPosition do begin
-  CurrentChar:=byte(TFLRERawByteChar(LocalInput[Position]));
+  CurrentChar:=TFLREUInt8(TFLRERawByteChar(LocalInput[Position]));
   LastState:=State;
   State:=State^.NextStates[LocalByteMap^[CurrentChar]];
   if not assigned(State) then begin
@@ -12949,7 +13371,7 @@ begin
  Position:=UntilExcludingPosition-1;
 
  if (Position>=0) and (Position<LocalInputLength) then begin
-  CurrentChar:=byte(TFLRERawByteChar(LocalInput[Position]));
+  CurrentChar:=TFLREUInt8(TFLRERawByteChar(LocalInput[Position]));
  end else begin
   CurrentChar:=256;
  end;
@@ -13050,9 +13472,9 @@ begin
  inherited Destroy;
 end;
 
-function TFLREThreadLocalStorageInstance.GetSatisfyFlags(const Position:longint):longword;
-var PreviousPosition:longint;
-    PreviousChar,CurrentChar:longword;
+function TFLREThreadLocalStorageInstance.GetSatisfyFlags(const Position:TFLRESizeInt):TFLREUInt32;
+var PreviousPosition:TFLRESizeInt;
+    PreviousChar,CurrentChar:TFLREUInt32;
 begin
  result:=0;
  if rfUTF8 in Instance.Flags then begin
@@ -13071,12 +13493,12 @@ begin
  end else begin
   PreviousPosition:=Position-1;
   if (PreviousPosition>=0) and (PreviousPosition<InputLength) then begin
-   PreviousChar:=byte(TFLRERawByteChar(Input[PreviousPosition]));
+   PreviousChar:=TFLREUInt8(TFLRERawByteChar(Input[PreviousPosition]));
   end else begin
    PreviousChar:=0;
   end;
   if (Position>=0) and (Position<InputLength) then begin
-   CurrentChar:=byte(TFLRERawByteChar(Input[Position]));
+   CurrentChar:=TFLREUInt8(TFLRERawByteChar(Input[Position]));
   end else begin
    CurrentChar:=0;
   end;
@@ -13117,8 +13539,8 @@ begin
  end;
 end;
 
-function TFLREThreadLocalStorageInstance.LookAssertion(const Position,WhichLookAssertionString:longint;const LookBehind,Negative:boolean):boolean;
-var Index,LookAssertionStringLength,BasePosition:longint;
+function TFLREThreadLocalStorageInstance.LookAssertion(const Position,WhichLookAssertionString:TFLRESizeInt;const LookBehind,Negative:boolean):boolean;
+var Index,LookAssertionStringLength,BasePosition:TFLRESizeInt;
     LookAssertionString:TFLRERawByteString;
 begin
  if WhichLookAssertionString<Instance.CountLookAssertionStrings then begin
@@ -13128,7 +13550,7 @@ begin
    if Position>=LookAssertionStringLength then begin
     result:=true;
     for Index:=0 to LookAssertionStringLength-1 do begin
-     if Input[Position-Index]<>LookAssertionString[LookAssertionStringLength-Index] then begin
+     if Input[(Position-Index)-1]<>LookAssertionString[LookAssertionStringLength-Index] then begin
       result:=false;
       break;
      end;
@@ -13145,7 +13567,7 @@ begin
      dec(BasePosition);
     end;
     for Index:=1 to LookAssertionStringLength do begin
-     if Input[BasePosition+Index]<>LookAssertionString[Index] then begin
+     if Input[(BasePosition+Index)-1]<>LookAssertionString[Index] then begin
       result:=false;
       break;
      end;
@@ -13160,8 +13582,8 @@ begin
  result:=result xor Negative;
 end;
 
-function TFLREThreadLocalStorageInstance.BackReferenceAssertion(const CaptureStart,CaptureEnd,BackReferenceStart,BackReferenceEnd:longint;const IgnoreCase:boolean):boolean;
-var CapturePosition,BackReferencePosition:longint;
+function TFLREThreadLocalStorageInstance.BackReferenceAssertion(const CaptureStart,CaptureEnd,BackReferenceStart,BackReferenceEnd:TFLRESizeInt;const IgnoreCase:boolean):boolean;
+var CapturePosition,BackReferencePosition:TFLRESizeInt;
 begin
  result:=false;
  if (CaptureStart>=0) and (CaptureEnd>0) and (BackReferenceStart>=0) and (BackReferenceEnd>0) then begin
@@ -13182,7 +13604,7 @@ begin
      CapturePosition:=CaptureStart;
      BackReferencePosition:=BackReferenceStart;
      while (CapturePosition<CaptureEnd) and (BackReferencePosition<BackReferenceEnd) do begin
-      if UnicodeToLower(byte(TFLRERawByteChar(Input[CapturePosition])))<>UnicodeToLower(byte(TFLRERawByteChar(Input[BackReferencePosition]))) then begin
+      if UnicodeToLower(TFLREUInt8(TFLRERawByteChar(Input[CapturePosition])))<>UnicodeToLower(TFLREUInt8(TFLRERawByteChar(Input[BackReferencePosition]))) then begin
        result:=false;
        exit;
       end;
@@ -13212,7 +13634,7 @@ end;
 constructor TFLRE.Create(const ARegularExpression:TFLRERawByteString;const AFlags:TFLREFlags=[rfDELIMITERS]);
 const EmptyString:pansichar='';
 var StartDelimiter,EndDelimiter:TFLRERawByteChar;
-    Index,SubIndex:longint;
+    Index,SubIndex:TFLRESizeInt;
     FlagsStr:TFLRERawByteString;
     ThreadLocalStorageInstance:TFLREThreadLocalStorageInstance;
     Captures:TFLRECaptures;
@@ -13235,7 +13657,7 @@ begin
 
  RegularExpressionHasCharClasses:=false;
 
- Nodes:=TList.Create;
+ Nodes:=TFLREPointerList.Create;
 
  ForwardInstructions:=nil;
  CountForwardInstructions:=0;
@@ -13440,16 +13862,14 @@ begin
 
   if not ((fifHasLookAssertions in InternalFlags) or (fifHasBackReferences in InternalFlags)) then begin
    Include(InternalFlags,fifDFAReady);
-  end;
-
-  if (fifHasLookAssertions in InternalFlags) or (fifHasBackReferences in InternalFlags) then begin
-   Include(InternalFlags,fifOnePassNFAReady);
-  end else begin
    CompileOnePassNFA;
   end;
 
   if (CountForwardInstructions>0) and (CountForwardInstructions<512) then begin
    Include(InternalFlags,fifBitStateNFAReady);
+   MaxBitStateNFATextSize:=SizeOf(TFLREBitStateNFAVisited) div CountForwardInstructions;
+  end else begin
+   MaxBitStateNFATextSize:=0;
   end;
 
   if not (fifBeginTextAnchor in InternalFlags) then begin
@@ -13483,7 +13903,7 @@ begin
 end;
 
 constructor TFLRE.Create(const ARegularExpressions:array of TFLRERawByteString;const AFlags:TFLREFlags=[]);
-var Index:longint;
+var Index:TFLRESizeInt;
     RegularExpressions:TFLRERawByteString;
 begin
  RegularExpressions:='';
@@ -13497,7 +13917,7 @@ begin
 end;
 
 destructor TFLRE.Destroy;
-var Index:longint;
+var Index:TFLRESizeInt;
     NextCharClassAction:PFLREOnePassNFAStateCharClassAction;
     ThreadLocalStorageInstance,NextThreadLocalStorageInstance:TFLREThreadLocalStorageInstance;
 begin
@@ -13582,7 +14002,7 @@ begin
  inherited Destroy;
 end;
 
-function TFLRE.NewCharClass(const CharClass:TFLRECharClass;const FromRegularExpression:boolean):longint;
+function TFLRE.NewCharClass(const CharClass:TFLRECharClass;const FromRegularExpression:boolean):TFLREInt32;
 begin
  if FromRegularExpression then begin
   RegularExpressionHasCharClasses:=true;
@@ -13600,7 +14020,7 @@ begin
  end;
 end;
 
-function TFLRE.GetCharClass(const CharClass:longint):TFLRECharClass;
+function TFLRE.GetCharClass(const CharClass:TFLREInt32):TFLRECharClass;
 begin
  if (CharClass>=0) and (CharClass<CountCharClasses) then begin
   result:=CharClasses[CharClass]^;
@@ -13609,7 +14029,7 @@ begin
  end;
 end;
 
-function TFLRE.NewNode(const NodeType:longint;const Left,Right:PFLRENode;const Value:longint):PFLRENode;
+function TFLRE.NewNode(const NodeType:TFLREInt32;const Left,Right:PFLRENode;const Value:TFLREInt32):PFLRENode;
 begin
  GetMem(result,SizeOf(TFLRENode));
  FillChar(result^,SizeOf(TFLRENode),#0);
@@ -13654,14 +14074,15 @@ end;
 
 // Mark-and-sweep garbage collector for freeing unused nodes
 procedure TFLRE.FreeUnusedNodes(RootNode:PFLRENode);
-var Index,Count:longint;
-    Visited,Stack:TList;
+var Index,Count:TFLREInt32;
+    Visited:TFLRENodeHashSet;
+    Stack:TFLREPointerList;
     Node:PFLRENode;
 begin
- Visited:=TList.Create;
+ Visited:=TFLRENodeHashSet.Create;
  try
   Count:=0;
-  Stack:=TList.Create;
+  Stack:=TFLREPointerList.Create;
   try
    Stack.Add(RootNode);
    while Stack.Count>0 do begin
@@ -13670,10 +14091,10 @@ begin
     if assigned(Node) then begin
      Visited.Add(Node);
      inc(Count);
-     if assigned(Node^.Left) and (Visited.IndexOf(Node^.Left)<0) then begin
+     if assigned(Node^.Left) and not Visited.Contains(Node^.Left) then begin
       Stack.Add(Node^.Left);
      end;
-     if assigned(Node^.Right) and (Visited.IndexOf(Node^.Right)<0) then begin
+     if assigned(Node^.Right) and not Visited.Contains(Node^.Right) then begin
       Stack.Add(Node^.Right);
      end;
     end;
@@ -13686,13 +14107,13 @@ begin
    while Index<Nodes.Count do begin
     Node:=Nodes[Index];
     Node^.Index:=Index;
-    if Visited.IndexOf(Node)<0 then begin
+    if Visited.Contains(Node) then begin
+     inc(Index);
+    end else begin
      Node^.Name:='';
      Finalize(Node^);
      FreeMem(Node);
      Nodes.Delete(Index);
-    end else begin
-     inc(Index);
     end;
    end;
   end;
@@ -13772,13 +14193,25 @@ begin
 end;
 
 function TFLRE.Concat(NodeLeft,NodeRight:PFLRENode):PFLRENode;
+ function ConcatEqualPlus(const NodeLeftMightBecomeCat,PlusNodeRight:PFLRENode):PFLRENode;
+ begin
+  if (NodeLeftMightBecomeCat^.NodeType=ntPLUS) and
+     assigned(NodeLeftMightBecomeCat^.Right) and
+     (PlusNodeRight^.NodeType=ntPLUS) then begin
+   NodeLeftMightBecomeCat^.NodeType:=ntCAT;
+   NodeLeftMightBecomeCat^.Right:=PlusNodeRight;
+   result:=NodeLeftMightBecomeCat;
+  end else begin
+   result:=PlusNodeRight;
+  end;
+ end;
 begin
  if assigned(NodeLeft) and assigned(NodeRight) then begin
   if (NodeLeft^.NodeType=ntZEROWIDTH) and (NodeRight^.NodeType=ntZEROWIDTH) then begin
    NodeLeft^.Value:=NodeLeft^.Value or NodeRight^.Value;
    result:=NodeLeft;
   end else if ((NodeLeft^.NodeType in [ntSTAR,ntPLUS,ntQUEST]) and (NodeRight^.NodeType=ntPLUS)) and AreNodesEqualSafe(NodeLeft^.Left,NodeRight^.Left) and (NodeLeft^.Value=0) and (NodeRight^.Value=0) then begin
-   result:=NodeRight;
+   result:=ConcatEqualPlus(NodeLeft,NodeRight);
   end else if ((NodeLeft^.NodeType in [ntSTAR,ntPLUS]) and (NodeRight^.NodeType in [ntSTAR,ntQUEST])) and AreNodesEqualSafe(NodeLeft^.Left,NodeRight^.Left) and (NodeLeft^.Value=0) and (NodeRight^.Value=0) then begin
    result:=NodeLeft;
   end else if (NodeLeft^.NodeType=ntCAT) and assigned(NodeLeft^.Left) and assigned(NodeLeft^.Right) then begin
@@ -13786,7 +14219,7 @@ begin
     NodeLeft^.Right^.Value:=NodeLeft^.Right^.Value or NodeRight^.Value;
     result:=NodeLeft;
    end else if ((NodeLeft^.Right^.NodeType in [ntSTAR,ntPLUS,ntQUEST]) and (NodeRight^.NodeType=ntPLUS)) and AreNodesEqualSafe(NodeLeft^.Right^.Left,NodeRight^.Left) and (NodeLeft^.Right^.Value=0) and (NodeRight^.Value=0) then begin
-    NodeLeft^.Right:=NodeRight;
+    NodeLeft^.Right:=ConcatEqualPlus(NodeLeft^.Right,NodeRight);
     result:=NodeLeft;
    end else if ((NodeLeft^.Right^.NodeType in [ntSTAR,ntPLUS]) and (NodeRight^.NodeType in [ntSTAR,ntQUEST])) and AreNodesEqualSafe(NodeLeft^.Right^.Left,NodeRight^.Left) and (NodeLeft^.Right^.Value=0) and (NodeRight^.Value=0) then begin
     result:=NodeLeft;
@@ -13817,7 +14250,7 @@ begin
     continue;
    end else if (result^.Left^.NodeType=ntCAT) and (result^.Right^.NodeType in [ntSTAR,ntPLUS,ntQUEST]) and assigned(result^.Left^.Right) and (result^.Right^.Value=0) then begin
     if ((result^.Left^.Right^.NodeType in [ntSTAR,ntPLUS,ntQUEST]) and (result^.Right^.NodeType=ntPLUS)) and AreNodesEqualSafe(result^.Left^.Right^.Left,result^.Right^.Left) then begin
-     result^.Left^.Right:=result^.Right;
+     result^.Left^.Right:=ConcatEqualPlus(result^.Left^.Right,result^.Right);
      result:=result^.Left;
      continue;
     end else if ((result^.Left^.Right^.NodeType in [ntSTAR,ntPLUS]) and (result^.Right^.NodeType in [ntSTAR,ntQUEST])) and AreNodesEqualSafe(result^.Left^.Right^.Left,result^.Right^.Left) then begin
@@ -13826,7 +14259,11 @@ begin
     end;
    end else if (result^.Left^.NodeType in [ntSTAR,ntPLUS,ntQUEST]) and (result^.Right^.NodeType=ntCAT) and assigned(result^.Right^.Left) and (result^.Left^.Value=0) then begin
     if ((result^.Left^.NodeType in [ntSTAR,ntPLUS,ntQUEST]) and (result^.Right^.Left^.NodeType=ntPLUS)) and AreNodesEqualSafe(result^.Left^.Left,result^.Right^.Left^.Left) and (result^.Right^.Left^.Value=0) then begin
-     result:=result^.Right;
+     if (result^.Left^.NodeType=ntPLUS) and assigned(result^.Left^.Right) then begin
+      result^.Left:=result^.Left^.Left;
+     end else begin
+      result:=result^.Right;
+     end;
      continue;
     end else if ((result^.Left^.NodeType in [ntSTAR,ntPLUS]) and (result^.Right^.Left^.NodeType in [ntSTAR,ntQUEST])) and AreNodesEqualSafe(result^.Left^.Left,result^.Right^.Left^.Left) and (result^.Right^.Left^.Value=0) then begin
      result^.Right^.Left:=result^.Left;
@@ -13835,7 +14272,11 @@ begin
     end;
    end else if (result^.Left^.NodeType in [ntSTAR,ntPLUS,ntQUEST]) and (result^.Right^.NodeType in [ntSTAR,ntPLUS,ntQUEST]) and (result^.Left^.Value=0) and (result^.Right^.Value=0) then begin
     if ((result^.Left^.NodeType in [ntSTAR,ntPLUS,ntQUEST]) and (result^.Right^.NodeType=ntPLUS)) and AreNodesEqualSafe(result^.Left^.Left,result^.Right^.Left) then begin
-     result:=result^.Right;
+     if (result^.Left^.NodeType=ntPLUS) and assigned(result^.Left^.Right) then begin
+      result^.Left:=result^.Left^.Left;
+     end else begin
+      result:=result^.Right;
+     end;
      continue;
     end else if ((result^.Left^.NodeType in [ntSTAR,ntPLUS]) and (result^.Right^.NodeType in [ntSTAR,ntQUEST])) and AreNodesEqualSafe(result^.Left^.Left,result^.Right^.Left) then begin
      result:=result^.Left;
@@ -13909,7 +14350,7 @@ end;
   * (a*)? equals (a?)* equals a*
   * (a+)? equals (a?)+ equals a*
 }
-function TFLRE.NewPlus(Node:PFLRENode;Kind:longint):PFLRENode;
+function TFLRE.NewPlus(Node:PFLRENode;Kind:TFLREInt32):PFLRENode;
 begin
  if (Kind=qkGREEDY) and ((assigned(Node) and (Node^.NodeType=ntPAREN)) and ((assigned(Node^.Left) and (Node^.Left^.NodeType in [ntPLUS,ntSTAR])) and (Node^.Left^.Value=qkGREEDY))) then begin
   result:=Node;
@@ -13923,7 +14364,7 @@ begin
  end;
 end;
 
-function TFLRE.NewStar(Node:PFLRENode;Kind:longint):PFLRENode;
+function TFLRE.NewStar(Node:PFLRENode;Kind:TFLREInt32):PFLRENode;
 begin
   if (Kind=qkGREEDY) and ((assigned(Node) and (Node^.NodeType=ntPAREN)) and ((assigned(Node^.Left) and (Node^.Left^.NodeType in [ntSTAR,ntPLUS{,ntQUEST}])) and (Node^.Left^.Value=qkGREEDY))) then begin
   result:=Node;
@@ -13936,7 +14377,7 @@ begin
  end;
 end;
 
-function TFLRE.NewQuest(Node:PFLRENode;Kind:longint):PFLRENode;
+function TFLRE.NewQuest(Node:PFLRENode;Kind:TFLREInt32):PFLRENode;
 begin
  if (Kind=qkGREEDY) and ((assigned(Node) and (Node^.NodeType=ntPAREN)) and ((assigned(Node^.Left) and (Node^.Left^.NodeType=ntQUEST)) and (Node^.Left^.Value=qkGREEDY))) then begin
   result:=Node;
@@ -13953,8 +14394,8 @@ begin
  end;
 end;
 
-function TFLRE.NewExact(Node:PFLRENode;MinCount,MaxCount,Kind:longint):PFLRENode;
-var Counter:longint;
+function TFLRE.NewExact(Node:PFLRENode;MinCount,MaxCount,Kind:TFLREInt32):PFLRENode;
+var Counter:TFLREInt32;
     OptionalNode:PFLRENode;
 begin
  begin
@@ -14025,7 +14466,7 @@ begin
 end;
 
 function TFLRE.OptimizeNode(StartNodeEx:PPFLRENode):boolean;
- procedure ParseNodes(NodeList:TList;n:PFLRENode;NodeType:longint);
+ procedure ParseNodes(NodeList:TFLREPointerList;n:PFLRENode;NodeType:TFLREInt32);
  begin
   while assigned(n) do begin
    if n^.NodeType=NodeType then begin
@@ -14052,15 +14493,39 @@ function TFLRE.OptimizeNode(StartNodeEx:PPFLRENode):boolean;
    end;
   end;
  end;
+ function CreateOrClearList(const aList:TFLREPointerList):TFLREPointerList;
+ begin
+  if assigned(aList) then begin
+   result:=aList;
+   result.Clear;
+  end else begin
+   result:=TFLREPointerList.Create;
+  end;
+ end;
+ function CreateOrClearNodeHashSet(const aNodeHashSet:TFLRENodeHashSet):TFLRENodeHashSet;
+ begin
+  if assigned(aNodeHashSet) then begin
+   result:=aNodeHashSet;
+   result.Clear;
+  end else begin
+   result:=TFLRENodeHashSet.Create;
+  end;
+ end;
 var NodeEx:PPFLRENode;
     Node,SeedNode,TestNode,l,r,Prefix,Suffix,Alternative,TempNode:PFLRENode;
     pr,pl:PPFLRENode;
     HasOptimizations,DoContinue,Optimized:boolean;
-    NodeStack,NodeList,NodeListLeft,Visited,TempNodeList,NewNodeList:TList;
-    NodeIndex,SubNodeIndex,NewNodeIndex:longint;
+    Visited:TFLRENodeHashSet;
+    NodeStack,NodeList,NodeListLeft,TempNodeList,NewNodeList:TFLREPointerList;
+    NodeIndex,SubNodeIndex,NewNodeIndex:TFLREInt32;
 begin
  result:=false;
- NodeStack:=TList.Create;
+ Visited:=nil;
+ NodeList:=nil;
+ NewNodeList:=nil;
+ TempNodeList:=nil;
+ NodeListLeft:=nil;
+ NodeStack:=TFLREPointerList.Create;
  try
   repeat
    HasOptimizations:=false;
@@ -14150,7 +14615,11 @@ begin
           HasOptimizations:=true;
           continue;
          end else if ((Node^.Left^.NodeType in [ntSTAR,ntPLUS,ntQUEST]) and (Node^.Right^.NodeType=ntPLUS)) and AreNodesEqual(Node^.Left^.Left,Node^.Right^.Left) then begin
-          NodeEx^:=Node^.Right;
+          if Node^.Left^.NodeType=ntPLUS then begin
+           Node^.Left:=Node^.Left^.Left;
+          end else begin
+           NodeEx^:=Node^.Right;
+          end;
           HasOptimizations:=true;
           continue;
          end else if ((Node^.Left^.NodeType in [ntSTAR,ntPLUS]) and (Node^.Right^.NodeType in [ntSTAR,ntQUEST])) and AreNodesEqual(Node^.Left^.Left,Node^.Right^.Left) then begin
@@ -14158,9 +14627,8 @@ begin
           HasOptimizations:=true;
           continue;
          end else begin
-          DoContinue:=false;
-          NodeList:=TList.Create;
-          try
+          NodeList:=CreateOrClearList(NodeList);
+          begin
            ParseNodes(NodeList,Node,ntCAT);
            Optimized:=false;
            DoContinue:=true;
@@ -14179,9 +14647,13 @@ begin
               DoContinue:=true;
               Optimized:=true;
              end else if ((l^.NodeType in [ntSTAR,ntPLUS,ntQUEST]) and (r^.NodeType=ntPLUS)) and AreNodesEqualSafe(l^.Left,r^.Left) then begin
-              NodeList.Delete(NodeIndex);
-              if NodeIndex>=NodeList.Count then begin
-               NodeIndex:=NodeList.Count-1;
+              if l^.NodeType=ntPLUS then begin
+               NodeList[NodeIndex]:=l^.Left;
+              end else begin
+               NodeList.Delete(NodeIndex);
+               if NodeIndex>=NodeList.Count then begin
+                NodeIndex:=NodeList.Count-1;
+               end;
               end;
               DoContinue:=true;
               Optimized:=true;
@@ -14205,8 +14677,6 @@ begin
             DoContinue:=true;
             HasOptimizations:=true;
            end;
-          finally
-           FreeAndNil(NodeList);
           end;
           if DoContinue then begin
            continue;
@@ -14234,19 +14704,19 @@ begin
            Optimized:=false;
            repeat
             DoContinue:=false;
-            NodeList:=TList.Create;
-            try
+            NodeList:=CreateOrClearList(NodeList);
+            begin
              ParseNodes(NodeList,Node,ntALT);
-             NewNodeList:=TList.Create;
-             try
-              Visited:=TList.Create;
-              try
+             NewNodeList:=CreateOrClearList(NewNodeList);
+             begin
+              Visited:=CreateOrClearNodeHashSet(Visited);
+              begin
                for NodeIndex:=NodeList.Count-1 downto 0 do begin
                 SeedNode:=NodeList[NodeIndex];
-                if Visited.IndexOf(SeedNode)<0 then begin
+                if not Visited.Contains(SeedNode) then begin
                  Visited.Add(SeedNode);
-                 TempNodeList:=TList.Create;
-                 try
+                 TempNodeList:=CreateOrClearList(TempNodeList);
+                 begin
                   TempNodeList.Add(SeedNode);
                   l:=SeedNode;
                   while assigned(l) and (l^.NodeType=ntCAT) do begin
@@ -14254,7 +14724,7 @@ begin
                   end;
                   for SubNodeIndex:=NodeIndex-1 downto 0 do begin
                    TestNode:=NodeList[SubNodeIndex];
-                   if Visited.IndexOf(TestNode)<0 then begin
+                   if not Visited.Contains(TestNode) then begin
                     r:=TestNode;
                     while assigned(r) and (r^.NodeType=ntCAT) do begin
                      r:=r^.Left;
@@ -14270,8 +14740,8 @@ begin
                    Alternative:=nil;
                    for SubNodeIndex:=0 to TempNodeList.Count-1 do begin
                     TestNode:=TempNodeList[SubNodeIndex];
-                    NodeListLeft:=TList.Create;
-                    try
+                    NodeListLeft:=CreateOrClearList(NodeListLeft);
+                    begin
                      ParseNodes(NodeListLeft,TestNode,ntCAT);
                      NodeListLeft.Delete(NodeListLeft.Count-1);
                      if NodeListLeft.Count>0 then begin
@@ -14280,9 +14750,10 @@ begin
                        TempNode:=NewNode(ntCAT,TempNode,NodeListLeft[NewNodeIndex],0);
                       end;
                       Alternative:=NewAlt(Alternative,TempNode);
+                     end else begin
+                      TempNode:=NewNode(ntZEROWIDTH,nil,nil,0);
+                      Alternative:=NewAlt(Alternative,TempNode);
                      end;
-                    finally
-                     NodeListLeft.Free;
                     end;
                    end;
                    TempNode:=Concat(Prefix,Alternative);
@@ -14294,13 +14765,9 @@ begin
                   end else begin
                    NewNodeList.Add(SeedNode);
                   end;
-                 finally
-                  TempNodeList.Free;
                  end;
                 end;
                end;
-              finally
-               Visited.Free;
               end;
               if DoContinue and (NewNodeList.Count>0) then begin
                NodeEx^:=NewNodeList[0];
@@ -14309,11 +14776,7 @@ begin
                end;
                Node:=NodeEx^;
               end;
-             finally
-              NewNodeList.Free;
              end;
-            finally
-             FreeAndNil(NodeList);
             end;
            until not DoContinue;
            if Optimized then begin
@@ -14326,19 +14789,19 @@ begin
            Optimized:=false;
            repeat
             DoContinue:=false;
-            NodeList:=TList.Create;
-            try
+            NodeList:=CreateOrClearList(NodeList);
+            begin
              ParseNodes(NodeList,Node,ntALT);
-             NewNodeList:=TList.Create;
-             try
-              Visited:=TList.Create;
-              try
+             NewNodeList:=CreateOrClearList(NewNodeList);
+             begin
+              Visited:=CreateOrClearNodeHashSet(Visited);
+              begin
                for NodeIndex:=NodeList.Count-1 downto 0 do begin
                 SeedNode:=NodeList[NodeIndex];
-                if Visited.IndexOf(SeedNode)<0 then begin
+                if not Visited.Contains(SeedNode) then begin
                  Visited.Add(SeedNode);
-                 TempNodeList:=TList.Create;
-                 try
+                 TempNodeList:=CreateOrClearList(TempNodeList);
+                 begin
                   TempNodeList.Add(SeedNode);
                   l:=SeedNode;
                   while assigned(l) and (l^.NodeType=ntCAT) do begin
@@ -14346,7 +14809,7 @@ begin
                   end;
                   for SubNodeIndex:=NodeIndex-1 downto 0 do begin
                    TestNode:=NodeList[SubNodeIndex];
-                   if Visited.IndexOf(TestNode)<0 then begin
+                   if not Visited.Contains(TestNode) then begin
                     r:=TestNode;
                     while assigned(r) and (r^.NodeType=ntCAT) do begin
                      r:=r^.Right;
@@ -14362,8 +14825,8 @@ begin
                    Alternative:=nil;
                    for SubNodeIndex:=0 to TempNodeList.Count-1 do begin
                     TestNode:=TempNodeList[SubNodeIndex];
-                    NodeListLeft:=TList.Create;
-                    try
+                    NodeListLeft:=CreateOrClearList(NodeListLeft);
+                    begin
                      ParseNodes(NodeListLeft,TestNode,ntCAT);
                      NodeListLeft.Delete(0);
                      if NodeListLeft.Count>0 then begin
@@ -14372,9 +14835,10 @@ begin
                        TempNode:=NewNode(ntCAT,TempNode,NodeListLeft[NewNodeIndex],0);
                       end;
                       Alternative:=NewAlt(Alternative,TempNode);
+                     end else begin
+                      TempNode:=NewNode(ntZEROWIDTH,nil,nil,0);
+                      Alternative:=NewAlt(Alternative,TempNode);
                      end;
-                    finally
-                     NodeListLeft.Free;
                     end;
                    end;                               
                    TempNode:=Concat(Alternative,Suffix);
@@ -14386,13 +14850,9 @@ begin
                   end else begin
                    NewNodeList.Add(SeedNode);
                   end;
-                 finally
-                  TempNodeList.Free;
                  end;
                 end;
                end;
-              finally
-               Visited.Free;
               end;
               if DoContinue and (NewNodeList.Count>0) then begin
                NodeEx^:=NewNodeList[0];
@@ -14401,11 +14861,7 @@ begin
                end;
                Node:=NodeEx^;
               end;
-             finally
-              NewNodeList.Free;
              end;
-            finally
-             FreeAndNil(NodeList);
             end;
            until not DoContinue;
            if Optimized then begin
@@ -14473,27 +14929,32 @@ begin
    end;
   until false;
  finally
-  NodeStack.Free;
+  FreeAndNil(NodeStack);
+  FreeAndNil(NodeList);
+  FreeAndNil(NewNodeList);
+  FreeAndNil(TempNodeList);
+  FreeAndNil(NodeListLeft);
+  FreeAndNil(Visited);
  end;
 end;
 
 procedure TFLRE.Parse;
-var SourcePosition,SourceLength:longint;
+var SourcePosition,SourceLength:TFLRESizeInt;
     Source:TFLRERawByteString;
     GroupIndexIntegerStack:TFLREIntegerList;
     GroupNameStringStack:TStringList;
     BackReferenceComparisonGroup:boolean;
- function Hex2Value(const c:TFLRERawByteChar):longword;
+ function Hex2Value(const c:TFLRERawByteChar):TFLREUInt32;
  begin
   case c of
    '0'..'9':begin
-    result:=byte(TFLRERawByteChar(c))-byte(TFLRERawByteChar('0'))
+    result:=TFLREUInt8(TFLRERawByteChar(c))-TFLREUInt8(TFLRERawByteChar('0'))
    end;
    'a'..'f':begin
-    result:=(byte(TFLRERawByteChar(c))-byte(TFLRERawByteChar('a')))+$a;
+    result:=(TFLREUInt8(TFLRERawByteChar(c))-TFLREUInt8(TFLRERawByteChar('a')))+$a;
    end;
    'A'..'F':begin
-    result:=(byte(TFLRERawByteChar(c))-byte(TFLRERawByteChar('A')))+$a;
+    result:=(TFLREUInt8(TFLRERawByteChar(c))-TFLREUInt8(TFLRERawByteChar('A')))+$a;
    end;
    else begin
     result:=0;
@@ -14502,8 +14963,8 @@ var SourcePosition,SourceLength:longint;
  end;
  function ParseDisjunction:PFLRENode; forward;
  procedure GetCharClassPerName(const Name:TFLRERawByteString;const UnicodeCharClass:TFLREUnicodeCharClass;const IgnoreCase,WithLowerCase:boolean);
- var i:longint;
-     f:int64;
+ var i:TFLREInt32;
+     f:TFLREInt64;
      LowerCaseName:TFLRERawByteString;
  begin
   if WithLowerCase then begin
@@ -14784,7 +15245,7 @@ var SourcePosition,SourceLength:longint;
   end;
  end;
  procedure SkipFreeSpacingWhiteSpace;
- var TemporarySourcePosition:longint;
+ var TemporarySourcePosition:TFLRESizeInt;
  begin
   if rfFREESPACING in Flags then begin
    if rfUTF8 in Flags then begin
@@ -14854,8 +15315,8 @@ var SourcePosition,SourceLength:longint;
    end;
   end;
  end;
- function NewUnicodeChar(UnicodeChar:longword):PFLRENode;
- var Index:longint;
+ function NewUnicodeChar(UnicodeChar:TFLREUInt32):PFLRENode;
+ var Index:TFLREInt32;
      TemporaryString:TFLRERawByteString;
      TemporaryNode:PFLRENode;
  begin
@@ -14874,18 +15335,18 @@ var SourcePosition,SourceLength:longint;
    TemporaryString:='';
   end;
  end;
- function NewCharEx(UnicodeChar:longword):PFLRENode;
+ function NewCharEx(UnicodeChar:TFLREUInt32):PFLRENode;
  begin           
   if (rfUTF8 in Flags) and (UnicodeChar>=$80) then begin
    result:=NewUnicodeChar(UnicodeChar);
   end else if UnicodeChar<=$ff then begin
-   result:=NewNode(ntCHAR,nil,nil,NewCharClass([TFLRERawByteChar(byte(UnicodeChar))],true));
+   result:=NewNode(ntCHAR,nil,nil,NewCharClass([TFLRERawByteChar(TFLREUInt8(UnicodeChar))],true));
   end else begin
    raise EFLRE.Create('Syntax error');
   end;
  end;
- function NewChar(UnicodeChar:longword):PFLRENode;
- var LowerCaseUnicodeChar,UpperCaseUnicodeChar:longword;
+ function NewChar(UnicodeChar:TFLREUInt32):PFLRENode;
+ var LowerCaseUnicodeChar,UpperCaseUnicodeChar:TFLREUInt32;
  begin
   LowerCaseUnicodeChar:=UnicodeToLower(UnicodeChar);
   UpperCaseUnicodeChar:=UnicodeToUpper(UnicodeChar);
@@ -14893,19 +15354,19 @@ var SourcePosition,SourceLength:longint;
    if (rfUTF8 in Flags) and ((LowerCaseUnicodeChar>=$80) or (UpperCaseUnicodeChar>=$80)) then begin
     result:=NewAlt(NewCharEx(LowerCaseUnicodeChar),NewCharEx(UpperCaseUnicodeChar));
    end else begin
-    result:=NewNode(ntCHAR,nil,nil,NewCharClass([TFLRERawByteChar(byte(LowerCaseUnicodeChar)),TFLRERawByteChar(byte(UpperCaseUnicodeChar))],true));
+    result:=NewNode(ntCHAR,nil,nil,NewCharClass([TFLRERawByteChar(TFLREUInt8(LowerCaseUnicodeChar)),TFLRERawByteChar(TFLREUInt8(UpperCaseUnicodeChar))],true));
    end;
   end else begin
    if (rfUTF8 in Flags) and (UnicodeChar>=$80) then begin
     result:=NewCharEx(UnicodeChar);
    end else begin
-    result:=NewNode(ntCHAR,nil,nil,NewCharClass([TFLRERawByteChar(byte(UnicodeChar))],true));
+    result:=NewNode(ntCHAR,nil,nil,NewCharClass([TFLRERawByteChar(TFLREUInt8(UnicodeChar))],true));
    end;
   end;
  end;
- function CompileUTF8Range(Lo,Hi:longword):PFLRENode;
+ function CompileUTF8Range(Lo,Hi:TFLREUInt32):PFLRENode;
  type TString6Chars=array[0..6] of TFLRERawByteChar;
- const Seq0010ffff:array[0..6,0..4,0..1] of longint=((($00,$7f),(-1,-1),(-1,-1),(-1,-1),(-1,-1)),        // 00-7F
+ const Seq0010ffff:array[0..6,0..4,0..1] of TFLREInt32=((($00,$7f),(-1,-1),(-1,-1),(-1,-1),(-1,-1)),        // 00-7F
                                                      (($c2,$df),($80,$bf),(-1,-1),(-1,-1),(-1,-1)),      // C2-DF 80-BF
                                                      (($e0,$e0),($a0,$bf),($80,$bf),(-1,-1),(-1,-1)),    // E0-E0 A0-BF 80-BF
                                                      (($e1,$ef),($80,$bf),($80,$bf),(-1,-1),(-1,-1)),    // E1-EF 80-BF 80-BF
@@ -14934,65 +15395,65 @@ var SourcePosition,SourceLength:longint;
     NodeChain:=nil;
    end;
   end;
-  function ToString(CharValue:longword):TString6Chars;
+  function ToString(CharValue:TFLREUInt32):TString6Chars;
   begin
    case CharValue of
     $00000000..$0000007f:begin
-     result[0]:=TFLRERawByteChar(byte(1));
-     result[1]:=TFLRERawByteChar(byte(CharValue));
+     result[0]:=TFLRERawByteChar(TFLREUInt8(1));
+     result[1]:=TFLRERawByteChar(TFLREUInt8(CharValue));
     end;
     $00000080..$000007ff:begin
-     result[0]:=TFLRERawByteChar(byte(2));
-     result[1]:=TFLRERawByteChar(byte($c0 or ((CharValue shr 6) and $1f)));
-     result[2]:=TFLRERawByteChar(byte($80 or (CharValue and $3f)));
+     result[0]:=TFLRERawByteChar(TFLREUInt8(2));
+     result[1]:=TFLRERawByteChar(TFLREUInt8($c0 or ((CharValue shr 6) and $1f)));
+     result[2]:=TFLRERawByteChar(TFLREUInt8($80 or (CharValue and $3f)));
     end;
  // {$ifdef PLREStrictUTF8}$00000800..$0000d7ff,$0000e000..$0000ffff{$else}$00000800..$0000ffff{$endif}:begin
     $00000800..$0000ffff:begin
-     result[0]:=TFLRERawByteChar(byte(3));
-     result[1]:=TFLRERawByteChar(byte($e0 or ((CharValue shr 12) and $0f)));
-     result[2]:=TFLRERawByteChar(byte($80 or ((CharValue shr 6) and $3f)));
-     result[3]:=TFLRERawByteChar(byte($80 or (CharValue and $3f)));
+     result[0]:=TFLRERawByteChar(TFLREUInt8(3));
+     result[1]:=TFLRERawByteChar(TFLREUInt8($e0 or ((CharValue shr 12) and $0f)));
+     result[2]:=TFLRERawByteChar(TFLREUInt8($80 or ((CharValue shr 6) and $3f)));
+     result[3]:=TFLRERawByteChar(TFLREUInt8($80 or (CharValue and $3f)));
     end;
     $00010000..$0010ffff:begin
-     result[0]:=TFLRERawByteChar(byte(4));
-     result[1]:=TFLRERawByteChar(byte($f0 or ((CharValue shr 18) and $07)));
-     result[2]:=TFLRERawByteChar(byte($80 or ((CharValue shr 12) and $3f)));
-     result[3]:=TFLRERawByteChar(byte($80 or ((CharValue shr 6) and $3f)));
-     result[4]:=TFLRERawByteChar(byte($80 or (CharValue and $3f)));
+     result[0]:=TFLRERawByteChar(TFLREUInt8(4));
+     result[1]:=TFLRERawByteChar(TFLREUInt8($f0 or ((CharValue shr 18) and $07)));
+     result[2]:=TFLRERawByteChar(TFLREUInt8($80 or ((CharValue shr 12) and $3f)));
+     result[3]:=TFLRERawByteChar(TFLREUInt8($80 or ((CharValue shr 6) and $3f)));
+     result[4]:=TFLRERawByteChar(TFLREUInt8($80 or (CharValue and $3f)));
     end;
     $00200000..$03ffffff:begin
-     result[0]:=TFLRERawByteChar(byte(5));
-     result[1]:=TFLRERawByteChar(byte($f8 or ((CharValue shr 24) and $03)));
-     result[2]:=TFLRERawByteChar(byte($80 or ((CharValue shr 18) and $3f)));
-     result[3]:=TFLRERawByteChar(byte($80 or ((CharValue shr 12) and $3f)));
-     result[4]:=TFLRERawByteChar(byte($80 or ((CharValue shr 6) and $3f)));
-     result[5]:=TFLRERawByteChar(byte($80 or (CharValue and $3f)));
+     result[0]:=TFLRERawByteChar(TFLREUInt8(5));
+     result[1]:=TFLRERawByteChar(TFLREUInt8($f8 or ((CharValue shr 24) and $03)));
+     result[2]:=TFLRERawByteChar(TFLREUInt8($80 or ((CharValue shr 18) and $3f)));
+     result[3]:=TFLRERawByteChar(TFLREUInt8($80 or ((CharValue shr 12) and $3f)));
+     result[4]:=TFLRERawByteChar(TFLREUInt8($80 or ((CharValue shr 6) and $3f)));
+     result[5]:=TFLRERawByteChar(TFLREUInt8($80 or (CharValue and $3f)));
     end;
     $04000000..$7fffffff:begin
-     result[0]:=TFLRERawByteChar(byte(6));
-     result[1]:=TFLRERawByteChar(byte($fc or ((CharValue shr 30) and $01)));
-     result[2]:=TFLRERawByteChar(byte($80 or ((CharValue shr 24) and $3f)));
-     result[3]:=TFLRERawByteChar(byte($80 or ((CharValue shr 18) and $3f)));
-     result[4]:=TFLRERawByteChar(byte($80 or ((CharValue shr 12) and $3f)));
-     result[5]:=TFLRERawByteChar(byte($80 or ((CharValue shr 6) and $3f)));
-     result[6]:=TFLRERawByteChar(byte($80 or (CharValue and $3f)));
+     result[0]:=TFLRERawByteChar(TFLREUInt8(6));
+     result[1]:=TFLRERawByteChar(TFLREUInt8($fc or ((CharValue shr 30) and $01)));
+     result[2]:=TFLRERawByteChar(TFLREUInt8($80 or ((CharValue shr 24) and $3f)));
+     result[3]:=TFLRERawByteChar(TFLREUInt8($80 or ((CharValue shr 18) and $3f)));
+     result[4]:=TFLRERawByteChar(TFLREUInt8($80 or ((CharValue shr 12) and $3f)));
+     result[5]:=TFLRERawByteChar(TFLREUInt8($80 or ((CharValue shr 6) and $3f)));
+     result[6]:=TFLRERawByteChar(TFLREUInt8($80 or (CharValue and $3f)));
     end;
     else begin
-     result[0]:=TFLRERawByteChar(byte(3));
+     result[0]:=TFLRERawByteChar(TFLREUInt8(3));
      result[1]:=#$ef;
      result[2]:=#$bf;
      result[3]:=#$bd;
     end;
    end;
   end;
-  procedure AddRange(const Lo,Hi:byte);
+  procedure AddRange(const Lo,Hi:TFLREUInt8);
   var Node:PFLRENode;
   begin
-   Node:=NewNode(ntCHAR,nil,nil,NewCharClass([TFLRERawByteChar(byte(Lo))..TFLRERawByteChar(byte(Hi))],true));
+   Node:=NewNode(ntCHAR,nil,nil,NewCharClass([TFLRERawByteChar(TFLREUInt8(Lo))..TFLRERawByteChar(TFLREUInt8(Hi))],true));
    Add(Node);
   end;
-  procedure ProcessRange(Lo,Hi:longword);
-  var i,m:longword;
+  procedure ProcessRange(Lo,Hi:TFLREUInt32);
+  var i,m:TFLREUInt32;
       StrLo,StrHi:TString6Chars;
   begin
    if Hi>$0010ffff then begin
@@ -15005,7 +15466,7 @@ var SourcePosition,SourceLength:longint;
        if Seq0010ffff[m,i,0]<0 then begin
         break;
        end;
-       AddRange(byte(Seq0010ffff[m,i,0]),byte(Seq0010ffff[m,i,1]));
+       AddRange(TFLREUInt8(Seq0010ffff[m,i,0]),TFLREUInt8(Seq0010ffff[m,i,1]));
       end;
       AddSuffix;
      end;
@@ -15015,7 +15476,7 @@ var SourcePosition,SourceLength:longint;
        if Seq0010ffff[m,i,0]<0 then begin
         break;
        end;
-       AddRange(byte(Seq0010ffff[m,i,0]),byte(Seq0010ffff[m,i,1]));
+       AddRange(TFLREUInt8(Seq0010ffff[m,i,0]),TFLREUInt8(Seq0010ffff[m,i,1]));
       end;
       AddSuffix;
      end;
@@ -15053,9 +15514,9 @@ var SourcePosition,SourceLength:longint;
       end;
       StrLo:=ToString(Lo);
       StrHi:=ToString(Hi);
-      if byte(TFLRERawByteChar(StrLo[0]))=byte(TFLRERawByteChar(StrHi[0])) then begin
-       for i:=1 to byte(TFLRERawByteChar(StrLo[0])) do begin
-        AddRange(byte(TFLRERawByteChar(StrLo[i])),byte(TFLRERawByteChar(StrHi[i])));
+      if TFLREUInt8(TFLRERawByteChar(StrLo[0]))=TFLREUInt8(TFLRERawByteChar(StrHi[0])) then begin
+       for i:=1 to TFLREUInt8(TFLRERawByteChar(StrLo[0])) do begin
+        AddRange(TFLREUInt8(TFLRERawByteChar(StrLo[i])),TFLREUInt8(TFLRERawByteChar(StrHi[i])));
        end;
        AddSuffix;
       end;
@@ -15103,12 +15564,12 @@ var SourcePosition,SourceLength:longint;
     Range:=UnicodeCharClass.First;
     while assigned(Range) and (Range.Lo<256) do begin
      if Range.Lo=Range.Hi then begin
-      Include(CharClass,TFLRERawByteChar(byte(Range.Lo)));
+      Include(CharClass,TFLRERawByteChar(TFLREUInt8(Range.Lo)));
      end else begin
       if Range.Hi<256 then begin
-       CharClass:=CharClass+[TFLRERawByteChar(byte(Range.Lo))..TFLRERawByteChar(byte(Range.Hi))];
+       CharClass:=CharClass+[TFLRERawByteChar(TFLREUInt8(Range.Lo))..TFLRERawByteChar(TFLREUInt8(Range.Hi))];
       end else begin
-       CharClass:=CharClass+[TFLRERawByteChar(byte(Range.Lo))..#$ff];
+       CharClass:=CharClass+[TFLRERawByteChar(TFLREUInt8(Range.Lo))..#$ff];
       end;
      end;
      Range:=Range.Next;
@@ -15118,7 +15579,7 @@ var SourcePosition,SourceLength:longint;
   end;
  end;
  function TestClassPOSIXCharacterClass:boolean;
- var LocalSourcePosition,i:longint;
+ var LocalSourcePosition,Index:TFLRESizeInt;
  begin
   result:=false;
   LocalSourcePosition:=SourcePosition;
@@ -15141,11 +15602,12 @@ var SourcePosition,SourceLength:longint;
    exit;
   end;
 
-  i:=0;
+  Index:=0;
   while (LocalSourcePosition<=SourceLength) and (Source[LocalSourcePosition] in ['a'..'z','A'..'Z','0'..'9','_','-']) do begin
+   inc(Index);
    inc(LocalSourcePosition);
   end;
-  if i=0 then begin
+  if Index=0 then begin
    exit;
   end;
 
@@ -15156,7 +15618,7 @@ var SourcePosition,SourceLength:longint;
   end;
 
   if (LocalSourcePosition<=SourceLength) and (Source[LocalSourcePosition]=']') then begin
-   inc(LocalSourcePosition);
+// inc(LocalSourcePosition);
   end else begin
    exit;
   end;
@@ -15167,7 +15629,7 @@ var SourcePosition,SourceLength:longint;
  var Name:TFLRERawByteString;
      Negate,IgnoreCase:boolean;
  begin
-  result:=false;
+//result:=false;
 
   IgnoreCase:=CanBeAlreadyCanonicalized and (rfIGNORECASE in Flags);
 
@@ -15219,7 +15681,8 @@ var SourcePosition,SourceLength:longint;
  function ParseClassEscapeUnicodeProperty(const UnicodeCharClass:TFLREUnicodeCharClass;const CanBeAlreadyCanonicalized:boolean):boolean;
  var Identifier:TFLRERawByteString;
      IgnoreCase,IsNegative:boolean;
-     f,LastSourcePos,UntilSourcePos:longint;
+     f:TFLREInt32;
+     LastSourcePos,UntilSourcePos:TFLRESizeInt;
  begin
   result:=false;
   if SourcePosition<=SourceLength then begin
@@ -15232,7 +15695,7 @@ var SourcePosition,SourceLength:longint;
                                         PUCUUnicodeClassHashMapSeedBits,
                                         PUCUUnicodeClassHashMapValueBits,
                                         PUCUUnicodeClassHashMapSize,
-                                        UTF32CharToUTF8(byte(TPUCURawByteChar(Source[SourcePosition]))));
+                                        UTF32CharToUTF8(TFLREUInt8(TPUCURawByteChar(Source[SourcePosition]))));
      if f>=0 then begin
       inc(SourcePosition);
       UnicodeCharClass.AddUnicodeCategory(f,IgnoreCase);
@@ -15273,9 +15736,9 @@ var SourcePosition,SourceLength:longint;
   end;
  end;
  function ParseClassEscape(const CanBeAlreadyCanonicalized:boolean):TFLREUnicodeCharClass;
- var i:longint;
+ var i:TFLREInt32;
      IgnoreCase:boolean;
-     UnicodeChar:longword;
+     UnicodeChar:TFLREUInt32;
  begin
   result:=nil;
   try
@@ -15284,7 +15747,7 @@ var SourcePosition,SourceLength:longint;
    if (SourcePosition<=SourceLength) and (Source[SourcePosition] in ['0'..'9']) then begin
     i:=0;
     while (SourcePosition<=SourceLength) and (Source[SourcePosition] in ['0'..'9']) do begin
-     i:=(i*10)+longint(byte(TFLRERawByteChar(Source[SourcePosition]))-byte(TFLRERawByteChar('0')));
+     i:=(i*10)+TFLREInt32(TFLREUInt8(TFLRERawByteChar(Source[SourcePosition]))-TFLREUInt8(TFLRERawByteChar('0')));
      inc(SourcePosition);
     end;
     if i<>0 then begin
@@ -15419,10 +15882,10 @@ var SourcePosition,SourceLength:longint;
      if (SourcePosition<=SourceLength) and (Source[SourcePosition] in ['a'..'z','A'..'Z']) then begin
       case Source[SourcePosition] of
        'a'..'z':begin
-        result.AddChar(byte(TFLRERawByteChar(Source[SourcePosition]))-byte(TFLRERawByteChar('a')),IgnoreCase);
+        result.AddChar(TFLREUInt8(TFLRERawByteChar(Source[SourcePosition]))-TFLREUInt8(TFLRERawByteChar('a')),IgnoreCase);
        end;
        'A'..'Z':begin
-        result.AddChar(byte(TFLRERawByteChar(Source[SourcePosition]))-byte(TFLRERawByteChar('A')),IgnoreCase);
+        result.AddChar(TFLREUInt8(TFLRERawByteChar(Source[SourcePosition]))-TFLREUInt8(TFLRERawByteChar('A')),IgnoreCase);
        end;
       end;
       result.Canonicalized:=IgnoreCase;
@@ -15493,11 +15956,11 @@ var SourcePosition,SourceLength:longint;
         result.AddChar(ord('\'),IgnoreCase);
        end;
       end else begin
-       if (rfUTF8 in Flags) and (byte(TFLRERawByteChar(Source[SourcePosition]))>=$80) then begin
+       if (rfUTF8 in Flags) and (TFLREUInt8(TFLRERawByteChar(Source[SourcePosition]))>=$80) then begin
         UnicodeChar:=UTF8CodeUnitGetCharAndIncFallback(Source,SourcePosition);
         result.AddChar(UnicodeChar,IgnoreCase);
        end else begin
-        result.AddChar(byte(TFLRERawByteChar(Source[SourcePosition])),IgnoreCase);
+        result.AddChar(TFLREUInt8(TFLRERawByteChar(Source[SourcePosition])),IgnoreCase);
         inc(SourcePosition);
        end;
       end;
@@ -15505,11 +15968,11 @@ var SourcePosition,SourceLength:longint;
      result.Canonicalized:=IgnoreCase;
     end;
     else begin
-     if (rfUTF8 in Flags) and (byte(TFLRERawByteChar(Source[SourcePosition]))>=$80) then begin
+     if (rfUTF8 in Flags) and (TFLREUInt8(TFLRERawByteChar(Source[SourcePosition]))>=$80) then begin
       UnicodeChar:=UTF8CodeUnitGetCharAndIncFallback(Source,SourcePosition);
       result.AddChar(UnicodeChar,IgnoreCase);
      end else begin
-      result.AddChar(byte(TFLRERawByteChar(Source[SourcePosition])),IgnoreCase);
+      result.AddChar(TFLREUInt8(TFLRERawByteChar(Source[SourcePosition])),IgnoreCase);
       inc(SourcePosition);
      end;
     end;
@@ -15534,10 +15997,10 @@ var SourcePosition,SourceLength:longint;
      end;
     end else begin
      result:=TFLREUnicodeCharClass.Create;
-     if (rfUTF8 in Flags) and (byte(TFLRERawByteChar(Source[SourcePosition]))>=$80) then begin
+     if (rfUTF8 in Flags) and (TFLREUInt8(TFLRERawByteChar(Source[SourcePosition]))>=$80) then begin
       result.AddChar(UTF8CodeUnitGetCharAndIncFallback(Source,SourcePosition));
      end else begin
-      result.AddChar(byte(TFLRERawByteChar(Source[SourcePosition])));
+      result.AddChar(TFLREUInt8(TFLRERawByteChar(Source[SourcePosition])));
       inc(SourcePosition);
      end;
     end;
@@ -15712,7 +16175,7 @@ var SourcePosition,SourceLength:longint;
   end;
  end;
  function NewNumberedGroup:PFLRENode;
- var SubMatchIndex,GroupIndex:longint;
+ var SubMatchIndex,GroupIndex:TFLREInt32;
  begin
   if ([rfNAMED,rfNOCAPTURES,rfMULTIMATCH]*Flags)<>[] then begin
    result:=ParseDisjunction;
@@ -15740,7 +16203,7 @@ var SourcePosition,SourceLength:longint;
   end;
  end;
  function NewNamedGroup(const Name:TFLRERawByteString):PFLRENode;
- var SubMatchIndex,GroupIndex:longint;
+ var SubMatchIndex,GroupIndex:TFLREInt32;
  begin
   if ([rfNOCAPTURES,rfMULTIMATCH]*Flags)<>[] then begin
    result:=ParseDisjunction;
@@ -15775,8 +16238,8 @@ var SourcePosition,SourceLength:longint;
    end;
   end;
  end;
- function NewBackReferencePerIndex(const Group:longint;const ComparisonGroup:boolean):PFLRENode;
- var Value:longint;
+ function NewBackReferencePerIndex(const Group:TFLREInt32;const ComparisonGroup:boolean):PFLRENode;
+ var Value:TFLREInt32;
  begin
   result:=nil;
   if (Group>=CountCaptures) or (GroupIndexIntegerStack.IndexOf(Group)>=0) then begin
@@ -15798,7 +16261,8 @@ var SourcePosition,SourceLength:longint;
   end;
  end;
  function NewBackReferencePerName(const Name:TFLRERawByteString;const ComparisonGroup:boolean):PFLRENode;
- var Start,Index,Value:longint;
+ var Start,Index:TFLRESizeInt;
+     Value:TFLREInt32;
      Minus:boolean;
  begin
   result:=nil;
@@ -15817,7 +16281,7 @@ var SourcePosition,SourceLength:longint;
     end else begin
      Value:=0;
     end;
-    inc(Value,byte(TFLRERawByteChar(Name[Index]))-byte(TFLRERawByteChar('0')));
+    inc(Value,TFLREUInt8(TFLRERawByteChar(Name[Index]))-TFLREUInt8(TFLRERawByteChar('0')));
    end else begin
     Value:=-1;
     break;
@@ -15855,10 +16319,208 @@ var SourcePosition,SourceLength:longint;
    end;
   end;
  end;
+ function UnescapeString(const aEscapedString:TFLRERawByteString):TFLRERawByteString;
+ var Index,Len:TFLRESizeInt;
+     UnicodeChar:TFLREUInt32;
+ begin
+  Len:=length(aEscapedString);
+  if PtrPosChar(TFLRERawByteChar('\'),@aEscapedString[1],Len,0)>=0 then begin
+   result:='';
+   Index:=1;
+   while Index<=Len do begin
+    case aEscapedString[Index] of
+     TFLRERawByteChar('\'):begin
+      inc(Index);
+      if Index<Len then begin
+       case aEscapedString[Index] of
+        'a':begin
+         inc(Index);
+         result:=result+TFLRERawByteChar(#$07);
+        end;
+        'b':begin
+         inc(Index);
+         result:=result+TFLRERawByteChar(#$08);
+        end;
+        'B':begin
+         inc(Index);
+         result:=result+TFLRERawByteChar('\');
+        end;
+        't':begin
+         inc(Index);
+         result:=result+TFLRERawByteChar(#$09);
+        end;
+        'n':begin
+         inc(Index);
+         result:=result+TFLRERawByteChar(#$0a);
+        end;
+        'v':begin
+         inc(Index);
+         result:=result+TFLRERawByteChar(#$0b);
+        end;
+        'f':begin
+         inc(Index);
+         result:=result+TFLRERawByteChar(#$0c);
+        end;
+        'r':begin
+         inc(Index);
+         result:=result+TFLRERawByteChar(#$0d);
+        end;
+        'e':begin
+         inc(Index);
+         result:=result+TFLRERawByteChar(#$1b);
+        end;
+        'w','W':begin
+         raise EFLRE.Create('Syntax error');
+        end;
+        's','S':begin
+         raise EFLRE.Create('Syntax error');
+        end;
+        'd','D':begin
+         raise EFLRE.Create('Syntax error');
+        end;
+        'p':begin
+         raise EFLRE.Create('Syntax error');
+        end;
+        'P':begin
+         raise EFLRE.Create('Syntax error');
+        end;
+        'c':begin
+         inc(Index);
+         if (Index<=Len) and (aEscapedString[Index] in ['a'..'z','A'..'Z']) then begin
+          case aEscapedString[Index] of
+           'a'..'z':begin
+            result:=result+TFLRERawByteChar(TFLREUInt8(TFLRERawByteChar(aEscapedString[Index]))-TFLREUInt8(TFLRERawByteChar('a')));
+           end;
+           'A'..'Z':begin
+            result:=result+TFLRERawByteChar(TFLREUInt8(TFLRERawByteChar(aEscapedString[Index]))-TFLREUInt8(TFLRERawByteChar('A')));
+           end;
+          end;
+         end else begin
+          raise EFLRE.Create('Syntax error');
+         end;
+        end;
+        'x':begin
+         inc(Index);
+         if ((Index+1)<=Len) and
+            (aEscapedString[Index+0] in ['0'..'9','a'..'f','A'..'F']) and
+            (aEscapedString[Index+1] in ['0'..'9','a'..'f','A'..'F']) then begin
+          if rfUTF8 in Flags then begin
+           result:=result+PUCUUTF32CharToUTF8((Hex2Value(aEscapedString[Index+0]) shl 4) or Hex2Value(aEscapedString[Index+1]));
+          end else begin
+           result:=result+TFLRERawByteChar((Hex2Value(aEscapedString[Index+0]) shl 4) or Hex2Value(aEscapedString[Index+1]));
+          end;
+          inc(Index,2);
+         end else if (Index<=Len) and (aEscapedString[Index]='{') then begin
+          inc(Index);
+          UnicodeChar:=0;
+          while (Index<=Len) and (aEscapedString[Index] in ['0'..'9','a'..'f','A'..'F']) do begin
+           UnicodeChar:=(UnicodeChar shl 4) or Hex2Value(aEscapedString[Index]);
+           inc(Index);
+          end;
+          if (Index<=Len) and (aEscapedString[Index]='}') then begin
+           inc(Index);
+           if rfUTF8 in Flags then begin
+            result:=result+PUCUUTF32CharToUTF8(UnicodeChar);
+           end else begin
+            if UnicodeChar<$100 then begin
+             result:=result+TFLRERawByteChar(TFLREUInt8(UnicodeChar));
+            end else begin
+             raise EFLRE.Create('Syntax error');
+            end;
+           end;
+          end else begin
+           raise EFLRE.Create('Syntax error');
+          end;
+         end else begin
+          raise EFLRE.Create('Syntax error');
+         end;
+        end;
+        'u':begin
+         inc(Index);
+         if ((Index+3)<=Len) and
+            (aEscapedString[Index+0] in ['0'..'9','a'..'f','A'..'F']) and
+            (aEscapedString[Index+1] in ['0'..'9','a'..'f','A'..'F']) and
+            (aEscapedString[Index+2] in ['0'..'9','a'..'f','A'..'F']) and
+            (aEscapedString[Index+3] in ['0'..'9','a'..'f','A'..'F']) then begin
+          UnicodeChar:=(Hex2Value(aEscapedString[Index+0]) shl 24) or (Hex2Value(aEscapedString[Index+1]) shl 16) or (Hex2Value(aEscapedString[Index+2]) shl 8) or Hex2Value(aEscapedString[Index+3]);
+          inc(Index,4);
+          if rfUTF8 in Flags then begin
+           result:=result+PUCUUTF32CharToUTF8(UnicodeChar);
+          end else begin
+           if UnicodeChar<$100 then begin
+            result:=result+TFLRERawByteChar(TFLREUInt8(UnicodeChar));
+           end else begin
+            raise EFLRE.Create('Syntax error');
+           end;
+          end;
+         end else begin
+          raise EFLRE.Create('Syntax error');
+         end;
+        end;
+        'U':begin
+         inc(Index);
+         if (Index<=Len) and (aEscapedString[Index] in ['0'..'9','a'..'f','A'..'F']) then begin
+          UnicodeChar:=0;
+          while (Index<=Len) and (aEscapedString[Index] in ['0'..'9','a'..'f','A'..'F']) do begin
+           UnicodeChar:=(UnicodeChar shl 4) or Hex2Value(aEscapedString[Index]);
+           inc(Index);
+          end;
+          if rfUTF8 in Flags then begin
+           result:=result+PUCUUTF32CharToUTF8(UnicodeChar);
+          end else begin
+           if UnicodeChar<$100 then begin
+            result:=result+TFLRERawByteChar(TFLREUInt8(UnicodeChar));
+           end else begin
+            raise EFLRE.Create('Syntax error');
+           end;
+          end;
+         end else begin
+          raise EFLRE.Create('Syntax error');
+         end;
+        end;
+        'Q':begin
+         inc(Index);
+         while Index<=Len do begin
+          if aEscapedString[Index]='\' then begin
+           inc(Index);
+           if (Index<=Len) and (aEscapedString[Index]='E') then begin
+            inc(Index);
+            break;
+           end else begin
+            result:=result+'\';
+           end;
+          end else begin
+           if (rfUTF8 in Flags) and (TFLREUInt8(TFLRERawByteChar(aEscapedString[Index]))>=$80) then begin
+            UnicodeChar:=UTF8CodeUnitGetCharAndIncFallback(aEscapedString,Index);
+            result:=result+PUCUUTF32CharToUTF8(UnicodeChar);
+           end else begin
+            result:=result+aEscapedString[Index];
+            inc(Index);
+           end;
+          end;
+         end;
+        end;
+        else begin
+         result:=result+aEscapedString[Index];
+         inc(Index);
+        end;
+       end;
+      end;
+     end;
+     else begin
+      result:=result+aEscapedString[Index];
+      inc(Index);
+     end;
+    end;
+   end;
+  end else begin
+   result:=aEscapedString;
+  end;
+ end;
  function ParseAtom:PFLRENode;
- var Value,Index:longint;
+ var Value,Index:TFLREInt32;
      Negate,Done,IsNegative,OldBackReferenceComparisonGroup:boolean;
-     UnicodeChar,LowerCaseUnicodeChar,UpperCaseUnicodeChar:longword;
+     UnicodeChar,LowerCaseUnicodeChar,UpperCaseUnicodeChar:TFLREUInt32;
      UnicodeCharClass:TFLREUnicodeCharClass;
      OldFlags:TFLREFlags;
      Name,TemporaryString:TFLRERawByteString;
@@ -15999,9 +16661,21 @@ var SourcePosition,SourceLength:longint;
            inc(SourcePosition);
            TemporaryString:='';
            while (SourcePosition<=SourceLength) and (Source[SourcePosition]<>')') do begin
-            TemporaryString:=TemporaryString+Source[SourcePosition];
-            inc(SourcePosition);
+            if Source[SourcePosition]='\' then begin
+             TemporaryString:=TemporaryString+'\';
+             inc(SourcePosition);
+             if SourcePosition<=SourceLength then begin
+              TemporaryString:=TemporaryString+Source[SourcePosition];
+              inc(SourcePosition);
+             end else begin
+              raise EFLRE.Create('Syntax error');
+             end;
+            end else begin
+             TemporaryString:=TemporaryString+Source[SourcePosition];
+             inc(SourcePosition);
+            end;
            end;
+           TemporaryString:=UnescapeString(TemporaryString);
            Value:=-1;
            for Index:=0 to CountLookAssertionStrings-1 do begin
             if LookAssertionStrings[Index]=TemporaryString then begin
@@ -16030,9 +16704,21 @@ var SourcePosition,SourceLength:longint;
             inc(SourcePosition);
             TemporaryString:='';
             while (SourcePosition<=SourceLength) and (Source[SourcePosition]<>')') do begin
-             TemporaryString:=TemporaryString+Source[SourcePosition];
-             inc(SourcePosition);
+             if Source[SourcePosition]='\' then begin
+              TemporaryString:=TemporaryString+'\';
+              inc(SourcePosition);
+              if SourcePosition<=SourceLength then begin
+               TemporaryString:=TemporaryString+Source[SourcePosition];
+               inc(SourcePosition);
+              end else begin
+               raise EFLRE.Create('Syntax error');
+              end;
+             end else begin
+              TemporaryString:=TemporaryString+Source[SourcePosition];
+              inc(SourcePosition);
+             end;
             end;
+            TemporaryString:=UnescapeString(TemporaryString);
             Value:=-1;
             for Index:=0 to CountLookAssertionStrings-1 do begin
              if LookAssertionStrings[Index]=TemporaryString then begin
@@ -16147,16 +16833,16 @@ var SourcePosition,SourceLength:longint;
        if SourcePosition<=SourceLength then begin
         case Source[SourcePosition] of
          '0'..'9':begin
-          Value:=byte(TFLRERawByteChar(Source[SourcePosition]))-byte(TFLRERawByteChar('0'));
+          Value:=TFLREUInt8(TFLRERawByteChar(Source[SourcePosition]))-TFLREUInt8(TFLRERawByteChar('0'));
           inc(SourcePosition);
           while (SourcePosition<=SourceLength) and (Source[SourcePosition] in ['0'..'9']) do begin
-           Value:=(Value*10)+(byte(TFLRERawByteChar(Source[SourcePosition]))-byte(TFLRERawByteChar('0')));
+           Value:=(Value*10)+(TFLREUInt8(TFLRERawByteChar(Source[SourcePosition]))-TFLREUInt8(TFLRERawByteChar('0')));
            inc(SourcePosition);
           end;
           result:=NewBackReferencePerIndex(Value,false);
          end;
          'C':begin
-          // Any byte
+          // Any TFLREUInt8
           result:=NewNode(ntCHAR,nil,nil,NewCharClass(AllCharClass,true));
           inc(SourcePosition);
          end;
@@ -16323,10 +17009,10 @@ var SourcePosition,SourceLength:longint;
             end;
             else begin
              if (rfIGNORECASE in Flags) and (Source[SourcePosition] in ['a'..'z','A'..'Z']) then begin
-              UnicodeChar:=byte(TFLRERawByteChar(Source[SourcePosition]));
+              UnicodeChar:=TFLREUInt8(TFLRERawByteChar(Source[SourcePosition]));
               LowerCaseUnicodeChar:=UnicodeToLower(UnicodeChar);
               UpperCaseUnicodeChar:=UnicodeToUpper(UnicodeChar);
-              TemporaryNode:=NewNode(ntCHAR,nil,nil,NewCharClass([TFLRERawByteChar(byte(LowerCaseUnicodeChar)),TFLRERawByteChar(byte(UpperCaseUnicodeChar))],true));
+              TemporaryNode:=NewNode(ntCHAR,nil,nil,NewCharClass([TFLRERawByteChar(TFLREUInt8(LowerCaseUnicodeChar)),TFLRERawByteChar(TFLREUInt8(UpperCaseUnicodeChar))],true));
              end else begin
               TemporaryNode:=NewNode(ntCHAR,nil,nil,NewCharClass([Source[SourcePosition]],true));
               inc(SourcePosition);
@@ -16345,7 +17031,7 @@ var SourcePosition,SourceLength:longint;
           end;
          end;
          else begin
-          if (rfUTF8 in Flags) and (byte(TFLRERawByteChar(Source[SourcePosition]))>=$80) then begin
+          if (rfUTF8 in Flags) and (TFLREUInt8(TFLRERawByteChar(Source[SourcePosition]))>=$80) then begin
            UnicodeChar:=UTF8CodeUnitGetCharAndIncFallback(Source,SourcePosition);
            result:=NewUnicodeChar(UnicodeChar);
           end else begin
@@ -16446,11 +17132,11 @@ var SourcePosition,SourceLength:longint;
       end;
       else begin
        if (rfIGNORECASE in Flags) and (Source[SourcePosition] in ['a'..'z','A'..'Z']) then begin
-        UnicodeChar:=byte(TFLRERawByteChar(Source[SourcePosition]));
+        UnicodeChar:=TFLREUInt8(TFLRERawByteChar(Source[SourcePosition]));
         inc(SourcePosition);
         LowerCaseUnicodeChar:=UnicodeToLower(UnicodeChar);
         UpperCaseUnicodeChar:=UnicodeToUpper(UnicodeChar);
-        result:=NewNode(ntCHAR,nil,nil,NewCharClass([TFLRERawByteChar(byte(LowerCaseUnicodeChar)),TFLRERawByteChar(byte(UpperCaseUnicodeChar))],true));
+        result:=NewNode(ntCHAR,nil,nil,NewCharClass([TFLRERawByteChar(TFLREUInt8(LowerCaseUnicodeChar)),TFLRERawByteChar(TFLREUInt8(UpperCaseUnicodeChar))],true));
        end else begin
         result:=NewNode(ntCHAR,nil,nil,NewCharClass([Source[SourcePosition]],true));
         inc(SourcePosition);
@@ -16471,7 +17157,7 @@ var SourcePosition,SourceLength:longint;
   end;
  end;
  function ParseTerm:PFLRENode;
- var MinCount,MaxCount,Kind:longint;
+ var MinCount,MaxCount,Kind:TFLREInt32;
  begin
   result:=nil;
   try
@@ -16544,19 +17230,19 @@ var SourcePosition,SourceLength:longint;
        if (SourcePosition<=SourceLength) and (Source[SourcePosition] in ['0'..'9']) then begin
         MinCount:=0;
         while (SourcePosition<=SourceLength) and (Source[SourcePosition] in ['0'..'9']) do begin
-         MinCount:=(MinCount*10)+(byte(TFLRERawByteChar(Source[SourcePosition]))-byte(TFLRERawByteChar('0')));
+         MinCount:=(MinCount*10)+(TFLREUInt8(TFLRERawByteChar(Source[SourcePosition]))-TFLREUInt8(TFLRERawByteChar('0')));
          inc(SourcePosition);
         end;
        end else begin
-        MinCount:=-1;
         raise EFLRE.Create('Syntax error');
+        MinCount:=-1;
        end;
        if (SourcePosition<=SourceLength) and (Source[SourcePosition]=',') then begin
         inc(SourcePosition);
         if (SourcePosition<=SourceLength) and (Source[SourcePosition] in ['0'..'9']) then begin
          MaxCount:=0;
          while (SourcePosition<=SourceLength) and (Source[SourcePosition] in ['0'..'9']) do begin
-          MaxCount:=(MaxCount*10)+(byte(TFLRERawByteChar(Source[SourcePosition]))-byte(TFLRERawByteChar('0')));
+          MaxCount:=(MaxCount*10)+(TFLREUInt8(TFLRERawByteChar(Source[SourcePosition]))-TFLREUInt8(TFLRERawByteChar('0')));
           inc(SourcePosition);
          end;
          if MinCount>MaxCount then begin
@@ -16689,7 +17375,8 @@ var SourcePosition,SourceLength:longint;
    raise;
   end;
  end;
-var Counter,SubCounter,SubMatchIndex:longint;
+var Counter,SubCounter:TFLRESizeInt;
+    SubMatchIndex:TFLREInt32;
     Node,SubNode:PFLRENode;
 begin
  Source:=RegularExpression;
@@ -16781,29 +17468,29 @@ begin
 end;
 
 procedure TFLRE.Compile;
- procedure GenerateInstructions(var Instructions:TFLREInstructions;var CountInstructions:longint;const Reversed:boolean);
- var NodeStack:TList;
-  function NewInstruction(Opcode:longword):longint;
+ procedure GenerateInstructions(var Instructions:TFLREInstructions;var CountInstructions:TFLREInt32;const Reversed:boolean);
+ var NodeStack:TFLREPointerList;
+  function NewInstruction(Opcode:TFLREUInt32):TFLREInt32;
   begin
    result:=CountInstructions;
    inc(CountInstructions);
    if CountInstructions>length(Instructions) then begin
     SetLength(Instructions,CountInstructions*2);
    end;
-   Instructions[result].IDandOpcode:=(longword(result) shl 8) or (Opcode and $ff);
-   Instructions[result].Next:=pointer(ptrint(-1));
-   Instructions[result].OtherNext:=pointer(ptrint(-1));
+   Instructions[result].IDandOpcode:=(TFLREUInt32(result) shl 8) or (Opcode and $ff);
+   Instructions[result].Next:=pointer(TFLREPtrInt(-1));
+   Instructions[result].OtherNext:=pointer(TFLREPtrInt(-1));
   end;
   procedure Emit(Node,BackreferenceParentNode:PFLRENode);
   type PStackItem=^TStackItem;
        TStackItem=record
         Node,BackreferenceParentNode:PFLRENode;
-        Argument,i0,i1{$ifndef UseOpcodeJMP},FromIndex,ToIndex,OutIndex{$endif}:longint;
+        Argument,i0,i1{$ifndef UseOpcodeJMP},FromIndex,ToIndex,OutIndex{$endif}:TFLREInt32;
        end;
        TStackItems=array of TStackItem;
   var Stack:TStackItems;
       StackItem:PStackItem;
-      StackSize,Count,Argument,i0,i1,Index{$ifndef UseOpcodeJMP},FromIndex,ToIndex,OutIndex{$endif},Flags:longint;
+      StackSize,Count,Argument,i0,i1,Index{$ifndef UseOpcodeJMP},FromIndex,ToIndex,OutIndex{$endif},Flags:TFLREInt32;
       CurrentChar,SingleChar:TFLRERawByteChar;
       CharClass:TFLRECharClass;
   begin
@@ -16836,7 +17523,7 @@ procedure TFLRE.Compile;
          0:begin
           i0:=NewInstruction(opSPLIT);
           Instructions[i0].Value:=skALT;
-          Instructions[i0].Next:=pointer(ptrint(CountInstructions));
+          Instructions[i0].Next:=pointer(TFLREPtrInt(CountInstructions));
 {$ifndef UseOpcodeJMP}
           FromIndex:=CountInstructions;
 {$endif}
@@ -16873,7 +17560,7 @@ procedure TFLRE.Compile;
 {$ifdef UseOpcodeJMP}
           i1:=NewInstruction(opJMP);
 {$endif}
-          Instructions[i0].OtherNext:=pointer(ptrint(CountInstructions));
+          Instructions[i0].OtherNext:=pointer(TFLREPtrInt(CountInstructions));
           begin
            if (StackSize+1)>length(Stack) then begin
             SetLength(Stack,(StackSize+1)*2);
@@ -16904,14 +17591,14 @@ procedure TFLRE.Compile;
          end;
          2:begin
 {$ifdef UseOpcodeJMP}
-          Instructions[i1].Next:=pointer(ptrint(CountInstructions));
+          Instructions[i1].Next:=pointer(TFLREPtrInt(CountInstructions));
 {$else}
           for Index:=FromIndex to ToIndex do begin
-           if ptruint(Instructions[Index].Next)=ptruint(OutIndex) then begin
-            Instructions[Index].Next:=pointer(ptruint(CountInstructions));
+           if TFLREPtrUInt(Instructions[Index].Next)=TFLREPtrUInt(OutIndex) then begin
+            Instructions[Index].Next:=pointer(TFLREPtrUInt(CountInstructions));
            end;
-           if ptruint(Instructions[Index].OtherNext)=ptruint(OutIndex) then begin
-            Instructions[Index].OtherNext:=pointer(ptruint(CountInstructions));
+           if TFLREPtrUInt(Instructions[Index].OtherNext)=TFLREPtrUInt(OutIndex) then begin
+            Instructions[Index].OtherNext:=pointer(TFLREPtrUInt(CountInstructions));
            end;
           end;
 {$endif}
@@ -16967,10 +17654,10 @@ procedure TFLRE.Compile;
         CharClass:=GetCharClass(Node^.Value);
         if CharClass=EmptyCharClass then begin
          i0:=NewInstruction(opNONE);
-         Instructions[i0].Next:=pointer(ptrint(CountInstructions));
+         Instructions[i0].Next:=pointer(TFLREPtrInt(CountInstructions));
         end else if CharClass=AllCharClass then begin
          i0:=NewInstruction(opANY);
-         Instructions[i0].Next:=pointer(ptrint(CountInstructions));
+         Instructions[i0].Next:=pointer(TFLREPtrInt(CountInstructions));
         end else begin
          SingleChar:=#0;
          Count:=0;
@@ -16987,12 +17674,12 @@ procedure TFLRE.Compile;
          end;
          if Count=1 then begin
           i0:=NewInstruction(opSINGLECHAR);
-          Instructions[i0].Value:=byte(TFLRERawByteChar(SingleChar));
+          Instructions[i0].Value:=TFLREUInt8(TFLRERawByteChar(SingleChar));
          end else begin
           i0:=NewInstruction(opCHAR);
-          Instructions[i0].Value:=ptruint(pointer(CharClasses[Node^.Value]));
+          Instructions[i0].Value:=TFLREPtrUInt(pointer(CharClasses[Node^.Value]));
          end;
-         Instructions[i0].Next:=pointer(ptrint(CountInstructions));
+         Instructions[i0].Next:=pointer(TFLREPtrInt(CountInstructions));
         end;
        end;
        ntPAREN:begin
@@ -17012,7 +17699,7 @@ procedure TFLRE.Compile;
           end else begin
            i0:=NewInstruction(opSAVE);
            Instructions[i0].Value:=Node^.Value shl 1;
-           Instructions[i0].Next:=pointer(ptrint(CountInstructions));
+           Instructions[i0].Next:=pointer(TFLREPtrInt(CountInstructions));
            begin
             if (StackSize+1)>length(Stack) then begin
              SetLength(Stack,(StackSize+1)*2);
@@ -17038,7 +17725,7 @@ procedure TFLRE.Compile;
          1:begin
           i0:=NewInstruction(opSAVE);
           Instructions[i0].Value:=(Node^.Value shl 1) or 1;
-          Instructions[i0].Next:=pointer(ptrint(CountInstructions));
+          Instructions[i0].Next:=pointer(TFLREPtrInt(CountInstructions));
          end;
         end;
        end;
@@ -17049,7 +17736,7 @@ procedure TFLRE.Compile;
           Instructions[i0].Value:=skQUEST;
           if Node^.Value<>0 then begin
            // Non-greedy
-           Instructions[i0].OtherNext:=pointer(ptrint(CountInstructions));
+           Instructions[i0].OtherNext:=pointer(TFLREPtrInt(CountInstructions));
            begin
             if (StackSize+1)>length(Stack) then begin
              SetLength(Stack,(StackSize+1)*2);
@@ -17063,7 +17750,7 @@ procedure TFLRE.Compile;
            end;
           end else begin
            // Greedy
-           Instructions[i0].Next:=pointer(ptrint(CountInstructions));
+           Instructions[i0].Next:=pointer(TFLREPtrInt(CountInstructions));
            begin
             if (StackSize+1)>length(Stack) then begin
              SetLength(Stack,(StackSize+1)*2);
@@ -17089,11 +17776,11 @@ procedure TFLRE.Compile;
          end;
          1:begin
           // Non-greedy
-          Instructions[i0].Next:=pointer(ptrint(CountInstructions));
+          Instructions[i0].Next:=pointer(TFLREPtrInt(CountInstructions));
          end;
          2:begin
           // Greedy
-          Instructions[i0].OtherNext:=pointer(ptrint(CountInstructions));
+          Instructions[i0].OtherNext:=pointer(TFLREPtrInt(CountInstructions));
          end;
         end;
        end;
@@ -17104,7 +17791,7 @@ procedure TFLRE.Compile;
           Instructions[i0].Value:=skSTAR;
           if Node^.Value<>0 then begin
            // Non-greedy
-           Instructions[i0].OtherNext:=pointer(ptrint(CountInstructions));
+           Instructions[i0].OtherNext:=pointer(TFLREPtrInt(CountInstructions));
 {$ifndef UseOpcodeJMP}
            FromIndex:=CountInstructions;
 {$endif}
@@ -17122,7 +17809,7 @@ procedure TFLRE.Compile;
 {$endif}
           end else begin
            // Greedy
-           Instructions[i0].Next:=pointer(ptrint(CountInstructions));
+           Instructions[i0].Next:=pointer(TFLREPtrInt(CountInstructions));
 {$ifndef UseOpcodeJMP}
            FromIndex:=CountInstructions;
 {$endif}
@@ -17157,25 +17844,25 @@ procedure TFLRE.Compile;
 {$endif}
 {$ifdef UseOpcodeJMP}
           i1:=NewInstruction(opJMP);
-          Instructions[i1].Next:=pointer(ptrint(i0));
+          Instructions[i1].Next:=pointer(TFLREPtrInt(i0));
 {$endif}
           case Argument of
            1:begin
             // Non-greedy
-            Instructions[i0].Next:=pointer(ptrint(CountInstructions));
+            Instructions[i0].Next:=pointer(TFLREPtrInt(CountInstructions));
            end;
            2:begin
             // Greedy
-            Instructions[i0].OtherNext:=pointer(ptrint(CountInstructions));
+            Instructions[i0].OtherNext:=pointer(TFLREPtrInt(CountInstructions));
            end;
           end;
 {$ifndef UseOpcodeJMP}
           for Index:=FromIndex to ToIndex do begin
-           if ptruint(Instructions[Index].Next)=ptruint(OutIndex) then begin
-            Instructions[Index].Next:=pointer(ptruint(i0));
+           if TFLREPtrUInt(Instructions[Index].Next)=TFLREPtrUInt(OutIndex) then begin
+            Instructions[Index].Next:=pointer(TFLREPtrUInt(i0));
            end;
-           if ptruint(Instructions[Index].OtherNext)=ptruint(OutIndex) then begin
-            Instructions[Index].OtherNext:=pointer(ptruint(i0));
+           if TFLREPtrUInt(Instructions[Index].OtherNext)=TFLREPtrUInt(OutIndex) then begin
+            Instructions[Index].OtherNext:=pointer(TFLREPtrUInt(i0));
            end;
           end;
 {$endif}
@@ -17224,15 +17911,15 @@ procedure TFLRE.Compile;
           // Non-greedy
           i1:=NewInstruction(opSPLIT);
           Instructions[i1].Value:=skPLUS;
-          Instructions[i1].OtherNext:=pointer(ptrint(i0));
-          Instructions[i1].Next:=pointer(ptrint(CountInstructions));
+          Instructions[i1].OtherNext:=pointer(TFLREPtrInt(i0));
+          Instructions[i1].Next:=pointer(TFLREPtrInt(CountInstructions));
          end;
          2:begin
           // Greedy
           i1:=NewInstruction(opSPLIT);
           Instructions[i1].Value:=skPLUS;
-          Instructions[i1].Next:=pointer(ptrint(i0));
-          Instructions[i1].OtherNext:=pointer(ptrint(CountInstructions));
+          Instructions[i1].Next:=pointer(TFLREPtrInt(i0));
+          Instructions[i1].OtherNext:=pointer(TFLREPtrInt(CountInstructions));
          end;
         end;
        end;
@@ -17263,7 +17950,7 @@ procedure TFLRE.Compile;
          1:begin
           i0:=NewInstruction(opMATCH);
           Instructions[i0].Value:=Node^.Value;
-          Instructions[i0].Next:=pointer(ptrint(CountInstructions));
+          Instructions[i0].Next:=pointer(TFLREPtrInt(CountInstructions));
          end;
         end;
        end;
@@ -17288,30 +17975,30 @@ procedure TFLRE.Compile;
         if Flags<>0 then begin
          i0:=NewInstruction(opZEROWIDTH);
          Instructions[i0].Value:=Flags;
-         Instructions[i0].Next:=pointer(ptrint(CountInstructions));
+         Instructions[i0].Next:=pointer(TFLREPtrInt(CountInstructions));
         end else begin
          i0:=NewInstruction(opNOP);
-         Instructions[i0].Next:=pointer(ptrint(CountInstructions));
+         Instructions[i0].Next:=pointer(TFLREPtrInt(CountInstructions));
         end;
        end;
        ntLOOKBEHINDNEGATIVE:begin
         i0:=NewInstruction(opLOOKBEHINDNEGATIVE);
-        Instructions[i0].Next:=pointer(ptrint(CountInstructions));
+        Instructions[i0].Next:=pointer(TFLREPtrInt(CountInstructions));
         Instructions[i0].Value:=Node^.Value;
        end;
        ntLOOKBEHINDPOSITIVE:begin
         i0:=NewInstruction(opLOOKBEHINDPOSITIVE);
-        Instructions[i0].Next:=pointer(ptrint(CountInstructions));
+        Instructions[i0].Next:=pointer(TFLREPtrInt(CountInstructions));
         Instructions[i0].Value:=Node^.Value;
        end;
        ntLOOKAHEADNEGATIVE:begin
         i0:=NewInstruction(opLOOKAHEADNEGATIVE);
-        Instructions[i0].Next:=pointer(ptrint(CountInstructions));
+        Instructions[i0].Next:=pointer(TFLREPtrInt(CountInstructions));
         Instructions[i0].Value:=Node^.Value;
        end;
        ntLOOKAHEADPOSITIVE:begin
         i0:=NewInstruction(opLOOKAHEADPOSITIVE);
-        Instructions[i0].Next:=pointer(ptrint(CountInstructions));
+        Instructions[i0].Next:=pointer(TFLREPtrInt(CountInstructions));
         Instructions[i0].Value:=Node^.Value;
        end;
        ntBACKREFERENCE,ntBACKREFERENCEIGNORECASE:begin
@@ -17353,7 +18040,7 @@ procedure TFLRE.Compile;
           0:begin
            i0:=NewInstruction(opSAVE);
            Instructions[i0].Value:=Node^.Value shl 1;
-           Instructions[i0].Next:=pointer(ptrint(CountInstructions));
+           Instructions[i0].Next:=pointer(TFLREPtrInt(CountInstructions));
            begin
             if (StackSize+1)>length(Stack) then begin
              SetLength(Stack,(StackSize+1)*2);
@@ -17385,15 +18072,15 @@ procedure TFLRE.Compile;
            NodeStack.Delete(NodeStack.Count-1);
            i1:=NewInstruction(opSAVE);
            Instructions[i1].Value:=(Node^.Value shl 1) or 1;
-           Instructions[i1].Next:=pointer(ptrint(CountInstructions));
+           Instructions[i1].Next:=pointer(TFLREPtrInt(CountInstructions));
            if Node^.NodeType=ntBACKREFERENCEIGNORECASE then begin
             i1:=NewInstruction(opBACKREFERENCEIGNORECASE);
            end else begin
             i1:=NewInstruction(opBACKREFERENCE);
            end;
            Instructions[i1].Value:=CapturesToSubMatchesMap[Node^.Group] shl 1;
-           Instructions[i1].Next:=pointer(ptrint(CountInstructions));
-           Instructions[i1].OtherNext:=pointer(ptrint(i0));
+           Instructions[i1].Next:=pointer(TFLREPtrInt(CountInstructions));
+           Instructions[i1].OtherNext:=pointer(TFLREPtrInt(i0));
           end;
          end;
         end;
@@ -17408,14 +18095,14 @@ procedure TFLRE.Compile;
     SetLength(Stack,0);
    end;
   end;
- var Counter:longint;
+ var Counter:TFLRESizeInt;
      Instruction:PFLREInstruction;
  begin
   SetLength(Instructions,4096);
   CountInstructions:=0;
   try
    try
-    NodeStack:=TList.Create;
+    NodeStack:=TFLREPointerList.Create;
     try
      if Reversed then begin
       Emit(AnchoredRootNode,nil);
@@ -17434,13 +18121,13 @@ procedure TFLRE.Compile;
    SetLength(Instructions,CountInstructions);
    for Counter:=0 to CountInstructions-1 do begin
     Instruction:=@Instructions[Counter];
-    if Instruction^.Next<>pointer(ptruint(ptrint(-1))) then begin
-     Instruction^.Next:=@Instructions[ptruint(Instruction^.Next)];
+    if Instruction^.Next<>pointer(TFLREPtrUInt(TFLREPtrInt(-1))) then begin
+     Instruction^.Next:=@Instructions[TFLREPtrUInt(Instruction^.Next)];
     end else begin
      Instruction^.Next:=nil;
     end;
-    if Instruction^.OtherNext<>pointer(ptruint(ptrint(-1))) then begin
-     Instruction^.OtherNext:=@Instructions[ptruint(Instruction^.OtherNext)];
+    if Instruction^.OtherNext<>pointer(TFLREPtrUInt(TFLREPtrInt(-1))) then begin
+     Instruction^.OtherNext:=@Instructions[TFLREPtrUInt(Instruction^.OtherNext)];
     end else begin
      Instruction^.OtherNext:=nil;
     end;
@@ -17449,12 +18136,12 @@ procedure TFLRE.Compile;
     Instruction:=@Instructions[Counter];
     if (Instruction^.IDandOpcode and $ff)=opSPLIT then begin
      if ((((Instruction^.Next^.IDandOpcode and $ff)=opANY) or
-          (((Instruction^.Next^.IDandOpcode and $ff)=opCHAR) and (PFLRECharClass(pointer(ptruint(Instruction^.Next^.Value)))^=AllCharClass))) and
+          (((Instruction^.Next^.IDandOpcode and $ff)=opCHAR) and (PFLRECharClass(pointer(TFLREPtrUInt(Instruction^.Next^.Value)))^=AllCharClass))) and
          ((Instruction^.OtherNext^.IDandOpcode and $ff)=opMATCH)) or
         ((((Instruction^.OtherNext^.IDandOpcode and $ff)=opANY) or
-          (((Instruction^.OtherNext^.IDandOpcode and $ff)=opCHAR) and (PFLRECharClass(pointer(ptruint(Instruction^.OtherNext^.Value)))^=AllCharClass))) and
+          (((Instruction^.OtherNext^.IDandOpcode and $ff)=opCHAR) and (PFLRECharClass(pointer(TFLREPtrUInt(Instruction^.OtherNext^.Value)))^=AllCharClass))) and
          ((Instruction^.Next^.IDandOpcode and $ff)=opMATCH)) then begin
-      Instruction^.IDandOpcode:=(longword(Instruction^.IDandOpcode) and longword($ffffff00)) or opSPLITMATCH;
+      Instruction^.IDandOpcode:=(TFLREUInt32(Instruction^.IDandOpcode) and TFLREUInt32($ffffff00)) or opSPLITMATCH;
      end;
     end;
    end;
@@ -17480,9 +18167,9 @@ end;
 
 procedure TFLRE.CompileRange;
 var LowRangeString,HighRangeString:TFLRERawByteString;
-    LastIndex,LastMatchIndex,RangeStringLength:longint;
- function AddChars(Index:longint;const Str:TFLRERawByteString):longint;
- var Len,Counter,NewLen:longint;
+    LastIndex,LastMatchIndex,RangeStringLength:TFLRESizeInt;
+ function AddChars(Index:TFLRESizeInt;const Str:TFLRERawByteString):TFLRESizeInt;
+ var Len,Counter,NewLen:TFLRESizeInt;
  begin
   Len:=length(Str);
   result:=Index+Len;
@@ -17514,7 +18201,7 @@ var LowRangeString,HighRangeString:TFLRERawByteString;
    end;
   end;
  end;
- procedure ThreadPass(Instruction:PFLREInstruction;Index:longint);
+ procedure ThreadPass(Instruction:PFLREInstruction;Index:TFLRESizeInt);
  var CurrentChar:TFLRERawByteChar;
  begin
   while assigned(Instruction) do begin
@@ -17538,20 +18225,20 @@ var LowRangeString,HighRangeString:TFLRERawByteString;
      break;
     end;
     opSINGLECHAR:begin
-     AddChars(Index,TFLRERawByteChar(byte(Instruction^.Value)));
+     AddChars(Index,TFLRERawByteChar(TFLREUInt8(Instruction^.Value)));
      inc(Index);
      Instruction:=Instruction^.Next;
     end;
     opCHAR:begin
      for CurrentChar:=#0 to #255 do begin
-      if CurrentChar in PFLRECharClass(pointer(ptruint(Instruction^.Value)))^ then begin
-       AddChars(Index,TFLRERawByteChar(byte(CurrentChar)));
+      if CurrentChar in PFLRECharClass(pointer(TFLREPtrUInt(Instruction^.Value)))^ then begin
+       AddChars(Index,TFLRERawByteChar(TFLREUInt8(CurrentChar)));
        break;
       end;
      end;
      for CurrentChar:=#255 downto #0 do begin
-      if CurrentChar in PFLRECharClass(pointer(ptruint(Instruction^.Value)))^ then begin
-       AddChars(Index,TFLRERawByteChar(byte(CurrentChar)));
+      if CurrentChar in PFLRECharClass(pointer(TFLREPtrUInt(Instruction^.Value)))^ then begin
+       AddChars(Index,TFLRERawByteChar(TFLREUInt8(CurrentChar)));
        break;
       end;
      end;
@@ -17643,11 +18330,11 @@ end;
 procedure TFLRE.CompilePrefix;
 type TStackItem=record
       Node:PFLRENode;
-      Argument:ptrint;
+      Argument:TFLREPtrInt;
      end;
 var Node:PFLRENode;
-    Argument:ptrint;
-    StackPointer,Counter:longint;
+    Argument:TFLREPtrInt;
+    StackPointer,Counter:TFLREInt32;
     NodeStrings:array of TFLRERawByteString;
     Stack:array of TStackItem;
     Stop,First,IsSingle:boolean;
@@ -17824,8 +18511,8 @@ begin
 end;
 
 procedure TFLRE.CompileFixedStringSearch;
-var c:TFLRERawByteChar;
-    i,j,k:longint;
+var //c:TFLRERawByteChar;
+    i,j,k:TFLRESizeInt;
     HasMatch:boolean;
 begin
  FixedStringLength:=length(FixedString);
@@ -17880,11 +18567,11 @@ type PThread=^TThread;
      PThreadList=^TThreadList;
      TThreadList=record
       Threads:TThreads;
-      Count:longint;
+      Count:TFLREInt32;
      end;
      TThreadLists=array[0..1] of TThreadList;
-var CurrentPosition:longint;
-    Generation:int64;
+var CurrentPosition:TFLRESizeInt;
+    Generation:TFLREInt64;
     InstructionGenerations:TFLREInstructionGenerations;
     PrefixCharClasses:TFLREPrefixCharClasses;
  procedure AddThread(const ThreadList:PThreadList;Instruction:PFLREInstruction);
@@ -17920,7 +18607,7 @@ var CurrentPosition:longint;
   end;
  end;
  procedure CompilePrefixPattern;
- var CurrentPosition:longint;
+ var CurrentPosition:TFLRESizeInt;
      CurrentChar:TFLRERawByteChar;
  begin
   if not assigned(PrefixPatternBitMasks) then begin
@@ -17930,12 +18617,12 @@ var CurrentPosition:longint;
   for CurrentPosition:=0 to CountPrefixCharClasses-1 do begin
    for CurrentChar:=low(TFLRERawByteChar) to high(TFLRERawByteChar) do begin
     if CurrentChar in PrefixCharClasses[CurrentPosition] then begin
-     PrefixPatternBitMasks^[CurrentChar]:=PrefixPatternBitMasks^[CurrentChar] or longword(longword(1) shl CurrentPosition);
+     PrefixPatternBitMasks^[CurrentChar]:=PrefixPatternBitMasks^[CurrentChar] or TFLREUInt32(TFLREUInt32(1) shl CurrentPosition);
     end;
    end;
   end;
  end;
-var ThreadIndex,Count,TotalCount,Index:longint;
+var ThreadIndex,Count,TotalCount,Index:TFLREInt32;
     CurrentThreadList,NewThreadList,TemporaryThreadList:PThreadList;
     CurrentThread:PThread;
     Instruction:PFLREInstruction;
@@ -17979,7 +18666,7 @@ begin
     NewThreadList^.Count:=0;
 
     Generation:=1;
-    CurrentPosition:=0;
+//  CurrentPosition:=0;
     AddThread(CurrentThreadList,AnchoredStartInstruction);
 
     Count:=0;
@@ -18000,13 +18687,13 @@ begin
        end;
        opSINGLECHAR:begin
         if CurrentPosition<FLREMaxPrefixCharClasses then begin
-         PrefixCharClasses[CurrentPosition]:=PrefixCharClasses[CurrentPosition]+[TFLRERawByteChar(byte(Instruction^.Value))];
+         PrefixCharClasses[CurrentPosition]:=PrefixCharClasses[CurrentPosition]+[TFLRERawByteChar(TFLREUInt8(Instruction^.Value))];
         end;
         AddThread(NewThreadList,Instruction^.Next);
        end;
        opCHAR:begin
         if CurrentPosition<FLREMaxPrefixCharClasses then begin
-         PrefixCharClasses[CurrentPosition]:=PrefixCharClasses[CurrentPosition]+PFLRECharClass(pointer(ptruint(Instruction^.Value)))^;
+         PrefixCharClasses[CurrentPosition]:=PrefixCharClasses[CurrentPosition]+PFLRECharClass(pointer(TFLREPtrUInt(Instruction^.Value)))^;
         end;
         AddThread(NewThreadList,Instruction^.Next);
        end;
@@ -18134,7 +18821,7 @@ begin
         for CurrentChar:=low(TFLRERawByteChar) to high(TFLRERawByteChar) do begin
          if CurrentChar in PrefixCharClasses[0] then begin
           if LowChar<=HighChar then begin
-           if (byte(TFLRERawByteChar(HighChar))+1)=byte(TFLRERawByteChar(CurrentChar)) then begin
+           if (TFLREUInt8(TFLRERawByteChar(HighChar))+1)=TFLREUInt8(TFLRERawByteChar(CurrentChar)) then begin
             HighChar:=CurrentChar;
            end else begin
             inc(Count);
@@ -18160,7 +18847,7 @@ begin
           for CurrentChar:=low(TFLRERawByteChar) to high(TFLRERawByteChar) do begin
            if CurrentChar in PrefixCharClasses[0] then begin
             if LowChar<=HighChar then begin
-             if (byte(TFLRERawByteChar(HighChar))+1)=byte(TFLRERawByteChar(CurrentChar)) then begin
+             if (TFLREUInt8(TFLRERawByteChar(HighChar))+1)=TFLREUInt8(TFLRERawByteChar(CurrentChar)) then begin
               HighChar:=CurrentChar;
              end else begin
               FirstPrefixCharRanges[Count].FromChar:=LowChar;
@@ -18200,7 +18887,7 @@ begin
        for CurrentChar:=low(TFLRERawByteChar) to high(TFLRERawByteChar) do begin
         if CurrentChar in PrefixCharClasses[CurrentPosition] then begin
          if LowChar<=HighChar then begin
-          if (byte(TFLRERawByteChar(HighChar))+1)=byte(TFLRERawByteChar(CurrentChar)) then begin
+          if (TFLREUInt8(TFLRERawByteChar(HighChar))+1)=TFLREUInt8(TFLRERawByteChar(CurrentChar)) then begin
            HighChar:=CurrentChar;
           end else begin
            inc(Count);
@@ -18230,7 +18917,7 @@ begin
         for CurrentChar:=low(TFLRERawByteChar) to high(TFLRERawByteChar) do begin
          if CurrentChar in PrefixCharClasses[CurrentPosition] then begin
           if LowChar<=HighChar then begin
-           if (byte(TFLRERawByteChar(HighChar))+1)=byte(TFLRERawByteChar(CurrentChar)) then begin
+           if (TFLREUInt8(TFLRERawByteChar(HighChar))+1)=TFLREUInt8(TFLRERawByteChar(CurrentChar)) then begin
             HighChar:=CurrentChar;
            end else begin
             FirstPrefixCharRanges[CurrentPosition].FromChar:=LowChar;
@@ -18270,7 +18957,7 @@ end;
 
 procedure TFLRE.CompileByteMapForOnePassNFAAndDFA;
 var Node:PFLRENode;
-    i,ByteCount:longint;
+    Index,ByteCount:TFLRESizeInt;
     CurrentChar:TFLRERawByteChar;
     CharSetMap:TFLRECharClass;
     CharClass,NodeCharClass:TFLRECharClass;
@@ -18283,8 +18970,8 @@ begin
  ByteCount:=0;
  CharSetMap:=[];
  CharClass:=[];
- for i:=0 to Nodes.Count-1 do begin
-  Node:=Nodes[i];
+ for Index:=0 to Nodes.Count-1 do begin
+  Node:=Nodes[Index];
   if assigned(Node) then begin
    case Node^.NodeType of
     ntZEROWIDTH:begin
@@ -18326,8 +19013,8 @@ begin
   for CurrentChar:=low(TFLRERawByteChar) to high(TFLRERawByteChar) do begin
    if (CurrentChar in CharClass) and not (CurrentChar in CharSetMap) then begin
     System.Include(CharSetMap,CurrentChar);
-    ByteMap[byte(TFLRERawByteChar(CurrentChar))]:=ByteCount;
-    UnByteMap[ByteCount]:=byte(TFLRERawByteChar(CurrentChar));
+    ByteMap[TFLREUInt8(TFLRERawByteChar(CurrentChar))]:=ByteCount;
+    UnByteMap[ByteCount]:=TFLREUInt8(TFLRERawByteChar(CurrentChar));
     inc(ByteCount);
    end;
   end;
@@ -18335,7 +19022,7 @@ begin
  if ByteCount<256 then begin
   for CurrentChar:=low(TFLRERawByteChar) to high(TFLRERawByteChar) do begin
    if CurrentChar in CharSetMap then begin
-    inc(ByteMap[byte(TFLRERawByteChar(CurrentChar))]);
+    inc(ByteMap[TFLREUInt8(TFLRERawByteChar(CurrentChar))]);
    end;
   end;
   inc(ByteCount);
@@ -18347,15 +19034,15 @@ end;
 procedure TFLRE.CompileOnePassNFA;
 type TStackItem=record
       Instruction:PFLREInstruction;
-      Condition:longword;
+      Condition:TFLREUInt32;
      end;
      TStack=array of TStackItem;
 var Instruction:PFLREInstruction;
-    ToVisit,WorkQueue:TList;
+    ToVisit,WorkQueue:TFLREPointerList;
     Stack:TStack;
-    StackPointer,Len,MaxNodes,StateSize,i,NextIndex,NodesCount,b,ToVisitIndex,IndexValue:longint;
-    Condition,Action,NewAction:longword;
-    NodeByID:array of longint;
+    StackPointer,Len,MaxNodes,StateSize,Index,NextIndex,NodesCount,ByteValue,ToVisitIndex,IndexValue:TFLREInt32;
+    Condition,Action,NewAction:TFLREUInt32;
+    NodeByID:array of TFLREInt32;
     Nodes:PFLREOnePassNFAState;
     Node:PFLREOnePassNFAState;
     Matched,HasMatch:boolean;
@@ -18368,7 +19055,7 @@ begin
  Instruction:=AnchoredStartInstruction;
  Len:=CountForwardInstructions;
  MaxNodes:=Len+2;
- StateSize:=SizeOf(TFLREOnePassNFAState)+((ByteMapCount+1)*SizeOf(longword));
+ StateSize:=SizeOf(TFLREOnePassNFAState)+((ByteMapCount+1)*SizeOf(TFLREUInt32));
  HasMatch:=false;
  Stack:=nil;
  try
@@ -18376,7 +19063,7 @@ begin
   NodeByID:=nil;
   try
    SetLength(NodeByID,Len+2);
-   FillChar(NodeByID[0],length(NodeByID)*SizeOf(longint),#$ff);
+   FillChar(NodeByID[0],length(NodeByID)*SizeOf(TFLREInt32),#$ff);
    Nodes:=nil;
    try
     GetMem(Nodes,StateSize*MaxNodes);
@@ -18384,9 +19071,9 @@ begin
     NodeByID[AnchoredStartInstruction^.IDandOpcode shr 8]:=0;
     NodesCount:=1;
     Condition:=0;
-    ToVisit:=TList.Create;
+    ToVisit:=TFLREPointerList.Create;
     try
-     WorkQueue:=TList.Create;
+     WorkQueue:=TFLREPointerList.Create;
      try
       ToVisit.Add(AnchoredStartInstruction);
       ToVisitIndex:=0;
@@ -18394,9 +19081,9 @@ begin
        Instruction:=ToVisit[ToVisitIndex];
        inc(ToVisitIndex);
        if assigned(Instruction) then begin
-        Node:=pointer(@PFLRERawByteChar(Nodes)[StateSize*longint(NodeByID[Instruction^.IDandOpcode shr 8])]);
-        for i:=0 to ByteMapCount-1 do begin
-         Node^.Action[i]:=sfImpossible;
+        Node:=pointer(@PFLRERawByteChar(Nodes)[StateSize*TFLREInt32(NodeByID[Instruction^.IDandOpcode shr 8])]);
+        for Index:=0 to ByteMapCount-1 do begin
+         Node^.Action[Index]:=sfImpossible;
         end;
         Node^.MatchCondition:=sfImpossible;
         Node^.NoAction:=sfImpossible;
@@ -18437,17 +19124,17 @@ begin
            if Matched then begin
             Condition:=Condition or sfMatchWins;
            end;
-           NewAction:=longword(NextIndex shl sfIndexShift) or Condition;
+           NewAction:=TFLREUInt32(NextIndex shl sfIndexShift) or Condition;
            begin
             case Instruction^.IDandOpcode and $ff of
              opNONE:begin
               CharClass:=EmptyCharClass;
              end;
              opSINGLECHAR:begin
-              CharClass:=[TFLRERawByteChar(byte(Instruction^.Value))];
+              CharClass:=[TFLRERawByteChar(TFLREUInt8(Instruction^.Value))];
              end;
              opCHAR:begin
-              CharClass:=PFLRECharClass(pointer(ptruint(Instruction^.Value)))^;
+              CharClass:=PFLRECharClass(pointer(TFLREPtrUInt(Instruction^.Value)))^;
              end;
              else {opANY:}begin
               CharClass:=AllCharClass;
@@ -18485,33 +19172,33 @@ begin
               break;
              end;
              opSINGLECHAR:begin
-              b:=ByteMap[Instruction^.Value and $ff];
-              Action:=Node^.Action[b];
+              ByteValue:=ByteMap[Instruction^.Value and $ff];
+              Action:=Node^.Action[ByteValue];
               if (Action and sfImpossible)=sfImpossible then begin
-               Node^.Action[b]:=NewAction;
+               Node^.Action[ByteValue]:=NewAction;
               end else if Action<>NewAction then begin
                Exclude(InternalFlags,fifOnePassNFAReady);
                break;
               end;
              end;
              opCHAR:begin
-              if PFLRECharClass(pointer(ptruint(Instruction^.Value)))^=AllCharClass then begin
-               for i:=0 to ByteMapCount-1 do begin
-                Action:=Node^.Action[i];
+              if PFLRECharClass(pointer(TFLREPtrUInt(Instruction^.Value)))^=AllCharClass then begin
+               for Index:=0 to ByteMapCount-1 do begin
+                Action:=Node^.Action[Index];
                 if (Action and sfImpossible)=sfImpossible then begin
-                 Node^.Action[i]:=NewAction;
+                 Node^.Action[Index]:=NewAction;
                 end else if Action<>NewAction then begin
                  Exclude(InternalFlags,fifOnePassNFAReady);
                  break;
                 end;
                end;
               end else begin
-               for i:=0 to 255 do begin
-                if TFLRERawByteChar(byte(i)) in PFLRECharClass(pointer(ptruint(Instruction^.Value)))^ then begin
-                 b:=ByteMap[i];
-                 Action:=Node^.Action[b];
+               for Index:=0 to 255 do begin
+                if TFLRERawByteChar(TFLREUInt8(Index)) in PFLRECharClass(pointer(TFLREPtrUInt(Instruction^.Value)))^ then begin
+                 ByteValue:=ByteMap[Index];
+                 Action:=Node^.Action[ByteValue];
                  if (Action and sfImpossible)=sfImpossible then begin
-                  Node^.Action[b]:=NewAction;
+                  Node^.Action[ByteValue]:=NewAction;
                  end else if Action<>NewAction then begin
                   Exclude(InternalFlags,fifOnePassNFAReady);
                   break;
@@ -18524,10 +19211,10 @@ begin
               end;
              end;
              else {opANY:}begin
-              for i:=0 to ByteMapCount-1 do begin
-               Action:=Node^.Action[i];
+              for Index:=0 to ByteMapCount-1 do begin
+               Action:=Node^.Action[Index];
                if (Action and sfImpossible)=sfImpossible then begin
-                Node^.Action[i]:=NewAction;
+                Node^.Action[Index]:=NewAction;
                end else if Action<>NewAction then begin
                 Exclude(InternalFlags,fifOnePassNFAReady);
                 break;
@@ -18553,7 +19240,7 @@ begin
             break;
            end else begin
             NextIndex:=0;
-            NewAction:=longword(NextIndex shl sfIndexShift) or (Condition or sfMatchWins);
+            NewAction:=TFLREUInt32(NextIndex shl sfIndexShift) or (Condition or sfMatchWins);
             if (Node^.NoAction shr sfIndexShift)=0 then begin
              if (Node^.NoAction and sfImpossible)=sfImpossible then begin
               Node^.NoAction:=NewAction;
@@ -18562,11 +19249,11 @@ begin
               break;
              end;
             end;
-            for i:=0 to ByteMapCount-1 do begin
-             Action:=Node^.Action[i];
+            for Index:=0 to ByteMapCount-1 do begin
+             Action:=Node^.Action[Index];
              if (Action shr sfIndexShift)=0 then begin
               if (Action and sfImpossible)=sfImpossible then begin
-               Node^.Action[i]:=NewAction;
+               Node^.Action[Index]:=NewAction;
               end else if Action<>NewAction then begin
                Exclude(InternalFlags,fifOnePassNFAReady);
                break;
@@ -18607,7 +19294,7 @@ begin
            inc(StackPointer);
           end;
           opZEROWIDTH:begin
-           Condition:=Condition or longword(Instruction^.Value);
+           Condition:=Condition or TFLREUInt32(Instruction^.Value);
            if WorkQueue.IndexOf(Instruction^.Next)>=0 then begin
             Exclude(InternalFlags,fifOnePassNFAReady);
             break;
@@ -18649,7 +19336,7 @@ begin
         Exclude(InternalFlags,fifOnePassNFAReady);
        end else begin
         NextIndex:=0;
-        NewAction:=longword(NextIndex shl sfIndexShift) or (Condition or sfMatchWins);
+        NewAction:=TFLREUInt32(NextIndex shl sfIndexShift) or (Condition or sfMatchWins);
         if (Node^.NoAction shr sfIndexShift)=0 then begin
          if (Node^.NoAction and sfImpossible)=sfImpossible then begin
           Node^.NoAction:=NewAction;
@@ -18658,11 +19345,11 @@ begin
          end;
         end;
         if fifOnePassNFAReady in InternalFlags then begin
-         for i:=0 to ByteMapCount-1 do begin
-          Action:=Node^.Action[i];
+         for Index:=0 to ByteMapCount-1 do begin
+          Action:=Node^.Action[Index];
           if (Action shr sfIndexShift)=0 then begin
            if (Action and sfImpossible)=sfImpossible then begin
-            Node^.Action[i]:=NewAction;
+            Node^.Action[Index]:=NewAction;
            end else if Action<>NewAction then begin
             Exclude(InternalFlags,fifOnePassNFAReady);
             break;
@@ -18676,7 +19363,7 @@ begin
        GetMem(OnePassNFANodes,NodesCount*StateSize);
        OnePassNFANodesCount:=NodesCount;
        Move(Nodes^,OnePassNFANodes^,NodesCount*StateSize);
-       OnePassNFAStart:=pointer(@PFLRERawByteChar(OnePassNFANodes)[StateSize*longint(NodeByID[AnchoredStartInstruction^.IDandOpcode shr 8])]);
+       OnePassNFAStart:=pointer(@PFLRERawByteChar(OnePassNFANodes)[StateSize*TFLREInt32(NodeByID[AnchoredStartInstruction^.IDandOpcode shr 8])]);
        OnePassNFAStateSize:=StateSize;
       end;
      finally
@@ -18711,11 +19398,11 @@ type PThread=^TThread;
      PThreadList=^TThreadList;
      TThreadList=record
       Threads:TThreads;
-      Count:longint;
+      Count:TFLREInt32;
      end;
      TThreadLists=array[0..1] of TThreadList;
-var CurrentPosition:longint;
-    Generation:int64;
+var CurrentPosition:TFLRESizeInt;
+    Generation:TFLREInt64;
     InstructionGenerations:TFLREInstructionGenerations;
     InstructionVisitedCounts:TFLREInstructionGenerations;
     BeginningJump,BeginningSplit,EndingSplit,BeginningWildCard,BeginningAnchor,EndingAnchor,
@@ -18802,7 +19489,7 @@ var CurrentPosition:longint;
        TStackItems=array of TStackItem;
   var Stack:TStackItems;
       StackItem:PStackItem;
-      StackSize:longint;
+      StackSize:TFLREInt32;
       Alternative:boolean;
  begin
   Stack:=nil;
@@ -18886,11 +19573,11 @@ var CurrentPosition:longint;
    SetLength(Stack,0);
   end;
  end;
-var ThreadIndex,Count,TotalCount,Index:longint;
+var ThreadIndex{,Count,TotalCount},Index:TFLREInt32;
     CurrentThreadList,NewThreadList,TemporaryThreadList:PThreadList;
     CurrentThread:PThread;
     Instruction:PFLREInstruction;
-    CurrentChar:TFLRERawByteChar;
+//  CurrentChar:TFLRERawByteChar;
     ThreadLists:TThreadLists;
     PossibleBeginningSplit,PossibleBeginningAnchor,PossibleEndingSplit,PossibleEndingAnchor,
     HaveEndingAnchorWithoutEndingSplit,HaveEndingAnchorWithEndingSplit,HaveEndingWithoutEndingAnchor:boolean;
@@ -18947,14 +19634,14 @@ begin
     CurrentPosition:=0;
     AddThread(CurrentThreadList,AnchoredStartInstruction,false,false,false,false);
 
-    Count:=0;
+//  Count:=0;
 
     for CurrentPosition:=0 to $7fffffff do begin
      if CurrentThreadList^.Count=0 then begin
       break;
      end;
      inc(Generation);
-     inc(Count);
+//   inc(Count);
      for ThreadIndex:=0 to CurrentThreadList^.Count-1 do begin
       CurrentThread:=@CurrentThreadList^.Threads[ThreadIndex];
       Instruction:=CurrentThread^.Instruction;
@@ -19059,7 +19746,7 @@ end;
 
 function TFLRE.PrefilterOptimize(Node:TFLREPrefilterNode):TFLREPrefilterNode;
 var OK:boolean;
-    Counter:longint;
+    Counter:TFLREInt32;
     Temp:TFLREPrefilterNode;
 begin
  result:=Node;
@@ -19103,6 +19790,8 @@ begin
      end;
     end;
    end;
+   else begin
+   end;
   end;
   break;
  end;
@@ -19111,7 +19800,7 @@ end;
 function TFLRE.CompilePrefilterTree(RootNode:PFLRENode):TFLREPrefilterNode;
  function Process(Node:PFLRENode):TFLREPrefilterNode;
  var Left,Right,Temp,OtherTemp:TFLREPrefilterNode;
-     Counter,SubCounter,IndexCounter,Count:longint;
+     Counter,SubCounter,IndexCounter,Count:TFLREInt32;
      CharClass:TFLRECharClass;
      SingleChar,CurrentChar:TFLRERawByteChar;
      OK,ParentLoop:boolean;
@@ -19438,6 +20127,10 @@ function TFLRE.CompilePrefilterTree(RootNode:PFLRENode):TFLREPrefilterNode;
       end;
 
      end;
+
+     else begin
+     end;
+
     end;
 
     break;
@@ -19451,7 +20144,7 @@ begin
  result:=Process(RootNode);
 end;
 
-function TFLRE.IsWordChar(const CharValue:longword):boolean; {$ifdef caninline}inline;{$endif}
+function TFLRE.IsWordChar(const CharValue:TFLREUInt32):boolean;
 begin
  if CharValue=$ffffffff then begin
   result:=false;
@@ -19499,7 +20192,7 @@ begin
  end;
 end;
 
-function TFLRE.SearchNextPossibleStart(const Input:PFLRERawByteChar;const InputLength:longint):longint; {$ifdef cpu386}register;{$endif}
+function TFLRE.SearchNextPossibleStart(const Input:PFLRERawByteChar;const InputLength:TFLRESizeInt):TFLRESizeInt; {$ifdef cpu386}register;{$endif}
 begin
  if CountPrefixCharClasses>0 then begin
   if (CountPrefixCharClasses<=FixedStringLength) and not (rfIGNORECASE in Flags) then begin
@@ -19670,7 +20363,7 @@ begin
  end;
 end;
 
-function TFLRE.SearchNextPossibleStartForDFA(const Input:PFLRERawByteChar;const InputLength:longint):longint; {$ifdef cpu386}register;{$endif}
+function TFLRE.SearchNextPossibleStartForDFA(const Input:PFLRERawByteChar;const InputLength:TFLRESizeInt):TFLRESizeInt; {$ifdef cpu386}register;{$endif}
 begin
  case CountPrefixCharClasses of
   0:begin
@@ -19813,8 +20506,8 @@ begin
  end;
 end;
 
-function TFLRE.SearchMatch(ThreadLocalStorageInstance:TFLREThreadLocalStorageInstance;var Captures:TFLRECaptures;StartPosition,UntilExcludingPosition:longint;UnanchoredStart:boolean):boolean;
-var MatchBegin,MatchEnd,Offset,Len:longint;
+function TFLRE.SearchMatch(ThreadLocalStorageInstance:TFLREThreadLocalStorageInstance;var Captures:TFLRECaptures;StartPosition,UntilExcludingPosition:TFLRESizeInt;UnanchoredStart:boolean):boolean;
+var MatchBegin,MatchEnd,Offset,Len:TFLRESizeInt;
 begin
 
  // Check the start position
@@ -19854,7 +20547,18 @@ begin
  end;
 
  // Then try DFA
- if fifDFAReady in InternalFlags then begin
+ if (fifDFAReady in InternalFlags) and
+ 
+    // If we have only a small amount of text and we need submatch information anyway and we 
+    // use OnePass or BitState to do it, we can save the trouble with DFA. OnePass or BitState 
+    // perform fast enough for that. For very small texts, OnePass will actually beat DFA and 
+    // doesn't have the shared state and occasional overhead that DFA has.     
+    (not 
+     ((((fifOnePassNFAReady in InternalFlags) and not UnanchoredStart) and 
+       ((UntilExcludingPosition-StartPosition)<=4096) and
+       ((CountCaptures>=2) or ((UntilExcludingPosition-StartPosition)<=16))) or
+      ((fifBitStateNFAReady in InternalFlags) and (CountCaptures>=2) and ((UntilExcludingPosition-StartPosition)<=MaxBitStateNFATextSize)))) 
+     then begin
   ThreadLocalStorageInstance.DFA.IsUnanchored:=UnanchoredStart;
   case ThreadLocalStorageInstance.DFA.SearchMatch(StartPosition,UntilExcludingPosition,MatchEnd,UnanchoredStart) of
    DFAMatch:begin
@@ -19912,7 +20616,7 @@ begin
    exit;
   end;
  end else begin
-  if fifBitStateNFAReady in InternalFlags then begin
+  if (fifBitStateNFAReady in InternalFlags) and ((UntilExcludingPosition-StartPosition)<=MaxBitStateNFATextSize) then begin
    case ThreadLocalStorageInstance.BitStateNFA.SearchMatch(Captures,StartPosition,UntilExcludingPosition,UnanchoredStart) of
     BitStateNFAFail:begin
      result:=false;
@@ -19936,9 +20640,9 @@ begin
 
 end;
 
-function TFLRE.PtrMatch(const Input:pointer;const InputLength:longint;var Captures:TFLRECaptures;const StartPosition:longint=0):boolean;
+function TFLRE.PtrMatch(const Input:pointer;const InputLength:TFLRESizeInt;var Captures:TFLRECaptures;const StartPosition:TFLRESizeInt=0):boolean;
 var ThreadLocalStorageInstance:TFLREThreadLocalStorageInstance;
-    Index,Count:longint;
+    Index,Count:TFLRESizeInt;
 begin
  ThreadLocalStorageInstance:=AcquireThreadLocalStorageInstance;
  try
@@ -19969,9 +20673,9 @@ begin
  end;
 end;
 
-function TFLRE.PtrMatchNext(const Input:pointer;const InputLength:longint;var Captures:TFLRECaptures;const StartPosition:longint=0):boolean;
+function TFLRE.PtrMatchNext(const Input:pointer;const InputLength:TFLRESizeInt;var Captures:TFLRECaptures;const StartPosition:TFLRESizeInt=0):boolean;
 var ThreadLocalStorageInstance:TFLREThreadLocalStorageInstance;
-    Index,Count:longint;
+    Index,Count:TFLRESizeInt;
 begin
  if (StartPosition>=0) and (StartPosition<InputLength) then begin
   ThreadLocalStorageInstance:=AcquireThreadLocalStorageInstance;
@@ -20006,8 +20710,8 @@ begin
  end;
 end;
 
-function TFLRE.PtrMatchAll(const Input:pointer;const InputLength:longint;var MultiCaptures:TFLREMultiCaptures;const StartPosition:longint=0;Limit:longint=-1):boolean;
-var CurrentPosition,CountMultiCaptures,Next,Index,Count:longint;
+function TFLRE.PtrMatchAll(const Input:pointer;const InputLength:TFLRESizeInt;var MultiCaptures:TFLREMultiCaptures;const StartPosition:TFLRESizeInt=0;Limit:TFLRESizeInt=-1):boolean;
+var CurrentPosition,CountMultiCaptures,Next,Index,Count:TFLRESizeInt;
     MatchResult:TFLRECaptures;
     ThreadLocalStorageInstance:TFLREThreadLocalStorageInstance;
 begin
@@ -20074,8 +20778,8 @@ begin
  end;
 end;
 
-function TFLRE.PtrExtractAll(const Input:pointer;const InputLength:longint;var MultiExtractions:TFLREMultiStrings;const StartPosition:longint=0;Limit:longint=-1):boolean;
-var CurrentPosition,CountMultiExtractions,Next,Index,Count:longint;
+function TFLRE.PtrExtractAll(const Input:pointer;const InputLength:TFLRESizeInt;var MultiExtractions:TFLREMultiStrings;const StartPosition:TFLRESizeInt=0;Limit:TFLRESizeInt=-1):boolean;
+var CurrentPosition,CountMultiExtractions,Next,Index,Count:TFLRESizeInt;
     MatchResult:TFLRECaptures;
     ThreadLocalStorageInstance:TFLREThreadLocalStorageInstance;
 begin
@@ -20127,8 +20831,8 @@ begin
  end;
 end;
 
-function TFLRE.PtrReplace(const Input:pointer;const InputLength:longint;const Replacement:pointer;const ReplacementLength:longint;const StartPosition:longint=0;Limit:longint=-1):TFLRERawByteString;
-var CurrentPosition,LastEnd,i,j,e:longint;
+function TFLRE.PtrReplace(const Input:pointer;const InputLength:TFLRESizeInt;const Replacement:pointer;const ReplacementLength:TFLRESizeInt;const StartPosition:TFLRESizeInt=0;Limit:TFLRESizeInt=-1):TFLRERawByteString;
+var CurrentPosition,LastEnd,i,j,e:TFLRESizeInt;
     Captures:TFLRECaptures;
     SimpleReplacement:boolean;
     c,cc:TFLRERawByteChar;
@@ -20355,8 +21059,8 @@ begin
  end;
 end;
 
-function TFLRE.PtrReplaceCallback(const Input:pointer;const InputLength:longint;const ReplacementCallback:TFLREReplacementCallback;const StartPosition:longint=0;Limit:longint=-1):TFLRERawByteString;
-var CurrentPosition,Next,LastPosition:longint;
+function TFLRE.PtrReplaceCallback(const Input:pointer;const InputLength:TFLRESizeInt;const ReplacementCallbackData:pointer;const ReplacementCallback:TFLREReplacementCallback;const StartPosition:TFLRESizeInt=0;Limit:TFLRESizeInt=-1):TFLRERawByteString;
+var CurrentPosition,Next,LastPosition:TFLRESizeInt;
     Captures:TFLRECaptures;
     ThreadLocalStorageInstance:TFLREThreadLocalStorageInstance;
 begin
@@ -20388,7 +21092,7 @@ begin
       if LastPosition<Captures[0].Start then begin
        result:=result+FLREPtrCopy(PFLRERawByteChar(Input),LastPosition,Captures[0].Start-LastPosition);
       end;
-      result:=result+ReplacementCallback(PFLRERawByteChar(Input),Captures);
+      result:=result+ReplacementCallback(ReplacementCallbackData,PFLRERawByteChar(Input),InputLength,Captures);
       CurrentPosition:=Captures[0].Start+Captures[0].Length;
       if CurrentPosition<Next then begin
        CurrentPosition:=Next;
@@ -20411,9 +21115,65 @@ begin
  end;
 end;
 
-function TFLRE.PtrSplit(const Input:pointer;const InputLength:longint;var SplittedStrings:TFLREStrings;const StartPosition:longint=0;Limit:longint=-1;const WithEmpty:boolean=true):boolean;
-var LastPosition,MatchPosition,MatchEnd,Count,Index:longint;
-    Done:boolean;
+function TFLRE.PtrReplaceCallback(const Input:pointer;const InputLength:TFLRESizeInt;const ReplacementCallback:TFLREReplacementObjectCallback;const StartPosition:TFLRESizeInt=0;Limit:TFLRESizeInt=-1):TFLRERawByteString;
+var CurrentPosition,Next,LastPosition:TFLRESizeInt;
+    Captures:TFLRECaptures;
+    ThreadLocalStorageInstance:TFLREThreadLocalStorageInstance;
+begin
+ result:='';
+ if rfMULTIMATCH in Flags then begin
+  raise EFLRE.Create('ReplaceCallback unsupported in multi match mode');
+ end;
+ if not assigned(ReplacementCallback) then begin
+  raise EFLRE.Create('ReplaceCallback does need a replacement callback');
+ end;
+ Captures:=nil;
+ try
+  CurrentPosition:=StartPosition;
+  LastPosition:=CurrentPosition;
+  if CurrentPosition>=0 then begin
+   ThreadLocalStorageInstance:=AcquireThreadLocalStorageInstance;
+   try
+    ThreadLocalStorageInstance.Input:=Input;
+    ThreadLocalStorageInstance.InputLength:=InputLength;
+    SetLength(Captures,CountCaptures);
+    while (CurrentPosition<InputLength) and (Limit<>0) and SearchMatch(ThreadLocalStorageInstance,Captures,CurrentPosition,InputLength,fifHaveUnanchoredStart in InternalFlags) do begin
+     Next:=CurrentPosition+1;
+     if (Captures[0].Start+Captures[0].Length)=LastPosition then begin
+      CurrentPosition:=Captures[0].Start+Captures[0].Length;
+      if CurrentPosition<Next then begin
+       CurrentPosition:=Next;
+      end;
+     end else begin
+      if LastPosition<Captures[0].Start then begin
+       result:=result+FLREPtrCopy(PFLRERawByteChar(Input),LastPosition,Captures[0].Start-LastPosition);
+      end;
+      result:=result+ReplacementCallback(PFLRERawByteChar(Input),InputLength,Captures);
+      CurrentPosition:=Captures[0].Start+Captures[0].Length;
+      if CurrentPosition<Next then begin
+       CurrentPosition:=Next;
+      end;
+      LastPosition:=CurrentPosition;
+     end;
+     if Limit>0 then begin
+      dec(Limit);
+     end;
+    end;
+    if LastPosition<InputLength then begin
+     result:=result+FLREPtrCopy(PFLRERawByteChar(Input),LastPosition,InputLength-LastPosition);
+    end;
+   finally
+    ReleaseThreadLocalStorageInstance(ThreadLocalStorageInstance);
+   end;
+  end;
+ finally
+  SetLength(Captures,0);
+ end;
+end;
+
+function TFLRE.PtrSplit(const Input:pointer;const InputLength:TFLRESizeInt;var SplittedStrings:TFLREStrings;const StartPosition:TFLRESizeInt=0;Limit:TFLRESizeInt=-1;const WithEmpty:boolean=true):boolean;
+var LastPosition,MatchPosition,MatchEnd,Count,Index:TFLRESizeInt;
+//  Done:boolean;
     Captures:TFLRECaptures;
     ThreadLocalStorageInstance:TFLREThreadLocalStorageInstance;
 begin
@@ -20452,6 +21212,7 @@ begin
        Count:=1;
        SetLength(SplittedStrings,Count);
        SplittedStrings[0]:='';
+       result:=true;
       end;
 
      end else begin
@@ -20484,6 +21245,8 @@ begin
        end;
        SplittedStrings[Count]:=FLREPtrCopy(PFLRERawByteChar(Input),LastPosition,MatchPosition-LastPosition);
        inc(Count);
+
+       result:=true;
 
        if Limit>0 then begin
         dec(Limit);
@@ -20557,9 +21320,9 @@ begin
 
 end;
 
-function TFLRE.PtrTest(const Input:pointer;const InputLength:longint;const StartPosition:longint=0):boolean;
+function TFLRE.PtrTest(const Input:pointer;const InputLength:TFLRESizeInt;const StartPosition:TFLRESizeInt=0):boolean;
 var ThreadLocalStorageInstance:TFLREThreadLocalStorageInstance;
-    Index,Count:longint;
+    Index,Count:TFLRESizeInt;
     Captures:TFLRECaptures;
 begin
  ThreadLocalStorageInstance:=AcquireThreadLocalStorageInstance;
@@ -20586,9 +21349,9 @@ begin
  end;
 end;
 
-function TFLRE.PtrTestAll(const Input:pointer;const InputLength:longint;const StartPosition:longint=0):boolean;
+function TFLRE.PtrTestAll(const Input:pointer;const InputLength:TFLRESizeInt;const StartPosition:TFLRESizeInt=0):boolean;
 var ThreadLocalStorageInstance:TFLREThreadLocalStorageInstance;
-    Index,Count:longint;
+    Index,Count:TFLRESizeInt;
     Captures:TFLRECaptures;
 begin
  ThreadLocalStorageInstance:=AcquireThreadLocalStorageInstance;
@@ -20615,9 +21378,9 @@ begin
  end;
 end;
 
-function TFLRE.PtrFind(const Input:pointer;const InputLength:longint;const StartPosition:longint=0):longint;
+function TFLRE.PtrFind(const Input:pointer;const InputLength:TFLRESizeInt;const StartPosition:TFLRESizeInt=0):TFLRESizeInt;
 var ThreadLocalStorageInstance:TFLREThreadLocalStorageInstance;
-    Index,Count:longint;
+    Index,Count:TFLRESizeInt;
     Captures:TFLRECaptures;
 begin
  ThreadLocalStorageInstance:=AcquireThreadLocalStorageInstance;
@@ -20635,7 +21398,7 @@ begin
     Count:=CountCaptures;
    end;
    SetLength(Captures,Count);
-   if SearchMatch(ThreadLocalStorageInstance,Captures,StartPosition,InputLength,true) then begin
+   if SearchMatch(ThreadLocalStorageInstance,Captures,StartPosition,InputLength,fifHaveUnanchoredStart in InternalFlags) then begin
     result:=Captures[0].Start;
    end else begin
     result:=-1;
@@ -20648,8 +21411,8 @@ begin
  end;
 end;
 
-function TFLRE.Match(const Input:TFLRERawByteString;var Captures:TFLRECaptures;const StartPosition:longint=1):boolean;
-var Counter:longint;
+function TFLRE.Match(const Input:TFLRERawByteString;var Captures:TFLRECaptures;const StartPosition:TFLRESizeInt=1):boolean;
+var Counter:TFLRESizeInt;
 begin
  result:=PtrMatch(PFLRERawByteChar(@Input[1]),length(Input),Captures,StartPosition-1);
  for Counter:=0 to length(Captures)-1 do begin
@@ -20660,8 +21423,8 @@ begin
  end;
 end;
 
-function TFLRE.MatchNext(const Input:TFLRERawByteString;var Captures:TFLRECaptures;const StartPosition:longint=1):boolean;
-var Counter:longint;
+function TFLRE.MatchNext(const Input:TFLRERawByteString;var Captures:TFLRECaptures;const StartPosition:TFLRESizeInt=1):boolean;
+var Counter:TFLRESizeInt;
 begin
  result:=PtrMatchNext(PFLRERawByteChar(@Input[1]),length(Input),Captures,StartPosition-1);
  for Counter:=0 to length(Captures)-1 do begin
@@ -20672,8 +21435,8 @@ begin
  end;
 end;
 
-function TFLRE.MatchAll(const Input:TFLRERawByteString;var MultiCaptures:TFLREMultiCaptures;const StartPosition:longint=1;Limit:longint=-1):boolean;
-var Counter,SubCounter:longint;
+function TFLRE.MatchAll(const Input:TFLRERawByteString;var MultiCaptures:TFLREMultiCaptures;const StartPosition:TFLRESizeInt=1;Limit:TFLRESizeInt=-1):boolean;
+var Counter,SubCounter:TFLRESizeInt;
 begin
  result:=PtrMatchAll(PFLRERawByteChar(@Input[1]),length(Input),MultiCaptures,StartPosition-1,Limit);
  for Counter:=0 to length(MultiCaptures)-1 do begin
@@ -20686,43 +21449,48 @@ begin
  end;
 end;
 
-function TFLRE.ExtractAll(const Input:TFLRERawByteString;var MultiExtractions:TFLREMultiStrings;const StartPosition:longint=1;Limit:longint=-1):boolean;
+function TFLRE.ExtractAll(const Input:TFLRERawByteString;var MultiExtractions:TFLREMultiStrings;const StartPosition:TFLRESizeInt=1;Limit:TFLRESizeInt=-1):boolean;
 begin
  result:=PtrExtractAll(PFLRERawByteChar(@Input[1]),length(Input),MultiExtractions,StartPosition-1,Limit);
 end;
 
-function TFLRE.Replace(const Input,Replacement:TFLRERawByteString;const StartPosition:longint=1;Limit:longint=-1):TFLRERawByteString;
+function TFLRE.Replace(const Input,Replacement:TFLRERawByteString;const StartPosition:TFLRESizeInt=1;Limit:TFLRESizeInt=-1):TFLRERawByteString;
 begin
  result:=PtrReplace(PFLRERawByteChar(@Input[1]),length(Input),PFLRERawByteChar(@Replacement[1]),length(Replacement),StartPosition-1,Limit);
 end;
 
-function TFLRE.ReplaceCallback(const Input:TFLRERawByteString;const ReplacementCallback:TFLREReplacementCallback;const StartPosition:longint=1;Limit:longint=-1):TFLRERawByteString;
+function TFLRE.ReplaceCallback(const Input:TFLRERawByteString;const ReplacementCallbackData:pointer;const ReplacementCallback:TFLREReplacementCallback;const StartPosition:TFLRESizeInt=1;Limit:TFLRESizeInt=-1):TFLRERawByteString;
+begin
+ result:=PtrReplaceCallback(PFLRERawByteChar(@Input[1]),length(Input),ReplacementCallbackData,ReplacementCallback,StartPosition-1,Limit);
+end;
+
+function TFLRE.ReplaceCallback(const Input:TFLRERawByteString;const ReplacementCallback:TFLREReplacementObjectCallback;const StartPosition:TFLRESizeInt=1;Limit:TFLRESizeInt=-1):TFLRERawByteString;
 begin
  result:=PtrReplaceCallback(PFLRERawByteChar(@Input[1]),length(Input),ReplacementCallback,StartPosition-1,Limit);
 end;
 
-function TFLRE.Split(const Input:TFLRERawByteString;var SplittedStrings:TFLREStrings;const StartPosition:longint=1;Limit:longint=-1;const WithEmpty:boolean=true):boolean;
+function TFLRE.Split(const Input:TFLRERawByteString;var SplittedStrings:TFLREStrings;const StartPosition:TFLRESizeInt=1;Limit:TFLRESizeInt=-1;const WithEmpty:boolean=true):boolean;
 begin
  result:=PtrSplit(PFLRERawByteChar(@Input[1]),length(Input),SplittedStrings,StartPosition-1,Limit,WithEmpty);
 end;
 
-function TFLRE.Test(const Input:TFLRERawByteString;const StartPosition:longint=1):boolean;
+function TFLRE.Test(const Input:TFLRERawByteString;const StartPosition:TFLRESizeInt=1):boolean;
 begin
  result:=PtrTest(PFLRERawByteChar(@Input[1]),length(Input),StartPosition-1);
 end;
 
-function TFLRE.TestAll(const Input:TFLRERawByteString;const StartPosition:longint=1):boolean;
+function TFLRE.TestAll(const Input:TFLRERawByteString;const StartPosition:TFLRESizeInt=1):boolean;
 begin
  result:=PtrTestAll(PFLRERawByteChar(@Input[1]),length(Input),StartPosition-1);
 end;
 
-function TFLRE.Find(const Input:TFLRERawByteString;const StartPosition:longint=1):longint;
+function TFLRE.Find(const Input:TFLRERawByteString;const StartPosition:TFLRESizeInt=1):TFLRESizeInt;
 begin
  result:=PtrFind(PFLRERawByteChar(@Input[1]),length(Input),StartPosition-1)+1;
 end;
 
-function TFLRE.UTF8Match(const Input:TFLREUTF8String;var Captures:TFLRECaptures;const StartPosition:longint=1):boolean;
-var Counter:longint;
+function TFLRE.UTF8Match(const Input:TFLREUTF8String;var Captures:TFLRECaptures;const StartPosition:TFLRESizeInt=1):boolean;
+var Counter:TFLRESizeInt;
 begin
  result:=PtrMatch(PFLRERawByteChar(@Input[1]),length(Input),Captures,StartPosition-1);
  for Counter:=0 to length(Captures)-1 do begin
@@ -20733,8 +21501,8 @@ begin
  end;
 end;
 
-function TFLRE.UTF8MatchNext(const Input:TFLREUTF8String;var Captures:TFLRECaptures;const StartPosition:longint=1):boolean;
-var Counter:longint;
+function TFLRE.UTF8MatchNext(const Input:TFLREUTF8String;var Captures:TFLRECaptures;const StartPosition:TFLRESizeInt=1):boolean;
+var Counter:TFLRESizeInt;
 begin
  result:=PtrMatchNext(PFLRERawByteChar(@Input[1]),length(Input),Captures,StartPosition-1);
  for Counter:=0 to length(Captures)-1 do begin
@@ -20745,8 +21513,8 @@ begin
  end;
 end;
 
-function TFLRE.UTF8MatchAll(const Input:TFLREUTF8String;var MultiCaptures:TFLREMultiCaptures;const StartPosition:longint=1;Limit:longint=-1):boolean;
-var Counter,SubCounter:longint;
+function TFLRE.UTF8MatchAll(const Input:TFLREUTF8String;var MultiCaptures:TFLREMultiCaptures;const StartPosition:TFLRESizeInt=1;Limit:TFLRESizeInt=-1):boolean;
+var Counter,SubCounter:TFLRESizeInt;
 begin
  result:=PtrMatchAll(PFLRERawByteChar(@Input[1]),length(Input),MultiCaptures,StartPosition-1,Limit);
  for Counter:=0 to length(MultiCaptures)-1 do begin
@@ -20759,37 +21527,42 @@ begin
  end;
 end;
 
-function TFLRE.UTF8ExtractAll(const Input:TFLREUTF8String;var MultiExtractions:TFLREMultiStrings;const StartPosition:longint=1;Limit:longint=-1):boolean;
+function TFLRE.UTF8ExtractAll(const Input:TFLREUTF8String;var MultiExtractions:TFLREMultiStrings;const StartPosition:TFLRESizeInt=1;Limit:TFLRESizeInt=-1):boolean;
 begin
  result:=PtrExtractAll(PFLRERawByteChar(@Input[1]),length(Input),MultiExtractions,StartPosition-1,Limit);
 end;
 
-function TFLRE.UTF8Replace(const Input,Replacement:TFLREUTF8String;const StartPosition:longint=1;Limit:longint=-1):TFLREUTF8String;
+function TFLRE.UTF8Replace(const Input,Replacement:TFLREUTF8String;const StartPosition:TFLRESizeInt=1;Limit:TFLRESizeInt=-1):TFLREUTF8String;
 begin
  result:=PtrReplace(PFLRERawByteChar(@Input[1]),length(Input),PFLRERawByteChar(@Replacement[1]),length(Replacement),StartPosition-1,Limit);
 end;
 
-function TFLRE.UTF8ReplaceCallback(const Input:TFLREUTF8String;const ReplacementCallback:TFLREReplacementCallback;const StartPosition:longint=1;Limit:longint=-1):TFLRERawByteString;
+function TFLRE.UTF8ReplaceCallback(const Input:TFLREUTF8String;const ReplacementCallbackData:pointer;const ReplacementCallback:TFLREReplacementCallback;const StartPosition:TFLRESizeInt=1;Limit:TFLRESizeInt=-1):TFLRERawByteString;
+begin
+ result:=PtrReplaceCallback(PFLRERawByteChar(@Input[1]),length(Input),ReplacementCallbackData,ReplacementCallback,StartPosition-1,Limit);
+end;
+
+function TFLRE.UTF8ReplaceCallback(const Input:TFLREUTF8String;const ReplacementCallback:TFLREReplacementObjectCallback;const StartPosition:TFLRESizeInt=1;Limit:TFLRESizeInt=-1):TFLRERawByteString;
 begin
  result:=PtrReplaceCallback(PFLRERawByteChar(@Input[1]),length(Input),ReplacementCallback,StartPosition-1,Limit);
 end;
 
-function TFLRE.UTF8Split(const Input:TFLREUTF8String;var SplittedStrings:TFLREStrings;const StartPosition:longint=1;Limit:longint=-1;const WithEmpty:boolean=true):boolean;
+function TFLRE.UTF8Split(const Input:TFLREUTF8String;var SplittedStrings:TFLREStrings;const StartPosition:TFLRESizeInt=1;Limit:TFLRESizeInt=-1;const WithEmpty:boolean=true):boolean;
 begin
  result:=PtrSplit(PFLRERawByteChar(@Input[1]),length(Input),SplittedStrings,StartPosition-1,Limit,WithEmpty);
 end;
 
-function TFLRE.UTF8Test(const Input:TFLREUTF8String;const StartPosition:longint=1):boolean;
+function TFLRE.UTF8Test(const Input:TFLREUTF8String;const StartPosition:TFLRESizeInt=1):boolean;
 begin
  result:=PtrTest(PFLRERawByteChar(@Input[1]),length(Input),StartPosition-1);
 end;
 
-function TFLRE.UTF8TestAll(const Input:TFLREUTF8String;const StartPosition:longint=1):boolean;
+function TFLRE.UTF8TestAll(const Input:TFLREUTF8String;const StartPosition:TFLRESizeInt=1):boolean;
 begin
  result:=PtrTestAll(PFLRERawByteChar(@Input[1]),length(Input),StartPosition-1);
 end;
 
-function TFLRE.UTF8Find(const Input:TFLREUTF8String;const StartPosition:longint=1):longint;
+function TFLRE.UTF8Find(const Input:TFLREUTF8String;const StartPosition:TFLRESizeInt=1):TFLRESizeInt;
 begin
  result:=PtrFind(PFLRERawByteChar(@Input[1]),length(Input),StartPosition-1)+1;
 end;
@@ -20812,11 +21585,11 @@ begin
  end;
 end;
 
-function TFLRE.DumpRegularExpression:TFLRERawByteString;
+function TFLRE.DumpRegularExpressionNode(StartNode:PFLRENode):TFLRERawByteString;
 var CharClass:TFLRECharClass;
- function ProcessNode(Node:PFLRENode;ParentPrecedence:longint):TFLRERawByteString;
+ function ProcessNode(Node:PFLRENode;ParentPrecedence:TFLREInt32):TFLRERawByteString;
  const HexChars:array[$0..$f] of TFLRERawByteChar='0123456789abcdef';
- var Count,Counter,LowChar,HighChar:longint;
+ var Count,Counter,LowChar,HighChar:TFLREInt32;
      SingleChar,CurrentChar:TFLRERawByteChar;
  begin
   result:='';
@@ -20874,18 +21647,18 @@ var CharClass:TFLRECharClass;
       if SingleChar in ['a'..'z','A'..'Z','0'..'9','_','@',' ','/'] then begin
        result:=result+SingleChar;
       end else begin
-       result:=result+'\x'+HexChars[byte(TFLRERawByteChar(SingleChar)) shr 4]+HexChars[byte(TFLRERawByteChar(SingleChar)) and $f];
+       result:=result+'\x'+HexChars[TFLREUInt8(TFLRERawByteChar(SingleChar)) shr 4]+HexChars[TFLREUInt8(TFLRERawByteChar(SingleChar)) and $f];
       end;
      end else begin
       result:=result+'[';
       Counter:=0;
       while Counter<256 do begin
-       CurrentChar:=TFLRERawByteChar(byte(Counter));
+       CurrentChar:=TFLRERawByteChar(TFLREUInt8(Counter));
        if CurrentChar in CharClass then begin
         LowChar:=Counter;
         HighChar:=Counter;
         while Counter<256 do begin
-         CurrentChar:=TFLRERawByteChar(byte(Counter));
+         CurrentChar:=TFLRERawByteChar(TFLREUInt8(Counter));
          if CurrentChar in CharClass then begin
           HighChar:=Counter;
           inc(Counter);
@@ -20894,20 +21667,20 @@ var CharClass:TFLRECharClass;
          end;
         end;
         if LowChar=HighChar then begin
-         if TFLRERawByteChar(byte(LowChar)) in ['a'..'z','A'..'Z','0'..'9','_','@',' ','/'] then begin
-          result:=result+TFLRERawByteChar(byte(LowChar));
+         if TFLRERawByteChar(TFLREUInt8(LowChar)) in ['a'..'z','A'..'Z','0'..'9','_','@',' ','/'] then begin
+          result:=result+TFLRERawByteChar(TFLREUInt8(LowChar));
          end else begin
           result:=result+'\x'+HexChars[LowChar shr 4]+HexChars[LowChar and $f];
          end;
         end else begin
-         if TFLRERawByteChar(byte(LowChar)) in ['a'..'z','A'..'Z','0'..'9','_','@',' ','/'] then begin
-          result:=result+TFLRERawByteChar(byte(LowChar));
+         if TFLRERawByteChar(TFLREUInt8(LowChar)) in ['a'..'z','A'..'Z','0'..'9','_','@',' ','/'] then begin
+          result:=result+TFLRERawByteChar(TFLREUInt8(LowChar));
          end else begin
           result:=result+'\x'+HexChars[LowChar shr 4]+HexChars[LowChar and $f];
          end;
          result:=result+'-';
-         if TFLRERawByteChar(byte(HighChar)) in ['a'..'z','A'..'Z','0'..'9','_','@',' ','/'] then begin
-          result:=result+TFLRERawByteChar(byte(HighChar));
+         if TFLRERawByteChar(TFLREUInt8(HighChar)) in ['a'..'z','A'..'Z','0'..'9','_','@',' ','/'] then begin
+          result:=result+TFLRERawByteChar(TFLREUInt8(HighChar));
          end else begin
           result:=result+'\x'+HexChars[HighChar shr 4]+HexChars[HighChar and $f];
          end;
@@ -21020,7 +21793,12 @@ var CharClass:TFLRECharClass;
   end;
  end;
 begin
- result:=ProcessNode(AnchoredRootNode,npTopLevel);
+ result:=ProcessNode(StartNode,npTopLevel);
+end;
+
+function TFLRE.DumpRegularExpression:TFLRERawByteString;
+begin
+ result:=DumpRegularExpressionNode(AnchoredRootNode);
 end;
 
 function TFLRE.GetPrefilterExpression:TFLRERawByteString;
@@ -21126,7 +21904,7 @@ begin
 end;
 
 destructor TFLRECacheHashMap.Destroy;
-var Counter:longint;
+var Counter:TFLRESizeInt;
 begin
  Clear;
  for Counter:=0 to length(Entities)-1 do begin
@@ -21139,7 +21917,7 @@ begin
 end;
 
 procedure TFLRECacheHashMap.Clear;
-var Counter:longint;
+var Counter:TFLRESizeInt;
 begin
  for Counter:=0 to length(Entities)-1 do begin
   Entities[Counter].Key:='';
@@ -21153,9 +21931,9 @@ begin
  Resize;
 end;
 
-function TFLRECacheHashMap.FindCell(const Key:TFLRERawByteString):longword;
-var HashCode,Mask,Step:longword;
-    Entity:longint;
+function TFLRECacheHashMap.FindCell(const Key:TFLRERawByteString):TFLREUInt32;
+var HashCode,Mask,Step:TFLREUInt32;
+    Entity:TFLREInt32;
 begin
  HashCode:=HashString(Key);
  Mask:=(2 shl LogSize)-1;
@@ -21175,7 +21953,7 @@ begin
 end;
 
 procedure TFLRECacheHashMap.Resize;
-var NewLogSize,NewSize,Cell,Entity,Counter:longint;
+var NewLogSize,NewSize,Cell,Entity,Counter:TFLREInt32;
     OldEntities:TFLRECacheHashMapEntities;
     OldCellToEntityIndex:TFLRECacheHashMapEntityIndices;
     OldEntityToCellIndex:TFLRECacheHashMapEntityIndices;
@@ -21225,8 +22003,8 @@ begin
 end;
 
 function TFLRECacheHashMap.Add(const Key:TFLRERawByteString;Value:TFLRECacheHashMapData):PFLRECacheHashMapEntity;
-var Entity:longint;
-    Cell:longword;
+var Entity:TFLREInt32;
+    Cell:TFLREUInt32;
 begin
  result:=nil;
  while RealSize>=(1 shl LogSize) do begin
@@ -21253,8 +22031,8 @@ begin
 end;
 
 function TFLRECacheHashMap.Get(const Key:TFLRERawByteString;CreateIfNotExist:boolean=false):PFLRECacheHashMapEntity;
-var Entity:longint;
-    Cell:longword;
+var Entity:TFLREInt32;
+    Cell:TFLREUInt32;
 begin
  result:=nil;
  Cell:=FindCell(Key);
@@ -21267,8 +22045,8 @@ begin
 end;
 
 function TFLRECacheHashMap.Delete(const Key:TFLRERawByteString):boolean;
-var Entity:longint;
-    Cell:longword;
+var Entity:TFLREInt32;
+    Cell:TFLREUInt32;
 begin
  result:=false;
  Cell:=FindCell(Key);
@@ -21283,8 +22061,8 @@ begin
 end;
 
 function TFLRECacheHashMap.GetValue(const Key:TFLRERawByteString):TFLRECacheHashMapData;
-var Entity:longint;
-    Cell:longword;
+var Entity:TFLREInt32;
+    Cell:TFLREUInt32;
 begin
  Cell:=FindCell(Key);
  Entity:=CellToEntityIndex[Cell];
@@ -21304,12 +22082,12 @@ constructor TFLRECache.Create;
 begin
  inherited Create;
  ParallelLock:=0;
- List:=TList.Create;
+ List:=TFLREPointerList.Create;
  HashMap:=TFLRECacheHashMap.Create;
 end;
 
 destructor TFLRECache.Destroy;
-var Index:longint;
+var Index:TFLREInt32;
 begin
  for Index:=0 to List.Count-1 do begin
   TFLRE(List[Index]).Free;
@@ -21320,7 +22098,7 @@ begin
 end;
 
 procedure TFLRECache.Clear;
-var Index:longint;
+var Index:TFLREInt32;
 begin
  ParallelLockEnter(@ParallelLock);
  try
@@ -21352,7 +22130,7 @@ begin
 end;
 
 function TFLRECache.Get(const ARegularExpressions:array of TFLRERawByteString;const AFlags:TFLREFlags=[]):TFLRE;
-var Index:longint;
+var Index:TFLREInt32;
     HashKey:TFLRERawByteString;
 begin
  HashKey:=FLREPtrCopy(pointer(@AFlags),0,SizeOf(TFLREFlags));
@@ -21374,7 +22152,7 @@ end;
 
 const FLREGetVersionStringData:TFLRERawByteString=FLREVersionString+#0;
 
-function FLREGetVersion:longword; {$ifdef win32}{$ifdef cpu386}stdcall;{$endif}{$endif}
+function FLREGetVersion:TFLREUInt32; {$ifdef win32}{$ifdef cpu386}stdcall;{$endif}{$endif}
 begin
  result:=FLREVersion;
 end;
@@ -21384,10 +22162,10 @@ begin
  result:=PFLRERawByteChar(@FLREGetVersionStringData[1]);
 end;
 
-function FLRECreate(const RegularExpression:PFLRERawByteChar;const RegularExpressionLength:longint;const Flags:longword;const Error:PPAnsiChar):pointer; {$ifdef win32}{$ifdef cpu386}stdcall;{$endif}{$endif}
+function FLRECreate(const RegularExpression:PFLRERawByteChar;const RegularExpressionLength:TFLRESizeInt;const Flags:TFLREUInt32;const Error:PPAnsiChar):pointer; {$ifdef win32}{$ifdef cpu386}stdcall;{$endif}{$endif}
 var RealFlags:TFLREFlags;
     s:TFLRERawByteString;
-    Len:longint;
+    Len:TFLRESizeInt;
 begin
  result:=nil;
  if assigned(Error) and assigned(Error^) then begin
@@ -21461,12 +22239,17 @@ begin
  TFLRE(Instance).Free;
 end;
 
+function FLREAlloc(const Size:TFLRESizeInt):pointer; {$ifdef win32}{$ifdef cpu386}stdcall;{$endif}{$endif}
+begin
+ GetMem(result,Size);
+end;
+
 procedure FLREFree(const Data:pointer); {$ifdef win32}{$ifdef cpu386}stdcall;{$endif}{$endif}
 begin
  FreeMem(Data);
 end;
 
-function FLREGetCountCaptures(const Instance:pointer):longint; {$ifdef win32}{$ifdef cpu386}stdcall;{$endif}{$endif}
+function FLREGetCountCaptures(const Instance:pointer):TFLREInt32; {$ifdef win32}{$ifdef cpu386}stdcall;{$endif}{$endif}
 begin
  if assigned(Instance) then begin
   result:=TFLRE(Instance).CountCaptures;
@@ -21475,7 +22258,7 @@ begin
  end;
 end;
 
-function FLREGetNamedGroupIndex(const Instance:pointer;const GroupName:PFLRERawByteChar):longint; {$ifdef win32}{$ifdef cpu386}stdcall;{$endif}{$endif}
+function FLREGetNamedGroupIndex(const Instance:pointer;const GroupName:PFLRERawByteChar):TFLREInt32; {$ifdef win32}{$ifdef cpu386}stdcall;{$endif}{$endif}
 begin
  if assigned(Instance) then begin
   result:=TFLRE(Instance).NamedGroupStringIntegerPairHashMap.GetValue(GroupName);
@@ -21484,9 +22267,9 @@ begin
  end;
 end;
 
-function FLREDumpRegularExpression(const Instance:pointer;const RegularExpression,Error:ppansichar):longint; {$ifdef win32}{$ifdef cpu386}stdcall;{$endif}{$endif}
+function FLREDumpRegularExpression(const Instance:pointer;const RegularExpression,Error:ppansichar):TFLREInt32; {$ifdef win32}{$ifdef cpu386}stdcall;{$endif}{$endif}
 var s:TFLRERawByteString;
-    Len:longint;
+    Len:TFLRESizeInt;
 begin
  result:=0;
  if assigned(Error) and assigned(Error^) then begin
@@ -21536,9 +22319,9 @@ begin
  end;
 end;
 
-function FLREGetPrefilterExpression(const Instance:pointer;const Expression,Error:ppansichar):longint; {$ifdef win32}{$ifdef cpu386}stdcall;{$endif}{$endif}
+function FLREGetPrefilterExpression(const Instance:pointer;const Expression,Error:ppansichar):TFLREInt32; {$ifdef win32}{$ifdef cpu386}stdcall;{$endif}{$endif}
 var s:TFLRERawByteString;
-    Len:longint;
+    Len:TFLRESizeInt;
 begin
  result:=0;
  if assigned(Error) and assigned(Error^) then begin
@@ -21588,9 +22371,9 @@ begin
  end;
 end;
 
-function FLREGetPrefilterShortExpression(const Instance:pointer;const ShortExpression,Error:ppansichar):longint; {$ifdef win32}{$ifdef cpu386}stdcall;{$endif}{$endif}
+function FLREGetPrefilterShortExpression(const Instance:pointer;const ShortExpression,Error:ppansichar):TFLREInt32; {$ifdef win32}{$ifdef cpu386}stdcall;{$endif}{$endif}
 var s:TFLRERawByteString;
-    Len:longint;
+    Len:TFLRESizeInt;
 begin
  result:=0;
  if assigned(Error) and assigned(Error^) then begin
@@ -21640,9 +22423,9 @@ begin
  end;
 end;
 
-function FLREGetPrefilterSQLBooleanFullTextExpression(const Instance:pointer;const SQLBooleanFullTextExpression,Error:ppansichar):longint; {$ifdef win32}{$ifdef cpu386}stdcall;{$endif}{$endif}
+function FLREGetPrefilterSQLBooleanFullTextExpression(const Instance:pointer;const SQLBooleanFullTextExpression,Error:ppansichar):TFLREInt32; {$ifdef win32}{$ifdef cpu386}stdcall;{$endif}{$endif}
 var s:TFLRERawByteString;
-    Len:longint;
+    Len:TFLRESizeInt;
 begin
  result:=0;
  if assigned(SQLBooleanFullTextExpression) and assigned(SQLBooleanFullTextExpression^) then begin
@@ -21688,9 +22471,9 @@ begin
  end;
 end;
 
-function FLREGetPrefilterSQLExpression(const Instance:pointer;const Field:PFLRERawByteChar;SQLExpression,Error:ppansichar):longint; {$ifdef win32}{$ifdef cpu386}stdcall;{$endif}{$endif}
+function FLREGetPrefilterSQLExpression(const Instance:pointer;const Field:PFLRERawByteChar;SQLExpression,Error:ppansichar):TFLREInt32; {$ifdef win32}{$ifdef cpu386}stdcall;{$endif}{$endif}
 var s:TFLRERawByteString;
-    Len:longint;
+    Len:TFLRESizeInt;
 begin
  result:=0;
  if assigned(Error) and assigned(Error^) then begin
@@ -21740,7 +22523,7 @@ begin
  end;
 end;
 
-function FLREGetRange(const Instance:pointer;const LowRange,HighRange:PPAnsiChar;const LowRangeLength,HighRangeLength:PLongint;const Error:PPAnsiChar):longint; {$ifdef win32}{$ifdef cpu386}stdcall;{$endif}{$endif}
+function FLREGetRange(const Instance:pointer;const LowRange,HighRange:PPAnsiChar;const LowRangeLength,HighRangeLength:PFLRESizeInt;const Error:PPAnsiChar):TFLREInt32; {$ifdef win32}{$ifdef cpu386}stdcall;{$endif}{$endif}
 var LocalLowRange,LocalHighRange:TFLRERawByteString;
 begin
  LocalLowRange:='';
@@ -21769,11 +22552,11 @@ begin
  end;
 end;
 
-function FLREMatch(const Instance:pointer;const Input:pointer;const InputLength:longint;const Captures:PPointer;const MaxCaptures:longint;const CountCaptures:PLongint;const StartPosition:longint;const Error:PPAnsiChar):longint;
-type PLongints=^TLongints;
-     TLongints=array[0..65535] of longint;
+function FLREMatch(const Instance:pointer;const Input:pointer;const InputLength:TFLRESizeInt;const Captures:PPointer;const MaxCaptures:TFLRESizeInt;const CountCaptures:PFLRESizeInt;const StartPosition:TFLRESizeInt;const Error:PPAnsiChar):TFLREInt32;
+type TTFLRESizeInts=array[0..65535] of TFLRESizeInt;
+     PFLRESizeInts=^TTFLRESizeInts;
 var s:TFLRERawByteString;
-    Len,Index:longint;
+    Len,Index:TFLRESizeInt;
     LocalCaptures:TFLRECaptures;
 begin
  result:=0;
@@ -21792,18 +22575,18 @@ begin
     try
      if TFLRE(Instance).PtrMatch(Input,InputLength,LocalCaptures,StartPosition) then begin
       if MaxCaptures<0 then begin
-       GetMem(Captures^,length(LocalCaptures)*(sizeof(longint)*2));
+       GetMem(Captures^,length(LocalCaptures)*(sizeof(TFLRESizeInt)*2));
        for Index:=0 to length(LocalCaptures)-1 do begin
-        PLongints(Captures)^[(Index shl 1) or 0]:=LocalCaptures[Index].Start;
-        PLongints(Captures)^[(Index shl 1) or 1]:=LocalCaptures[Index].Length;
+        PFLRESizeInts(Captures^)^[(Index shl 1) or 0]:=LocalCaptures[Index].Start;
+        PFLRESizeInts(Captures^)^[(Index shl 1) or 1]:=LocalCaptures[Index].Length;
        end;
       end else begin
        for Index:=0 to length(LocalCaptures)-1 do begin
         if Index>=MaxCaptures then begin
          break;
         end;
-        PLongints(Captures)^[(Index shl 1) or 0]:=LocalCaptures[Index].Start;
-        PLongints(Captures)^[(Index shl 1) or 1]:=LocalCaptures[Index].Length;
+        PFLRESizeInts(Captures^)^[(Index shl 1) or 0]:=LocalCaptures[Index].Start;
+        PFLRESizeInts(Captures^)^[(Index shl 1) or 1]:=LocalCaptures[Index].Length;
        end;
       end;
       if assigned(CountCaptures) then begin
@@ -21841,11 +22624,11 @@ begin
  end;
 end;
 
-function FLREMatchNext(const Instance:pointer;const Input:pointer;const InputLength:longint;const Captures:PPointer;const MaxCaptures:longint;const CountCaptures:PLongint;const StartPosition:longint;const Error:PPAnsiChar):longint;
-type PLongints=^TLongints;
-     TLongints=array[0..65535] of longint;
+function FLREMatchNext(const Instance:pointer;const Input:pointer;const InputLength:TFLRESizeInt;const Captures:PPointer;const MaxCaptures:TFLRESizeInt;const CountCaptures:PFLRESizeInt;const StartPosition:TFLRESizeInt;const Error:PPAnsiChar):TFLREInt32;
+type TTFLRESizeInts=array[0..65535] of TFLRESizeInt;
+     PFLRESizeInts=^TTFLRESizeInts;
 var s:TFLRERawByteString;
-    Len,Index:longint;
+    Len,Index:TFLRESizeInt;
     LocalCaptures:TFLRECaptures;
 begin
  result:=0;
@@ -21864,18 +22647,18 @@ begin
     try
      if TFLRE(Instance).PtrMatchNext(Input,InputLength,LocalCaptures,StartPosition) then begin
       if MaxCaptures<0 then begin
-       GetMem(Captures^,length(LocalCaptures)*(sizeof(longint)*2));
+       GetMem(Captures^,length(LocalCaptures)*(sizeof(TFLRESizeInt)*2));
        for Index:=0 to length(LocalCaptures)-1 do begin
-        PLongints(Captures)^[(Index shl 1) or 0]:=LocalCaptures[Index].Start;
-        PLongints(Captures)^[(Index shl 1) or 1]:=LocalCaptures[Index].Length;
+        PFLRESizeInts(Captures^)^[(Index shl 1) or 0]:=LocalCaptures[Index].Start;
+        PFLRESizeInts(Captures^)^[(Index shl 1) or 1]:=LocalCaptures[Index].Length;
        end;
       end else begin
        for Index:=0 to length(LocalCaptures)-1 do begin
         if Index>=MaxCaptures then begin
          break;
         end;
-        PLongints(Captures)^[(Index shl 1) or 0]:=LocalCaptures[Index].Start;
-        PLongints(Captures)^[(Index shl 1) or 1]:=LocalCaptures[Index].Length;
+        PFLRESizeInts(Captures^)^[(Index shl 1) or 0]:=LocalCaptures[Index].Start;
+        PFLRESizeInts(Captures^)^[(Index shl 1) or 1]:=LocalCaptures[Index].Length;
        end;
       end;
       if assigned(CountCaptures) then begin
@@ -21913,11 +22696,11 @@ begin
  end;
 end;
 
-function FLREMatchAll(const Instance:pointer;const Input:pointer;const InputLength:longint;const MultiCaptures:PPointer;const MaxMultiCaptures:longint;const CountMultiCaptures,CountCaptures:PLongint;const StartPosition,Limit:longint;const Error:PPAnsiChar):longint;
+function FLREMatchAll(const Instance:pointer;const Input:pointer;const InputLength:TFLRESizeInt;const MultiCaptures:PPointer;const MaxMultiCaptures:TFLRESizeInt;const CountMultiCaptures,CountCaptures:PFLRESizeInt;const StartPosition,Limit:TFLRESizeInt;const Error:PPAnsiChar):TFLREInt32;
 var s:TFLRERawByteString;
-    Len,Index,SubIndex:longint;
+    Len,Index,SubIndex:TFLRESizeInt;
     LocalMultiCaptures:TFLREMultiCaptures;
-    p:plongint;
+    p:PFLRESizeInt;
 begin
  result:=0;
  if assigned(Error) and assigned(Error^) then begin
@@ -21935,7 +22718,7 @@ begin
     try
      if TFLRE(Instance).PtrMatchAll(Input,InputLength,LocalMultiCaptures,StartPosition,Limit) then begin
       if MaxMultiCaptures<0 then begin
-       GetMem(MultiCaptures^,length(LocalMultiCaptures)*TFLRE(Instance).CountCaptures*(sizeof(longint)*2));
+       GetMem(MultiCaptures^,length(LocalMultiCaptures)*TFLRE(Instance).CountCaptures*(sizeof(TFLRESizeInt)*2));
        p:=MultiCaptures^;
        for Index:=0 to length(LocalMultiCaptures)-1 do begin
         for SubIndex:=0 to length(LocalMultiCaptures[Index])-1 do begin
@@ -21997,9 +22780,9 @@ begin
  end;
 end;
 
-function FLREReplaceAll(const Instance:pointer;const Input:pointer;const InputLength:longint;const Replacement:pointer;const ReplacementLength:longint;const ResultString:PPointer;const ResultStringLength:PLongint;const StartPosition,Limit:longint;const Error:PPAnsiChar):longint;
+function FLREReplaceAll(const Instance:pointer;const Input:pointer;const InputLength:TFLRESizeInt;const Replacement:pointer;const ReplacementLength:TFLRESizeInt;const ResultString:PPointer;const ResultStringLength:PFLREInt32;const StartPosition,Limit:TFLRESizeInt;const Error:PPAnsiChar):TFLREInt32;
 var s:TFLRERawByteString;
-    Len:longint;
+    Len:TFLRESizeInt;
 begin
  result:=0;
  if assigned(Error) and assigned(Error^) then begin
@@ -22047,6 +22830,292 @@ begin
      s:='';
     end;
     result:=0;
+   end;
+  end;
+ end;
+end;
+
+type TFLREReplaceCallbackData=record
+      Input:pointer;
+      InputLength:TFLRESizeInt;
+      CallbackData:pointer;
+      Callback:TFLREReplacementExternalCallback;
+     end;
+     PFLREReplaceCallbackData=^TFLREReplaceCallbackData;
+
+function FLREReplaceCallbackHandler(const Data:pointer;const Input:PFLRERawByteChar;const InputLength:TFLRESizeInt;const Captures:TFLRECaptures):TFLRERawByteString;
+type TTFLRESizeInts=array[0..65535] of TFLRESizeInt;
+     PFLRESizeInts=^TTFLRESizeInts;
+var CallbackData:PFLREReplaceCallbackData;
+    Replacement:PAnsiChar;
+    ReplacementLength,Index:TFLRESizeInt;
+    TemporaryCaptures:Pointer;
+begin
+ result:='';
+ CallbackData:=Data;
+ if (length(Captures)>0) and assigned(CallbackData) and assigned(CallbackData^.Callback) then begin
+  TemporaryCaptures:=nil;
+  try
+   Replacement:=nil;
+   ReplacementLength:=0;
+   try
+    GetMem(TemporaryCaptures,length(Captures)*(sizeof(TFLRESizeInt)*2));
+    for Index:=0 to length(Captures)-1 do begin
+     PFLRESizeInts(TemporaryCaptures)^[(Index shl 1) or 0]:=Captures[Index].Start;
+     PFLRESizeInts(TemporaryCaptures)^[(Index shl 1) or 1]:=Captures[Index].Length;
+    end;
+    if CallbackData^.Callback(CallbackData^.CallbackData,
+                              CallbackData^.Input,
+                              CallbackData^.InputLength,
+                              TemporaryCaptures,
+                              length(Captures),
+                              @Replacement,
+                              @ReplacementLength)>0 then begin
+     SetLength(result,ReplacementLength);
+     if ReplacementLength>0 then begin
+      Move(Replacement^,result[1],ReplacementLength);
+     end;
+    end;
+   finally
+    if assigned(Replacement) then begin
+     FreeMem(Replacement);
+     Replacement:=nil;
+    end;
+   end;
+  finally
+   if assigned(TemporaryCaptures) then begin
+    FreeMem(TemporaryCaptures);
+    TemporaryCaptures:=nil;
+   end;
+  end;
+ end;
+end;
+
+function FLREReplaceCallback(const Instance:pointer;const Input:pointer;const InputLength:TFLRESizeInt;const ReplacementCallbackData:pointer;const ReplacementCallback:TFLREReplacementExternalCallback;const ResultString:PPointer;const ResultStringLength:PFLREInt32;const StartPosition,Limit:TFLRESizeInt;const Error:PPAnsiChar):TFLREInt32;
+var s:TFLRERawByteString;
+    Len:TFLRESizeInt;
+    CallbackData:TFLREReplaceCallbackData;
+begin
+ result:=0;
+ if assigned(Error) and assigned(Error^) then begin
+  FreeMem(Error^);
+  Error^:=nil;
+ end;
+ if assigned(ResultString) and assigned(ResultString^) then begin
+  FreeMem(ResultString^);
+  ResultString^:=nil;
+ end;
+ if assigned(Instance) then begin
+  try
+   if assigned(ResultString) then begin
+    CallbackData.Input:=Input;
+    CallbackData.InputLength:=InputLength;
+    CallbackData.CallbackData:=ReplacementCallbackData;
+    CallbackData.Callback:=ReplacementCallback;
+    s:='';
+    try
+     s:=TFLRE(Instance).PtrReplaceCallback(Input,InputLength,@CallbackData,FLREReplaceCallbackHandler,StartPosition,Limit);
+     Len:=length(s);
+     if Len>0 then begin
+      GetMem(ResultString^,(Len+1)*SizeOf(TFLRERawByteChar));
+      Move(s[1],PFLRERawByteChar(ResultString^)[0],Len);
+      PFLRERawByteChar(ResultString^)[Len]:=#0;
+     end else begin
+      ResultString^:=nil;
+     end;
+     if assigned(ResultStringLength) then begin
+      ResultStringLength^:=Len;
+     end;
+     result:=1;
+    finally
+     s:='';
+    end;
+   end;
+  except
+   on e:Exception do begin
+    if assigned(Error) then begin
+     s:=TFLRERawByteString(e.Message);
+     Len:=length(s);
+     if Len>0 then begin
+      GetMem(Error^,(Len+1)*SizeOf(TFLRERawByteChar));
+      Move(s[1],Error^[0],Len);
+      Error^[Len]:=#0;
+     end else begin
+      Error^:=nil;
+     end;
+     s:='';
+    end;
+    result:=0;
+   end;
+  end;
+ end;
+end;
+
+function FLRESplit(const Instance:pointer;const Input:pointer;const InputLength:TFLRESizeInt;SplittedStrings:PPointer;const CountSplittedStrings:PFLRESizeInt;const StartPosition:TFLRESizeInt;const Limit:TFLRESizeInt;const WithEmpty:TFLREInt32;const Error:PPAnsiChar):TFLREInt32;
+var s:TFLRERawByteString;
+    Len,Index:TFLRESizeInt;
+    TemporarySplittedStrings:TFLREStrings;
+    p:PFLREUInt8;
+begin
+ result:=0;
+ if assigned(Error) and assigned(Error^) then begin
+  FreeMem(Error^);
+  Error^:=nil;
+ end;
+ if assigned(SplittedStrings) and assigned(SplittedStrings^) then begin
+  FreeMem(SplittedStrings^);
+  SplittedStrings^:=nil;
+ end;
+ if assigned(Instance) then begin
+  try
+   TemporarySplittedStrings:=nil;
+   try
+    if TFLRE(Instance).PtrSplit(Input,InputLength,TemporarySplittedStrings,StartPosition,Limit,WithEmpty<>0) then begin
+     CountSplittedStrings^:=length(TemporarySplittedStrings);
+     if length(TemporarySplittedStrings)>0 then begin
+      Len:=0;
+      for Index:=0 to length(TemporarySplittedStrings)-1 do begin
+       inc(Len,SizeOf(TFLRESizeInt)+((length(TemporarySplittedStrings[Index])+1)*SizeOf(TFLRERawByteChar)));
+      end;
+      GetMem(SplittedStrings^,Len);
+      p:=SplittedStrings^;
+      for Index:=0 to length(TemporarySplittedStrings)-1 do begin
+       TFLRESizeInt(pointer(p)^):=length(TemporarySplittedStrings[Index]);
+       inc(p,SizeOf(TFLRESizeInt));
+       if length(TemporarySplittedStrings[Index])>0 then begin
+        Move(TemporarySplittedStrings[Index][1],p^,length(TemporarySplittedStrings[Index])*SizeOf(TFLRERawByteChar));
+        inc(p,length(TemporarySplittedStrings[Index])*SizeOf(TFLRERawByteChar));
+       end;
+       TFLRERawByteChar(pointer(p)^):=#0;
+       inc(p,SizeOf(TFLRERawByteChar));
+      end;
+     end;
+     result:=1;
+    end else begin
+     result:=0;
+    end;
+   finally
+    TemporarySplittedStrings:=nil;
+   end;
+  except
+   on e:Exception do begin
+    if assigned(Error) then begin
+     s:=TFLRERawByteString(e.Message);
+     Len:=length(s);
+     if Len>0 then begin
+      GetMem(Error^,(Len+1)*SizeOf(TFLRERawByteChar));
+      Move(s[1],Error^[0],Len);
+      Error^[Len]:=#0;
+     end else begin
+      Error^:=nil;
+     end;
+     s:='';
+    end;
+    result:=0;
+   end;
+  end;
+ end;
+end;
+
+function FLRETest(const Instance:pointer;const Input:pointer;const InputLength:TFLRESizeInt;const StartPosition:TFLRESizeInt;const Error:PPAnsiChar):TFLREInt32;
+var s:TFLRERawByteString;
+    Len:TFLRESizeInt;
+begin
+ result:=0;
+ if assigned(Error) and assigned(Error^) then begin
+  FreeMem(Error^);
+  Error^:=nil;
+ end;
+ if assigned(Instance) then begin
+  try
+   if TFLRE(Instance).PtrTest(Input,InputLength,StartPosition) then begin
+    result:=1;
+   end else begin
+    result:=0;
+   end;
+  except
+   on e:Exception do begin
+    if assigned(Error) then begin
+     s:=TFLRERawByteString(e.Message);
+     Len:=length(s);
+     if Len>0 then begin
+      GetMem(Error^,(Len+1)*SizeOf(TFLRERawByteChar));
+      Move(s[1],Error^[0],Len);
+      Error^[Len]:=#0;
+     end else begin
+      Error^:=nil;
+     end;
+     s:='';
+    end;
+    result:=0;
+   end;
+  end;
+ end;
+end;
+
+function FLRETestAll(const Instance:pointer;const Input:pointer;const InputLength:TFLRESizeInt;const StartPosition:TFLRESizeInt;const Error:PPAnsiChar):TFLREInt32;
+var s:TFLRERawByteString;
+    Len:TFLRESizeInt;
+begin
+ result:=0;
+ if assigned(Error) and assigned(Error^) then begin
+  FreeMem(Error^);
+  Error^:=nil;
+ end;
+ if assigned(Instance) then begin
+  try
+   if TFLRE(Instance).PtrTestAll(Input,InputLength,StartPosition) then begin
+    result:=1;
+   end else begin
+    result:=0;
+   end;
+  except
+   on e:Exception do begin
+    if assigned(Error) then begin
+     s:=TFLRERawByteString(e.Message);
+     Len:=length(s);
+     if Len>0 then begin
+      GetMem(Error^,(Len+1)*SizeOf(TFLRERawByteChar));
+      Move(s[1],Error^[0],Len);
+      Error^[Len]:=#0;
+     end else begin
+      Error^:=nil;
+     end;
+     s:='';
+    end;
+    result:=0;
+   end;
+  end;
+ end;
+end;
+
+function FLREFind(const Instance:pointer;const Input:pointer;const InputLength:TFLRESizeInt;const StartPosition:TFLRESizeInt;const Error:PPAnsiChar):TFLRESizeInt;
+var s:TFLRERawByteString;
+    Len:TFLRESizeInt;
+begin
+ result:=-1;
+ if assigned(Error) and assigned(Error^) then begin
+  FreeMem(Error^);
+  Error^:=nil;
+ end;
+ if assigned(Instance) then begin
+  try
+   result:=TFLRE(Instance).PtrFind(Input,InputLength,StartPosition);
+  except
+   on e:Exception do begin
+    if assigned(Error) then begin
+     s:=TFLRERawByteString(e.Message);
+     Len:=length(s);
+     if Len>0 then begin
+      GetMem(Error^,(Len+1)*SizeOf(TFLRERawByteChar));
+      Move(s[1],Error^[0],Len);
+      Error^[Len]:=#0;
+     end else begin
+      Error^:=nil;
+     end;
+     s:='';
+    end;
+    result:=-1;
    end;
   end;
  end;
@@ -22113,7 +23182,7 @@ const FLRESignature:TFLRERawByteString=' FLRE - yet another efficient, principle
        tsQUINTAIL=6;
 {$endif}
        tsMUL=16;
-  procedure AssignCharsetToCharClass(const Charset:TAnsiCharSet;const CharClass:byte);
+  procedure AssignCharsetToCharClass(const Charset:TAnsiCharSet;const CharClass:TFLREUInt8);
   var c:TFLRERawByteChar;
   begin
    for c:=low(TFLRERawByteChar) to high(TFLRERawByteChar) do begin
@@ -22122,11 +23191,11 @@ const FLRESignature:TFLRERawByteString=' FLRE - yet another efficient, principle
     end;
    end;
   end;
-  procedure AddTranslation(const FromState,AtCharClass,ToState:byte);
+  procedure AddTranslation(const FromState,AtCharClass,ToState:TFLREUInt8);
   begin
    UTF8DFATransitions[(FromState*tsMUL)+AtCharClass]:=ToState*tsMUL;
   end;
- var i:longint;
+ var i:TFLREInt32;
  begin
   FillChar(UTF8DFACharClasses,sizeof(TUTF8Chars),#0);
   FillChar(UTF8DFATransitions,sizeof(TUTF8Bytes),#0);
@@ -22363,7 +23432,7 @@ const FLRESignature:TFLRERawByteString=' FLRE - yet another efficient, principle
 {$endif}
 {$ifdef FLRERuntimeUTF8DFATableGenerationDump}
   for i:=0 to 255 do begin
-   write(UTF8DFACharClasses[TFLRERawByteChar(byte(i))],',');
+   write(UTF8DFACharClasses[TFLRERawByteChar(TFLREUInt8(i))],',');
   end;
   writeln;
   for i:=0 to 255 do begin
@@ -22397,7 +23466,7 @@ begin
 end;
 
 procedure FinalizeFLRE;
-var i:longint;
+//var i:TFLREInt32;
 begin
  if FLREInitialized then begin
   FreeAndNil(NativeCodeMemoryManager);
